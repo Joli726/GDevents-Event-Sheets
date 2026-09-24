@@ -87,7 +87,7 @@ var preset: int = 1
 ## @en Handbrake braking, pixels per second per second.
 @export_range(0.0, 10000.0, 10.0) var handbrake_force: float = 300.0
 ## С какой скорости скольжения вбок считать, что машину заносит.
-## @en From what sideways sliding speed the car counts as drifting.
+## @en Drift threshold — from what sideways sliding speed the car counts as drifting.
 @export_range(0.0, 1000.0, 5.0) var drift_threshold: float = 70.0
 
 ## @group.en Controls

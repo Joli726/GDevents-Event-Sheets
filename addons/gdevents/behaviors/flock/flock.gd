@@ -79,7 +79,7 @@ const GROUP := "__gde_flock"
 ## @en Rotate the object toward its course.
 @export var rotate_object: bool = true
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = false
 
 var _vel: Vector2 = Vector2.ZERO

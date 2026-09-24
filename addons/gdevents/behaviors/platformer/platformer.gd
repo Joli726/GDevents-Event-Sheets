@@ -20,6 +20,12 @@ signal jumped(jump_index: int)
 signal landed
 ## Оттолкнулся от стены.
 signal wall_jumped
+## Схватился за лестницу.
+signal climb_started
+## Слез с лестницы.
+signal climb_ended
+## Спрыгнул вниз сквозь одностороннюю платформу.
+signal dropped_down
 
 const PRESETS: Array[Dictionary] = [
 	{},
@@ -149,10 +155,25 @@ var preset: int = 1
 ## @en Input lock after a wall jump, seconds.
 @export_range(0.0, 0.5, 0.01) var wall_jump_lock: float = 0.12
 
+## @group.en Ladders and platforms
+@export_group("Лестницы и платформы")
+## Лазать по лестницам — зонам с поведением «Лестница»: вверх и вниз стрелками, прыжок — соскочить.
+## @en Climb ladders — zones with the "Ladder" behavior: up and down with the arrow keys, jump to get off.
+@export var climb_ladders: bool = true
+## Скорость лазанья, пикселей в секунду.
+## @en Climbing speed, pixels per second.
+@export_range(0.0, 2000.0, 5.0) var climb_speed: float = 120.0
+## Скорость вбок на лестнице, доля от бега. 0 — только вверх и вниз.
+## @en Sideways speed on a ladder, share of running. 0 — only up and down.
+@export_range(0.0, 1.0, 0.05) var ladder_side_speed: float = 0.4
+## Спрыгивание вниз — сквозь односторонние платформы: «вниз» и прыжок.
+## @en Drop down through one-way platforms: "down" and jump.
+@export var drop_through: bool = true
+
 ## @group.en Look
 @export_group("Вид")
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = true
 ## Автоматические анимации по состоянию. Имена ниже должны совпадать с AnimatedSprite2D.
 ## @en Automatic animations by state. The names below must match the AnimatedSprite2D.
@@ -175,6 +196,9 @@ var preset: int = 1
 ## Анимация скольжения по стене. Пусто — анимация падения.
 ## @en Wall slide animation. Empty — the fall animation.
 @export var wall_slide_animation: String = ""
+## Анимация лазанья по лестнице. Пусто — анимация покоя.
+## @en Ladder climbing animation. Empty — the idle animation.
+@export var climb_animation: String = ""
 
 ## @group.en Controls
 @export_group("Управление")
@@ -192,6 +216,14 @@ var _wall_sliding: bool = false
 var _was_on_floor: bool = false
 var _jump_frame: int = -10
 var _land_frame: int = -10
+var _climb_dir: float = 0.0
+var _climbing: bool = false
+var _ladder: Node = null
+var _leave_ladder: bool = false
+var _drop_wanted: bool = false
+var _drop_frame: int = -10
+## Тела односторонних платформ, сквозь которые сейчас спрыгиваем -> сколько ещё секунд.
+var _dropping: Dictionary = {}
 
 
 func _physics_process(delta: float) -> void:
@@ -200,16 +232,37 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var dir := _dir
+	var vert := _climb_dir
 	if default_controls:
 		dir += Input.get_axis("ui_left", "ui_right")
+		vert += Input.get_axis("ui_up", "ui_down")
 		if Input.is_action_just_pressed("ui_accept"):
-			_jump_buffer = jump_buffer_time
+			if drop_through and Input.is_action_pressed("ui_down"):
+				_drop_wanted = true
+			else:
+				_jump_buffer = jump_buffer_time
 		if Input.is_action_just_released("ui_accept"):
 			_jump_released = true
 	dir = clampf(dir, -1.0, 1.0)
+	vert = clampf(vert, -1.0, 1.0)
 	_dir = 0.0
+	_climb_dir = 0.0
+	_forget_drops(body, delta)
 
 	var on_ground := body.is_on_floor()
+	if _drop_wanted:
+		_drop_wanted = false
+		var ow := _one_way_floor(body)
+		if on_ground and ow != null:
+			_drop(body, ow)
+			on_ground = false
+		else:
+			# Под ногами не односторонняя платформа — это обычный прыжок.
+			_jump_buffer = jump_buffer_time
+
+	if climb_ladders and _update_climbing(body, on_ground, vert):
+		_climb(body, dir, vert, delta)
+		return
 	_wall_lock = maxf(0.0, _wall_lock - delta)
 	_jump_buffer = maxf(0.0, _jump_buffer - delta)
 
@@ -259,6 +312,121 @@ func _physics_process(delta: float) -> void:
 	_update_look(body, on_ground)
 
 
+# ---------------------------------------------------------- лестницы ---
+
+## Решить, лезем ли. true — этот кадр персонаж на лестнице.
+func _update_climbing(body: CharacterBody2D, on_ground: bool, vert: float) -> bool:
+	var ladder := _ladder_at(body)
+	if _climbing and (ladder == null or _leave_ladder):
+		_set_climbing(body, false, null)
+	elif _climbing and ladder != _ladder:
+		# Перелез на соседнюю лестницу.
+		if is_instance_valid(_ladder):
+			_ladder.call("_climber", body, false)
+		_ladder = ladder
+		_ladder.call("_climber", body, true)
+	elif not _climbing and ladder != null and absf(vert) > 0.5:
+		# Стоя на полу, вниз не полезешь — разве что сквозь одностороннюю платформу.
+		if not (on_ground and vert > 0.0 and _one_way_floor(body) == null):
+			_set_climbing(body, true, ladder)
+	_leave_ladder = false
+	return _climbing
+
+
+func _ladder_at(body: CharacterBody2D) -> Node:
+	for n: Node in get_tree().get_nodes_in_group("__gde_ladder"):
+		if n.call("contains", body.global_position):
+			return n
+	return null
+
+
+func _set_climbing(body: CharacterBody2D, on: bool, ladder: Node) -> void:
+	if on == _climbing:
+		return
+	_climbing = on
+	if is_instance_valid(_ladder):
+		_ladder.call("_climber", body, false)
+	_ladder = ladder
+	if on:
+		_ladder.call("_climber", body, true)
+		body.velocity = Vector2.ZERO
+		_jumps_used = 0
+		climb_started.emit()
+	else:
+		climb_ended.emit()
+
+
+func _climb(body: CharacterBody2D, dir: float, vert: float, delta: float) -> void:
+	var own: float = float(_ladder.get("climb_speed"))
+	var sp := own if own > 0.0 else climb_speed
+	body.velocity.y = vert * sp
+	body.velocity.x = dir * max_speed * ladder_side_speed
+	if bool(_ladder.get("snap_to_center")) and is_zero_approx(dir):
+		var cx := (_ladder.call("zone") as Rect2).get_center().x
+		body.velocity.x = clampf((cx - body.global_position.x) / maxf(delta, 0.0001), -sp, sp)
+	if body.is_on_floor() and vert > 0.0:
+		var ow := _one_way_floor(body)
+		if ow != null:
+			_drop(body, ow)
+		else:
+			# Долез до пола — стоим.
+			_set_climbing(body, false, null)
+	# С лестницы спрыгивают, как с земли.
+	_coyote = maxf(coyote_time, delta * 2.0)
+	_jumps_used = 0
+	var before := _jump_frame
+	_try_jump(body)
+	if _jump_frame != before:
+		_set_climbing(body, false, null)
+	body.move_and_slide()
+	_was_on_floor = body.is_on_floor()
+	if animate and _climbing:
+		Gde.auto_animation(body, climb_animation if not climb_animation.is_empty() else idle_animation)
+	elif not _climbing:
+		_update_look(body, body.is_on_floor())
+
+
+# ------------------------------------------- односторонние платформы ---
+
+## Односторонняя платформа под ногами: её тело или слой тайлов, иначе null.
+func _one_way_floor(body: CharacterBody2D) -> Object:
+	for i in body.get_slide_collision_count():
+		var c := body.get_slide_collision(i)
+		if c.get_normal().dot(body.up_direction) < 0.7:
+			continue
+		var sh: Object = c.get_collider_shape()
+		if (sh is CollisionShape2D and (sh as CollisionShape2D).one_way_collision) \
+				or (sh is CollisionPolygon2D and (sh as CollisionPolygon2D).one_way_collision):
+			return c.get_collider()
+		var col: Object = c.get_collider()
+		if col != null and col.is_class("TileMapLayer"):
+			# У тайлов односторонность своя у каждого — пробуем: сплошной
+			# тайл просто вытолкнет персонажа обратно наверх.
+			return col
+	return null
+
+
+func _drop(body: CharacterBody2D, platform: Object) -> void:
+	if platform is PhysicsBody2D:
+		body.add_collision_exception_with(platform as PhysicsBody2D)
+		_dropping[platform] = 0.3
+	else:
+		body.global_position += -body.up_direction * 3.0
+	body.velocity.y = maxf(body.velocity.y, 60.0)
+	_coyote = 0.0
+	_drop_frame = Engine.get_physics_frames()
+	dropped_down.emit()
+
+
+func _forget_drops(body: CharacterBody2D, delta: float) -> void:
+	for p: Variant in _dropping.keys():
+		_dropping[p] = float(_dropping[p]) - delta
+		if float(_dropping[p]) <= 0.0:
+			if is_instance_valid(p):
+				body.remove_collision_exception_with(p as PhysicsBody2D)
+			_dropping.erase(p)
+
+
 func _try_jump(body: CharacterBody2D) -> void:
 	if _jump_buffer <= 0.0:
 		return
@@ -270,7 +438,9 @@ func _try_jump(body: CharacterBody2D) -> void:
 		_wall_lock = wall_jump_lock
 		wall_jumped.emit()
 		done = true
-	elif _coyote > 0.0 and _jumps_used == 0:
+	# С пола прыгают всегда; койот-тайм лишь продлевает это за край.
+	# Раньше при койот-тайме 0 с пола было не прыгнуть вовсе.
+	elif (_coyote > 0.0 or body.is_on_floor()) and _jumps_used == 0:
 		_jumps_used = 1
 		body.velocity.y = -jump_force
 		jumped.emit(1)
@@ -323,6 +493,32 @@ func simulate_right() -> void:
 ## @action.en Jump: _PARAM0_
 func simulate_jump() -> void:
 	_jump_buffer = maxf(jump_buffer_time, 0.02)
+
+
+## @action Лезть вверх по лестнице: _PARAM0_
+## @action.en Climb up the ladder: _PARAM0_
+func simulate_up() -> void:
+	_climb_dir -= 1.0
+
+
+## @action Лезть вниз по лестнице: _PARAM0_
+## @action.en Climb down the ladder: _PARAM0_
+func simulate_down() -> void:
+	_climb_dir += 1.0
+
+
+## @action Слезть с лестницы: _PARAM0_
+## @action.en Get off the ladder: _PARAM0_
+func leave_ladder() -> void:
+	_leave_ladder = true
+
+
+## Сквозь одностороннюю платформу под ногами. На обычном полу — просто прыжок.
+## @en Through the one-way platform underfoot. On a normal floor — just a jump.
+## @action Спрыгнуть вниз: _PARAM0_
+## @action.en Drop down: _PARAM0_
+func simulate_drop() -> void:
+	_drop_wanted = true
 
 
 ## @action Оборвать прыжок _PARAM0_ (как отпускание кнопки)
@@ -394,6 +590,25 @@ func just_jumped() -> bool:
 ## @condition.en _PARAM0_ has just landed
 func just_landed() -> bool:
 	return Engine.get_physics_frames() - _land_frame <= RECENT_FRAMES
+
+
+## @condition _PARAM0_ лезет по лестнице
+## @condition.en _PARAM0_ is climbing a ladder
+func is_climbing() -> bool:
+	return _climbing
+
+
+## @condition _PARAM0_ у лестницы — может за неё схватиться
+## @condition.en _PARAM0_ is at a ladder — can grab it
+func at_ladder() -> bool:
+	var body := object as CharacterBody2D
+	return body != null and _ladder_at(body) != null
+
+
+## @condition _PARAM0_ только что спрыгнул вниз сквозь платформу
+## @condition.en _PARAM0_ has just dropped down through a platform
+func just_dropped() -> bool:
+	return Engine.get_physics_frames() - _drop_frame <= RECENT_FRAMES
 
 
 ## @condition _PARAM0_ может прыгнуть прямо сейчас

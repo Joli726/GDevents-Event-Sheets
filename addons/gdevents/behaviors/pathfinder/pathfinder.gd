@@ -26,8 +26,8 @@ signal arrived
 ## Дистанция остановки — на каком расстоянии от цели остановиться.
 ## @en Stop distance — how far from the target to stop.
 @export_range(0.0, 500.0, 1.0) var stop_distance: float = 8.0
-## Как часто пересчитывать путь к движущейся цели, секунд.
-## @en How often to recompute the path to a moving target, seconds.
+## Пересчёт пути — как часто искать путь к движущейся цели заново, секунд.
+## @en Repath interval — how often to look for a new path to a moving target, seconds.
 @export_range(0.05, 10.0, 0.05) var repath_interval: float = 0.5
 ## Движение к цели включено.
 ## @en Moving to the target is on.
@@ -42,7 +42,7 @@ signal arrived
 ## @en Turn toward the movement direction.
 @export var rotate_object: bool = false
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = false
 
 ## @group.en Grid
@@ -54,7 +54,7 @@ signal arrived
 ## @en Object radius — how far to keep from walls. 0 — half a cell.
 @export_range(0.0, 256.0, 1.0) var agent_radius: float = 0.0
 ## Запас поиска вокруг объекта и цели, в клетках — насколько далеко можно уйти в обход.
-## @en Search margin around the object and the target, in cells — how far a detour may go.
+## @en Search margin, in cells — how far a detour around the object and the target may go.
 @export_range(1, 200, 1) var search_margin: int = 12
 ## Ходить по диагонали.
 ## @en Walk diagonally.

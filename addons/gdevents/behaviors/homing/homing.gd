@@ -54,7 +54,7 @@ signal expired
 ## @en Lifetime, seconds: then the projectile disappears. 0 — forever.
 @export_range(0.0, 60.0, 0.1) var lifetime: float = 5.0
 ## Поворачивать объект по направлению полёта.
-## @en Rotate the object toward the flight direction.
+## @en Rotate the object — toward the flight direction.
 @export var rotate_object: bool = true
 ## Наведение включено.
 ## @en Homing is on.

@@ -538,7 +538,21 @@ func _test_labels() -> void:
 					raw_names.append("%s.%s" % [bname, id])
 	_eq(untitled.size(), 0, "у каждого поведения есть русское название")
 	_eq(undocumented.size(), 0, "у каждой инструкции поведений есть описание")
-	_eq(raw_names.size(), 0, "нигде не протекло имя свойства из кода")
+	_eq(raw_names.size(), 0, "нигде не протекло имя свойства из кода%s"
+			% ("" if raw_names.is_empty() else ": " + ", ".join(raw_names)))
+	# По-английски фразы длиннее, и короткое название из первой мысли
+	# описания не получалось — в списке стояло «flip_sprite».
+	GdeI18n.set_language("en", false)
+	var reg_en := GdeRegistry.load_default()
+	var raw_en: Array[String] = []
+	for bname2: String in reg_en.behaviors:
+		var t2: Dictionary = (reg_en.behaviors[bname2] as Dictionary)["actions"]
+		for id2: String in t2:
+			if str((t2[id2] as Dictionary).get("sentence", "")).contains("“%s”" % id2.trim_prefix("set_")):
+				raw_en.append("%s.%s" % [bname2, id2])
+	GdeI18n.set_language("ru", false)
+	_eq(raw_en.size(), 0, "и по-английски имя свойства из кода не протекло%s"
+			% ("" if raw_en.is_empty() else ": " + ", ".join(raw_en)))
 
 
 ## Лист, прошедший через редактор, должен остаться байт-в-байт тем же,

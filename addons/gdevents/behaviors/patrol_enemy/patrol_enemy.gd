@@ -75,7 +75,7 @@ enum State { PATROL, TURN_PAUSE, CHASE, SEARCH, RETURN }
 ## @en Chase speed, pixels per second.
 @export_range(0.0, 2000.0, 5.0) var chase_speed: float = 130.0
 ## Сколько секунд искать цель, пропавшую из виду, прежде чем сдаться.
-## @en How many seconds to search for a target out of sight before giving up.
+## @en Search time — how many seconds to look for a target out of sight before giving up.
 @export_range(0.0, 30.0, 0.1) var lose_time: float = 1.5
 ## Не прыгать с края в погоне — остановиться и ждать.
 ## @en Do not jump off an edge while chasing — stop and wait.
@@ -96,7 +96,7 @@ enum State { PATROL, TURN_PAUSE, CHASE, SEARCH, RETURN }
 ## @group.en Look
 @export_group("Вид")
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = true
 ## Автоматические анимации по состоянию. Имена ниже должны совпадать с AnimatedSprite2D.
 ## @en Automatic animations by state. The names below must match the AnimatedSprite2D.

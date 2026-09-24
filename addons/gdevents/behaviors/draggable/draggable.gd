@@ -57,7 +57,7 @@ signal dropped
 ## @group.en Look
 @export_group("Вид")
 ## Подъём поверх остальных, пока объект тащат.
-## @en Lift above the others while the object is dragged.
+## @en Lift above others — while the object is dragged.
 @export var lift_while_dragging: bool = true
 ## Размер во время перетаскивания. 1.1 — чуть крупнее обычного.
 ## @en Size while dragging. 1.1 — a little bigger than usual.

@@ -37,8 +37,8 @@ signal center_lost
 ## Начальный угол, градусов: 0 — справа от центра, 90 — снизу.
 ## @en Start angle, degrees: 0 — to the right of the center, 90 — below.
 @export_range(-360.0, 360.0, 1.0) var start_angle: float = 0.0
-## Встать поровну по кругу с другими объектами на той же орбите.
-## @en Spread evenly around the circle with other objects on the same orbit.
+## Встать поровну — по кругу с другими объектами на той же орбите.
+## @en Spread evenly — around the circle with other objects on the same orbit.
 @export var spread_evenly: bool = true
 
 ## @group.en Wobble

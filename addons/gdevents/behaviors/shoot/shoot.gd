@@ -81,7 +81,7 @@ var preset: int = 1
 ## @en Projectile lifetime, seconds.
 @export_range(0.0, 30.0, 0.1) var bullet_lifetime: float = 3.0
 ## Выдавать снаряду движение, если у него нет поведения «Прямолинейное движение».
-## @en Give the projectile movement if it has no “Linear movement” behavior.
+## @en Auto movement — give the projectile movement if it has no “Linear movement” behavior.
 @export var auto_move: bool = true
 ## Прибавлять снаряду скорость стрелка.
 ## @en Add the shooter's velocity to the projectile.
@@ -130,7 +130,7 @@ var preset: int = 1
 ## @en Reload time, seconds.
 @export_range(0.0, 10.0, 0.1) var reload_time: float = 1.2
 ## Перезарядка автоматически, как только магазин опустел.
-## @en Reload automatically as soon as the magazine is empty.
+## @en Auto reload — as soon as the magazine is empty.
 @export var auto_reload: bool = true
 
 ## @group.en Recoil

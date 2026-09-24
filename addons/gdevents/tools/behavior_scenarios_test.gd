@@ -17,6 +17,9 @@ const SHOOT := preload("res://addons/gdevents/behaviors/shoot/shoot.gd")
 const FLOCK := preload("res://addons/gdevents/behaviors/flock/flock.gd")
 const CAR := preload("res://addons/gdevents/behaviors/car/car.gd")
 const GRID := preload("res://addons/gdevents/behaviors/grid_step/grid_step.gd")
+const PLATFORMER := preload("res://addons/gdevents/behaviors/platformer/platformer.gd")
+const PLATFORM := preload("res://addons/gdevents/behaviors/platform/platform.gd")
+const LADDER := preload("res://addons/gdevents/behaviors/ladder/ladder.gd")
 
 var _fails: int = 0
 var _checks: int = 0
@@ -38,6 +41,8 @@ func _ready() -> void:
 	await _flock()
 	await _car()
 	await _grid_step()
+	await _platforms()
+	await _ladder()
 	_report()
 
 
@@ -408,6 +413,155 @@ func _grid_step() -> void:
 	await _frames(10)
 	_eq(hb.call("cell_y"), 374.0, "сетка: шагнул вверх")
 	_eq(hb.call("steps_taken"), 2.0, "сетка: шагов сделано два")
+	w.queue_free()
+	await _frames(2)
+
+
+## Персонаж платформера без клавиатуры: управляем действиями.
+func _hero(w: Node, at: Vector2, props: Dictionary = {}) -> Array:
+	var h := _character(w, at, Vector2(20, 40))
+	var p := {"default_controls": false, "coyote_time": 0.0}
+	p.merge(props, true)
+	return [h, _beh(h, PLATFORMER, p)]
+
+
+func _platform(w: Node, at: Vector2, size: Vector2, props: Dictionary) -> Array:
+	var body := AnimatableBody2D.new()
+	body.position = at
+	body.add_child(_rect(size))
+	w.add_child(body)
+	return [body, _beh(body, PLATFORM, props)]
+
+
+func _platforms() -> void:
+	print("— Платформа")
+	var w := _world()
+	w.position = Vector2(0, 14000)
+	_static(w, Vector2(0, 200), Vector2(6000, 20))      # пол, верх на 190
+	# Односторонняя: запрыгнуть снизу, спрыгнуть вниз.
+	var ow: Array = _platform(w, Vector2(0, 100), Vector2(200, 10), {"one_way": true})
+	var hp: Array = _hero(w, Vector2(0, 160), {"jump_force": 600.0})
+	var hero: CharacterBody2D = hp[0]
+	await _frames(20)
+	(hp[1] as Node).call("simulate_jump")
+	await _frames(60)
+	_ok(hero.is_on_floor() and hero.position.y < 95.0, "односторонняя: запрыгнул снизу сквозь неё и стоит сверху (y = %.0f)" % hero.position.y)
+	var rider: Array[Node] = []
+	(ow[1] as Node).connect("stood_on", func(b: Node) -> void: rider.append(b))
+	await _frames(3)
+	_ok(bool((ow[1] as Node).call("has_rider")), "односторонняя: знает, что на ней стоят")
+	(hp[1] as Node).call("simulate_drop")
+	await _frames(40)
+	_ok(hero.is_on_floor() and hero.position.y > 150.0, "односторонняя: спрыгнул вниз сквозь неё (y = %.0f)" % hero.position.y)
+	_ok(bool((hp[1] as Node).call("just_dropped")) or hero.position.y > 150.0, "односторонняя: сигнал и условие спрыгивания")
+
+	# Движущаяся везёт стоящего.
+	var mv: Array = _platform(w, Vector2(1000, 100), Vector2(200, 10),
+			{"moving": true, "move_x": 300.0, "move_time": 1.0, "end_pause": 0.0, "ease_ends": false})
+	var hp2: Array = _hero(w, Vector2(1000, 70))
+	var h2: CharacterBody2D = hp2[0]
+	await _frames(10)
+	var p0 := (mv[0] as Node2D).position.x
+	var h0 := h2.position.x
+	await _frames(30)
+	var moved := (mv[0] as Node2D).position.x - p0
+	_ok(moved > 100.0, "движущаяся: едет (сдвинулась на %.0f px)" % moved)
+	_ok(absf((h2.position.x - h0) - moved) < 8.0 and h2.is_on_floor(),
+			"движущаяся: везёт стоящего (платформа %.0f, персонаж %.0f)" % [moved, h2.position.x - h0])
+
+	# Обычное StaticBody2D тоже везёт: платформа сообщает стоящему свою скорость.
+	var st := StaticBody2D.new()
+	st.position = Vector2(1500, 100)
+	st.add_child(_rect(Vector2(200, 10)))
+	w.add_child(st)
+	_beh(st, PLATFORM, {"moving": true, "move_x": 300.0, "move_time": 1.0, "end_pause": 0.0, "ease_ends": false})
+	var hp6: Array = _hero(w, Vector2(1500, 70))
+	var h6: CharacterBody2D = hp6[0]
+	await _frames(10)
+	var s0 := st.position.x
+	var h60 := h6.position.x
+	await _frames(30)
+	_ok(absf((h6.position.x - h60) - (st.position.x - s0)) < 8.0 and h6.is_on_floor(),
+			"движущаяся на StaticBody2D: тоже везёт (платформа %.0f, персонаж %.0f)" % [st.position.x - s0, h6.position.x - h60])
+
+	# Лента конвейера.
+	var belt: Array = _platform(w, Vector2(2000, 100), Vector2(400, 10), {"conveyor_speed": 120.0})
+	var hp3: Array = _hero(w, Vector2(2000, 70))
+	var h3: CharacterBody2D = hp3[0]
+	await _frames(10)
+	var x3 := h3.position.x
+	await _frames(30)
+	_ok(h3.position.x - x3 > 40.0, "лента: везёт стоящего вбок (%.0f px за полсекунды)" % (h3.position.x - x3))
+
+	# Рушится и возвращается.
+	var cr: Array = _platform(w, Vector2(3000, 100), Vector2(200, 10),
+			{"crumbles": true, "crumble_delay": 0.3, "respawn_time": 0.5})
+	var hp4: Array = _hero(w, Vector2(3000, 70))
+	var h4: CharacterBody2D = hp4[0]
+	await _frames(10)
+	_ok(bool((cr[1] as Node).call("is_crumbling")), "рушится: встал — задрожала")
+	await _frames(25)
+	_ok(bool((cr[1] as Node).call("is_broken")), "рушится: через 0.3 с рассыпалась")
+	await _frames(20)
+	_ok(h4.position.y > 150.0, "рушится: стоявший упал вниз")
+	await _frames(25)
+	_ok(not bool((cr[1] as Node).call("is_broken")) and (cr[0] as Node2D).visible, "рушится: вернулась через 0.5 с")
+
+	# Батут.
+	var tr: Array = _platform(w, Vector2(4000, 150), Vector2(200, 10), {"trampoline": true, "bounce_force": 800.0})
+	var hp5: Array = _hero(w, Vector2(4000, 0))
+	var h5: CharacterBody2D = hp5[0]
+	var bounced: Array[bool] = [false]
+	(tr[1] as Node).connect("bounced", func(_b: Node) -> void: bounced[0] = true)
+	var lowest := -INF
+	var rose := false
+	for i in 90:
+		await get_tree().physics_frame
+		lowest = maxf(lowest, h5.position.y)
+		if bounced[0] and h5.velocity.y < -300.0:
+			rose = true
+	_ok(bounced[0] and rose, "батут: приземлился — подбросило вверх")
+	w.queue_free()
+	await _frames(2)
+
+
+func _ladder() -> void:
+	print("— Лестница")
+	var w := _world()
+	w.position = Vector2(0, 16000)
+	_static(w, Vector2(0, 200), Vector2(2000, 20))      # пол, верх на 190
+	var zone := Area2D.new()
+	zone.position = Vector2(40, 90)
+	zone.add_child(_rect(Vector2(20, 200)))            # от -10 до 190
+	w.add_child(zone)
+	var lb := _beh(zone, LADDER, {})
+	var hp: Array = _hero(w, Vector2(30, 170))
+	var hero: CharacterBody2D = hp[0]
+	var pb: Node = hp[1]
+	await _frames(10)
+	var y0 := hero.position.y
+	for i in 30:
+		pb.call("simulate_up")
+		await get_tree().physics_frame
+	_ok(bool(pb.call("is_climbing")), "лестница: «вверх» у лестницы — полез")
+	_ok(hero.position.y < y0 - 40.0, "лестница: поднялся (на %.0f px)" % (y0 - hero.position.y))
+	_ok(absf(hero.position.x - 40.0) < 1.0, "лестница: встал по центру лестницы")
+	_ok(bool(lb.call("has_climber")), "лестница: знает, что по ней лезут")
+	var y1 := hero.position.y
+	await _frames(20)
+	_ok(absf(hero.position.y - y1) < 1.0, "лестница: отпустил — висит, а не падает")
+	for i in 20:
+		pb.call("simulate_down")
+		await get_tree().physics_frame
+	_ok(hero.position.y > y1 + 20.0, "лестница: полез вниз")
+	pb.call("simulate_jump")
+	await _frames(3)
+	_ok(not bool(pb.call("is_climbing")) and hero.velocity.y < 0.0, "лестница: прыжок — соскочил")
+	await _frames(60)
+	for i in 10:
+		pb.call("simulate_down")
+		await get_tree().physics_frame
+	_ok(not bool(pb.call("is_climbing")), "лестница: стоя на полу, «вниз» не цепляется за лестницу")
 	w.queue_free()
 	await _frames(2)
 
