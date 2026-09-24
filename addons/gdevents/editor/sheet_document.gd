@@ -205,6 +205,8 @@ func add_event(parent: Array, index: int, type: String = "standard") -> Array:
 			e["count"] = "1"
 			e["actions"] = []
 			e["children"] = []
+		"include":
+			e["sheet"] = ""
 		_:
 			e["conditions"] = []
 			e["actions"] = []

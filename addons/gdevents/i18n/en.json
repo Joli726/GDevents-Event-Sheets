@@ -974,5 +974,19 @@
 	"Локальные: %s": "Local: %s",
 	"Локальные переменные события: живут в нём и его подсобытиях, обнуляются при каждом запуске. Нажмите, чтобы изменить": "Event local variables: they live in the event and its sub-events and reset on every run. Click to edit",
 	"Локальная переменная события": "Event local variable",
-	"локальная переменная «%s»: имя — латинские буквы, цифры и _, не с цифры": "local variable «%s»: the name must be Latin letters, digits and _, not starting with a digit"
+	"локальная переменная «%s»: имя — латинские буквы, цифры и _, не с цифры": "local variable «%s»: the name must be Latin letters, digits and _, not starting with a digit",
+	"«Подключить лист»: не выбран лист": "«Include sheet»: no sheet chosen",
+	"«Подключить лист»: %s подключает сам себя по кругу (%s)": "«Include sheet»: %s includes itself in a loop (%s)",
+	"«Подключить лист»: слишком глубокая цепочка подключений": "«Include sheet»: the chain of includes is too deep",
+	"«Подключить лист»: листа %s нет": "«Include sheet»: there is no sheet %s",
+	"«Подключить лист»: в %s некорректный JSON": "«Include sheet»: invalid JSON in %s",
+	"«Подключить лист»: объект «%s» в %s — сцена %s, а в этом листе — %s": "«Include sheet»: object «%s» in %s is scene %s, but in this sheet it is %s",
+	"# ┌─ Подключён лист %s": "# ┌─ Included sheet %s",
+	"в подключённом листе: %s": "in the included sheet: %s",
+	"Подключить лист": "Include sheet",
+	"События другого листа — управление игроком, пауза, счёт — собираются здесь, как будто их скопировали. Правка общего листа доходит до всех, кто его подключил": "Events of another sheet — player controls, pause, score — are built here as if copied. A change to the shared sheet reaches every sheet that includes it",
+	"листа %s нет": "there is no sheet %s",
+	"— выберите лист —": "— choose a sheet —",
+	"%s (нет такого листа)": "%s (no such sheet)",
+	"Открыть подключённый лист": "Open the included sheet"
 }

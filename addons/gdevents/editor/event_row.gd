@@ -111,6 +111,10 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 	header.add_child(pad)
 	header.add_child(_row_tools(e))
 
+	# У подключения нет своих условий и действий — только выбор листа.
+	if _type == "include":
+		return card
+
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", COL_SEPARATION)
 	content.add_child(cols)
@@ -200,6 +204,34 @@ func _fill_type_header(row: HBoxContainer, e: Dictionary) -> void:
 			row.add_child(ne)
 		"while":
 			row.add_child(_caption(GdeI18n.t("Пока выполняется")))
+		"include":
+			var cap := _caption(GdeI18n.t("Подключить лист"))
+			row.add_child(cap)
+			var ob := OptionButton.new()
+			var cur := str(e.get("sheet", ""))
+			var sheets: Array[String] = panel.includable_sheets()
+			var sel := -1
+			for i in range(sheets.size()):
+				ob.add_item(sheets[i].replace("res://", ""), i)
+				ob.set_item_metadata(i, sheets[i])
+				if sheets[i] == cur:
+					sel = i
+			if sel < 0:
+				ob.add_item(GdeI18n.t("— выберите лист —") if cur.is_empty() else GdeI18n.t("%s (нет такого листа)") % cur, ob.item_count)
+				ob.set_item_metadata(ob.item_count - 1, cur)
+				sel = ob.item_count - 1
+			ob.selected = sel
+			ob.item_selected.connect(func(i: int):
+				panel.set_event_field(path, "sheet", str(ob.get_item_metadata(i))))
+			row.add_child(ob)
+			if not cur.is_empty():
+				var go := Button.new()
+				go.flat = true
+				go.focus_mode = Control.FOCUS_NONE
+				go.icon = GdeIcons.get_icon("edit")
+				go.tooltip_text = GdeI18n.t("Открыть подключённый лист")
+				go.pressed.connect(func(): panel.go_to_sheet(cur))
+				row.add_child(go)
 
 
 func _build_column(e: Dictionary, kind: String, add_label: String,

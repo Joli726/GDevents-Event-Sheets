@@ -30,6 +30,9 @@ var _error_items: Array = []
 ## [{"var": имя словаря в коде, "re": RegEx обращений к ним}].
 var _scopes: Array = []
 var _lv_n: int = 0
+## Длина пути события «Подключить лист», внутри которого идёт генерация.
+## Ошибки подключённых событий показываются на нём: в этом листе их строк нет.
+var _include_at: int = -1
 
 
 static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
@@ -39,6 +42,8 @@ static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -
 
 
 func _run(sheet: Dictionary, source_path: String) -> Dictionary:
+	if GdeInclude.has_includes(sheet.get("events", [])):
+		sheet = GdeInclude.expand(sheet, source_path)
 	var objects: Array = sheet.get("objects", [])
 	for o: Dictionary in objects:
 		_objects[str(o.get("name", ""))] = true
@@ -144,6 +149,8 @@ func _gen_event(e: Dictionary, indent: int, parent_ctx: String) -> void:
 			_gen_comment(e, indent)
 		"group":
 			_gen_group(e, indent, parent_ctx)
+		"include":
+			_gen_include(e, indent, parent_ctx)
 		"foreach":
 			_gen_foreach(e, indent, parent_ctx)
 		"repeat":
@@ -165,6 +172,24 @@ func _gen_group(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "# ┌─ %s" % str(e.get("name", GdeI18n.t("Группа"))))
 	_gen_events(e.get("children", []), indent, parent_ctx)
 	_line(indent, "# └─")
+
+
+func _gen_include(e: Dictionary, indent: int, parent_ctx: String) -> void:
+	if e.has("_error"):
+		_err(str(e["_error"]))
+		return
+	var outer := _include_at < 0
+	if outer:
+		_include_at = _path.size()
+	var sheet := str(e.get("sheet", ""))
+	_line(indent, "")
+	_line(indent, GdeI18n.t("# ┌─ Подключён лист %s") % sheet)
+	var saved := _path.duplicate()
+	_gen_events(e.get("_events", []), indent, parent_ctx)
+	_path = saved
+	_line(indent, "# └─")
+	if outer:
+		_include_at = -1
 
 
 func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -579,6 +604,14 @@ func _sentence(def: Variant, inst: Dictionary) -> String:
 
 
 func _err(text: String) -> void:
+	if _include_at >= 0:
+		# Ошибка внутри подключённого листа: строки её здесь нет — показать на
+		# событии подключения и сказать, где искать.
+		var at := _path.slice(0, _include_at)
+		var msg := GdeI18n.t("в подключённом листе: %s") % text
+		_errors.append(msg)
+		_error_items.append({"text": msg, "path": at, "inst": []})
+		return
 	_errors.append(text)
 	_error_items.append({"text": text, "path": _path.duplicate(), "inst": _inst.duplicate()})
 

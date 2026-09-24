@@ -143,6 +143,8 @@ func _build_ui() -> void:
 	am.add_icon_item(GdeIcons.get_icon("repeat"), GdeI18n.t("Повторить N раз"), 3)
 	am.add_icon_item(GdeIcons.get_icon("refresh"), GdeI18n.t("Пока выполняется"), 4)
 	am.add_icon_item(GdeIcons.get_icon("group"), GdeI18n.t("Группа"), 5)
+	am.add_icon_item(GdeIcons.get_icon("link"), GdeI18n.t("Подключить лист"), 6)
+	am.set_item_tooltip(am.item_count - 1, GdeI18n.t("События другого листа — управление игроком, пауза, счёт — собираются здесь, как будто их скопировали. Правка общего листа доходит до всех, кто его подключил"))
 	am.id_pressed.connect(_on_add_root_event)
 	bar.add_child(add_menu)
 
@@ -406,6 +408,25 @@ func _reload() -> void:
 	refresh_sheet_list()
 	if not keep.is_empty() and _sheet_paths.has(keep):
 		open_sheet(keep)
+
+
+## Листы, которые можно подключить к открытому: все, кроме него самого.
+func includable_sheets() -> Array[String]:
+	var out: Array[String] = []
+	for p: String in _sheet_paths:
+		if doc == null or p != doc.path:
+			out.append(p)
+	return out
+
+
+## Перейти к другому листу, сохранив правки этого — как при выборе в списке.
+func go_to_sheet(p: String) -> void:
+	var i := _sheet_paths.find(p)
+	if i < 0:
+		_set_status(GdeI18n.t("листа %s нет") % p, true)
+		return
+	_sheets.select(i)
+	_on_sheet_selected(i)
 
 
 func open_sheet(p: String) -> void:
@@ -1340,7 +1361,7 @@ func _on_event_menu(id: int) -> void:
 func _on_add_root_event(id: int) -> void:
 	if doc == null:
 		return
-	var types := ["standard", "comment", "foreach", "repeat", "while", "group"]
+	var types := ["standard", "comment", "foreach", "repeat", "while", "group", "include"]
 	if id < 0 or id >= types.size():
 		return
 	doc.add_event([], 9999, types[id])

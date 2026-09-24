@@ -53,6 +53,8 @@ func _ready() -> void:
 	_test_any_of()
 	print("—— локальные переменные ——")
 	_test_locals()
+	print("—— подключённые листы ——")
+	_test_include()
 	_finish()
 
 
@@ -551,6 +553,58 @@ func _test_locals() -> void:
 	var res := GdeGenerator.generate({"objects": [], "events": [bad]}, _reg, "res://t.gdes.json")
 	_ok(not (res["errors"] as Array).is_empty(), "локальная: плохое имя — ошибка сборки")
 	_free([r])
+
+
+# ------------------------------------------------------- подключённые листы ---
+
+func _write_sheet(path: String, sheet: Dictionary) -> void:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(sheet))
+	f.close()
+
+
+func _test_include() -> void:
+	var shared := "user://gde_test_shared.gdes.json"
+	_write_sheet(shared, {"format": 1, "objects": [{"name": "Gem", "scene": "res://addons/gdevents/tests/gem_virtual.tscn"}],
+		"variables": {"bonus": 7},
+		"events": [_event([], [_act("var.modify", ["ticks", "+", "Variable(bonus)"])])]})
+	var r := _runner({"ticks": 0, "after": 0}, [
+		{"type": "include", "sheet": shared},
+		_event([], [_act("var.modify", ["after", "=", "Variable(ticks)"])]),
+	])
+	_tick(r, 2)
+	_eq(Gde.var_get("ticks"), 14.0, "подключённый лист: его события выполняются каждый кадр")
+	_eq(Gde.var_get("after"), 14.0, "подключённый лист: на своём месте, до следующих событий")
+	_free([r])
+
+	var host := {"objects": [], "events": [{"type": "include", "sheet": shared}]}
+	var g := GdeGenerator.generate(host, _reg, "res://host.gdes.json")
+	_ok((g["errors"] as Array).is_empty() and str(g["code"]).contains("\"Gem\""), "подключённый лист: его объекты добавлены к листу")
+
+	var a := "user://gde_test_a.gdes.json"
+	var b := "user://gde_test_b.gdes.json"
+	_write_sheet(a, {"format": 1, "events": [{"type": "include", "sheet": b}]})
+	_write_sheet(b, {"format": 1, "events": [{"type": "include", "sheet": a}]})
+	g = GdeGenerator.generate({"events": [{"type": "include", "sheet": a}]}, _reg, "res://host.gdes.json")
+	_ok(str(g["errors"]).contains("по кругу"), "подключение по кругу — ошибка, а не зависание")
+
+	g = GdeGenerator.generate({"events": [_event([], []), {"type": "include", "sheet": "user://нет.gdes.json"}]}, _reg, "res://host.gdes.json")
+	var items: Array = g["error_items"]
+	_ok(items.size() == 1 and str(items[0]["path"]) == str([1]), "нет листа — ошибка на событии подключения")
+
+	var broken := "user://gde_test_broken.gdes.json"
+	_write_sheet(broken, {"format": 1, "events": [_event([], [_act("нет.такого", [])])]})
+	g = GdeGenerator.generate({"events": [{"type": "include", "sheet": broken}]}, _reg, "res://host.gdes.json")
+	items = g["error_items"]
+	_ok(items.size() == 1 and str(items[0]["path"]) == str([0]) and str(items[0]["text"]).contains("нет.такого"),
+			"ошибка внутри подключённого листа видна на событии подключения")
+
+	_write_sheet(broken, {"format": 1, "objects": [{"name": "Coin", "scene": "res://другая.tscn"}], "events": []})
+	g = GdeGenerator.generate({"objects": [{"name": "Coin", "scene": "res://coin.tscn"}],
+			"events": [{"type": "include", "sheet": broken}]}, _reg, "res://host.gdes.json")
+	_ok(str(g["errors"]).contains("Coin"), "один объект с разными сценами — ошибка")
+	for p: String in [shared, a, b, broken]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
 
 
 # ------------------------------------------------------------------ лист ---

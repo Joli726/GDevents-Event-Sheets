@@ -249,6 +249,7 @@ const EVENT_KEYS := {
 	"repeat": ["type", "disabled", "locals", "count", "actions", "children"],
 	"while": ["type", "disabled", "any", "locals", "conditions", "actions", "children"],
 	"group": ["type", "disabled", "name", "children"],
+	"include": ["type", "disabled", "sheet"],
 	"comment": ["type", "disabled", "text"],
 }
 const COND_KEYS := ["id", "params", "inverted", "disabled"]

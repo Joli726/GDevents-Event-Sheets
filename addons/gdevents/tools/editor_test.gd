@@ -195,6 +195,15 @@ func _test_panel() -> void:
 	_panel.doc.undo()
 	_panel.doc.undo()
 
+	# Подключение листа: карточка с выбором листа, без колонок условий.
+	var before := _count_items(_panel)
+	_panel.doc.add_event([], 9999, "include")
+	var last: int = (_panel.doc.data["events"] as Array).size() - 1
+	_ok(str((_panel.doc.event_at([last]) as Dictionary).get("sheet", "?")) == "", "«Подключить лист» создаётся пустым")
+	_ok(_find_label(_panel, GdeI18n.t("Подключить лист")), "на карточке подключения — подпись и выбор листа")
+	_ok(_count_items(_panel) == before, "у подключения нет своих строк условий и действий")
+	_panel.doc.undo()
+
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
 	_ok(GdeText.with_labels(def).contains("‹"), "фраза с подписями параметров")
