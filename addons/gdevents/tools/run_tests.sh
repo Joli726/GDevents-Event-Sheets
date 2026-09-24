@@ -54,6 +54,7 @@ run scenarios "$OK" --quit-after 60000 res://addons/gdevents/tools/behavior_scen
 run events    "$OK" --quit-after 20000 res://addons/gdevents/tools/events_test.tscn
 run check     "." --quit-after 5000 res://addons/gdevents/tools/check.tscn
 run bench     "$OK" res://addons/gdevents/tools/bench.tscn
+run reference "$OK" --script res://addons/gdevents/tools/make_reference.gd -- --check
 
 echo "== export"
 if GODOT=$GODOT bash addons/gdevents/tools/export_test.sh >"$LOG/export.log" 2>&1; then

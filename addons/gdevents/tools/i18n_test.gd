@@ -14,7 +14,7 @@ extends SceneTree
 const ROOT := "res://addons/gdevents/"
 ## Где живёт код, который показывает текст человеку.
 const DIRS := ["editor", "codegen", "expr", "registry", "runtime", "behaviors", "extensions"]
-const FILES := ["plugin.gd", "tools/check.gd", "tools/instruction_check.gd", "tools/library_list.gd"]
+const FILES := ["plugin.gd", "tools/check.gd", "tools/instruction_check.gd", "tools/library_list.gd", "tools/make_reference.gd"]
 
 var _fails: int = 0
 var _checks: int = 0

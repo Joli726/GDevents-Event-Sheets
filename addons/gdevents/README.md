@@ -356,14 +356,14 @@ timers are independent, lists, effects, key hold and double tap.
 The twelfth, `tools/export_test.sh`, exports a game to a `.pck` (no export
 templates needed), runs it without the editor and checks that the sheet was
 rebuilt before the export and that the translations went into the game.
+The thirteenth, `tools/debugger_test.sh`, runs a game with Godot's
+debugger attached (`tools/debugger_server.gd` stands in for the editor) and
+checks that fired events and live variables arrive.
 The fourteenth, `tools/bench.tscn`, is a load test: 500 enemies and 300
 bullets, all moving, bullets hitting enemies, "has just collided" and
 "touching from above", with shapes only and with Area2D; it prints the
 time of a sheet frame and fails above 33 ms (the old pair-by-pair check
 took 1700 ms here; now it is about 5–15 ms).
-The thirteenth, `tools/debugger_test.sh`, runs a game with Godot's
-debugger attached (`tools/debugger_server.gd` stands in for the editor) and
-checks that fired events and live variables arrive.
 
 There are also `tools/editor_shot.gd` and `tools/dialog_shot.tscn`: they put
 screenshots of the panel and the dialogs into `user://` — a quick way to see
