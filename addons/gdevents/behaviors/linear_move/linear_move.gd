@@ -52,7 +52,7 @@ signal bounced
 ## @group.en Screen edges
 @export_group("Края экрана")
 ## Отскок от краёв экрана вместо вылета за них.
-## @en Bounce off the screen edges instead of flying out.
+## @en Bounce off the screen edges — instead of flying out.
 @export var bounce_off_edges: bool = false
 ## Упругость — какая доля скорости остаётся после отскока.
 ## @en Bounciness — what share of the speed remains after a bounce.
@@ -61,7 +61,7 @@ signal bounced
 ## @group.en Look
 @export_group("Вид")
 ## Поворот объекта по направлению полёта.
-## @en Rotate the object toward the flight direction.
+## @en Rotate the object — toward the flight direction.
 @export var rotate_to_direction: bool = false
 
 var _age: float = 0.0

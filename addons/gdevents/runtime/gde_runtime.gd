@@ -131,6 +131,106 @@ func create_object(ctx: GdePickContext, obj: String, x: float, y: float, parent:
 	return n
 
 
+## Дублировать отобранные экземпляры вместе с переменными. В выборке
+## остаются копии — как после «Создать»: следующие действия трогают их.
+func duplicate_picked(ctx: GdePickContext, obj: String, dx: float, dy: float) -> void:
+	var copies: Array = []
+	for n: Node in ctx.pick(obj).duplicate():
+		if not is_instance_valid(n) or n.is_queued_for_deletion():
+			continue
+		var c := duplicate_object(n, dx, dy)
+		if c != null:
+			copies.append(c)
+	ctx.set_pick(obj, copies)
+
+
+func duplicate_object(n: Node, dx: float, dy: float) -> Node:
+	var parent := n.get_parent()
+	if parent == null:
+		return null
+	var c := n.duplicate()
+	_clean_meta(c)
+	# Переменные — свои, а не общие с оригиналом: иначе «−1 жизнь» у копии
+	# отнималась бы и у него.
+	if n.has_meta("__gde_vars"):
+		c.set_meta("__gde_vars", (n.get_meta("__gde_vars") as Dictionary).duplicate(true))
+	parent.add_child(c)
+	var from := main(n)
+	var to := main(c)
+	if from != null and to != null:
+		to.global_position = from.global_position + Vector2(dx, dy)
+	_try_tag(c)
+	return c
+
+
+## Служебные метаданные — кэши, указывающие на узлы оригинала, таймеры
+## и заказанные анимации — копии не нужны.
+func _clean_meta(n: Node) -> void:
+	for m: StringName in n.get_meta_list():
+		if String(m).begins_with("__gde_"):
+			n.remove_meta(m)
+	for ch: Node in n.get_children():
+		_clean_meta(ch)
+
+
+# ------------------------------------------------------------ прикрепление ---
+
+## Прикрепить экземпляр к ближайшему отобранному объекту: поднять предмет,
+## взять оружие в руку. Узел переносится внутрь того, что у объекта
+## двигается, и дальше едет вместе с ним. keep — остаться на своём месте,
+## иначе встать со сдвигом dx; dy от него.
+func attach(n: Node, ctx: GdePickContext, to_obj: String, dx: float, dy: float, keep: bool) -> void:
+	var n2 := n as Node2D
+	if n2 == null:
+		return
+	var best: Node = null
+	var best_d := INF
+	for b: Node in ctx.pick(to_obj):
+		if not is_instance_valid(b) or b == n or n.is_ancestor_of(b):
+			continue
+		var d := pos_of(b).distance_squared_to(pos_of(n))
+		if d < best_d:
+			best_d = d
+			best = b
+	var host := main(best) if best != null else null
+	if host == null or host == n or n.is_ancestor_of(host) or n.get_parent() == host:
+		return
+	var body := body_of(n)
+	if body is RigidBody2D and not n.has_meta("__gde_attach_freeze"):
+		# Прикреплённое тело не падает само по себе.
+		n.set_meta("__gde_attach_freeze", (body as RigidBody2D).freeze)
+		(body as RigidBody2D).freeze = true
+	n.reparent(host, true)
+	if not keep:
+		n2.position = Vector2(dx, dy)
+		n2.rotation = 0.0
+	n.set_meta("__gde_attached", true)
+
+
+func detach(n: Node) -> void:
+	if not is_instance_valid(n) or not n.has_meta("__gde_attached"):
+		return
+	var level := get_tree().current_scene
+	if level == null or level == n or n.is_ancestor_of(level):
+		level = get_tree().root
+	n.reparent(level, true)
+	n.remove_meta("__gde_attached")
+	var body := body_of(n)
+	if n.has_meta("__gde_attach_freeze"):
+		if body is RigidBody2D:
+			(body as RigidBody2D).freeze = bool(n.get_meta("__gde_attach_freeze"))
+		n.remove_meta("__gde_attach_freeze")
+
+
+func is_attached(n: Node) -> bool:
+	return is_instance_valid(n) and n.has_meta("__gde_attached")
+
+
+## Прикреплён ли a именно к b.
+func attached_to(a: Node, b: Node) -> bool:
+	return is_attached(a) and is_instance_valid(b) and b.is_ancestor_of(a)
+
+
 ## Удалить экземпляр. Из выборки убирается немедленно — queue_free()
 ## отложен до конца кадра, а GDevelop убирает объект сразу.
 func delete_object(n: Node) -> void:
@@ -259,6 +359,478 @@ func timer_advance(runner: Node, delta: float) -> void:
 	for k: Variant in e:
 		e[k] = float(e[k]) + delta
 	_every[id] = e
+	_advance_waits(runner, delta)
+
+
+# --------------------------------------------------------------- эффекты ---
+
+## Имена эффектов, по-английски и по-русски.
+const EFFECTS := {
+	"explosion": "explosion", "взрыв": "explosion",  # i18n: ключ — так пишут в листе
+	"sparks": "sparks", "искры": "sparks",  # i18n: ключ
+	"dust": "dust", "пыль": "dust",  # i18n: ключ
+	"smoke": "smoke", "дым": "smoke",  # i18n: ключ
+	"magic": "magic", "волшебство": "magic", "магия": "magic",  # i18n: ключ
+	"confetti": "confetti", "конфетти": "confetti",  # i18n: ключ
+}
+
+var _soft_dot: Texture2D = null
+var _square: Texture2D = null
+var _additive: CanvasItemMaterial = null
+
+
+## Мягкий круг — из него собраны все эффекты, картинки не нужны.
+func _dot() -> Texture2D:
+	if _soft_dot == null:
+		var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+		for x in 32:
+			for y in 32:
+				var d := Vector2(x - 15.5, y - 15.5).length() / 15.5
+				img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - d, 0.0, 1.0) ** 1.6))
+		_soft_dot = ImageTexture.create_from_image(img)
+	return _soft_dot
+
+
+func _sq() -> Texture2D:
+	if _square == null:
+		var img := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+		img.fill(Color.WHITE)
+		_square = ImageTexture.create_from_image(img)
+	return _square
+
+
+func _add_mat() -> CanvasItemMaterial:
+	if _additive == null:
+		_additive = CanvasItemMaterial.new()
+		_additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return _additive
+
+
+func _level() -> Node:
+	var scene := get_tree().current_scene
+	return scene if scene != null else get_tree().root
+
+
+## Готовый эффект в точке: взрыв, искры, пыль, дым, волшебство, конфетти.
+## size — во сколько раз крупнее обычного.
+func effect(name: String, x: float, y: float, size: float = 1.0) -> void:
+	var kind: String = EFFECTS.get(name.strip_edges().to_lower(), "")
+	if kind.is_empty():
+		_warn_once(self, "fx:" + name, GdeI18n.t("GDevents: неизвестный эффект «%s». Есть: %s")
+				% [name, "explosion, sparks, dust, smoke, magic, confetti"])
+		return
+	var at := Vector2(x, y)
+	var s := maxf(0.1, size)
+	match kind:
+		"explosion":
+			# Яркое ядро, огненные клочья и дым после.
+			_puff(at, Vector2.ZERO, Color(1.0, 0.95, 0.7), 0.0, 0.0, 0.16, 2.2 * s, 2.2, true)
+			for i in 22:
+				var c := Color(1.0, 0.85, 0.3).lerp(Color(1.0, 0.25, 0.05), randf())
+				_puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(80, 300) * s, c,
+						0.0, 3.5, randf_range(0.35, 0.65), randf_range(0.8, 2.0) * s, 0.2, true)
+			for i in 8:
+				_puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(20, 80) * s,
+						Color(0.55, 0.52, 0.5, 0.55), -40.0 * s, 1.5, randf_range(0.8, 1.2),
+						randf_range(1.2, 2.0) * s, 2.0, false)
+		"sparks":
+			for i in 16:
+				var v := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(180, 420) * s
+				var d := _puff(at, v, Color(1.0, 0.9, 0.5), 500.0 * s, 0.5, randf_range(0.25, 0.5), s, 0.5, true)
+				# Искра вытянута по ходу полёта.
+				d.scale = Vector2(0.9, 0.2) * s
+				d.rotation = v.angle()
+		"dust":
+			for i in 14:
+				var v := Vector2(randf_range(-110, 110), randf_range(-60, -10)) * s
+				_puff(at, v, Color(0.85, 0.8, 0.72, 0.7), 60.0 * s, 2.0, randf_range(0.5, 0.9),
+						randf_range(0.8, 1.4) * s, 1.8, false)
+		"smoke":
+			for i in 12:
+				var v := Vector2(randf_range(-30, 30), randf_range(-50, -15)) * s
+				_puff(at + Vector2(randf_range(-8, 8), 0) * s, v, Color(0.62, 0.62, 0.66, 0.6), -60.0 * s, 1.0,
+						randf_range(1.0, 1.7), randf_range(1.2, 2.0) * s, 2.5, false)
+		"magic":
+			for i in 22:
+				var c2 := [Color(0.4, 0.9, 1.0), Color(0.7, 0.45, 1.0), Color(1.0, 0.5, 0.85)][i % 3] as Color
+				var d2 := _puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(50, 150) * s, c2,
+						-30.0 * s, 1.0, randf_range(0.6, 1.0), randf_range(0.5, 0.9) * s, 0.0, true)
+				d2.spin = randf_range(-360, 360)
+		"confetti":
+			for i in 30:
+				var v := Vector2.UP.rotated(randf_range(-0.8, 0.8)) * randf_range(180, 340) * s
+				var d3 := _puff(at, v, Color.from_hsv(randf(), 0.75, 1.0), 400.0 * s, 1.0,
+						randf_range(1.2, 1.8), randf_range(1.6, 2.4) * s, 1.0, false, _sq())
+				d3.spin = randf_range(-720, 720)
+
+
+func _puff(at: Vector2, v: Vector2, c: Color, grav: float, drag: float, life: float, sc: float,
+		end_scale: float, add: bool, tex: Texture2D = null) -> GdeDebris:
+	var d := GdeDebris.new()
+	d.texture = tex if tex != null else _dot()
+	d.velocity = v
+	d.gravity = grav
+	d.drag = drag
+	d.lifetime = life
+	d.scale = Vector2.ONE * sc
+	d.end_scale = end_scale
+	d.modulate = c
+	d.z_index = 150
+	if add:
+		d.material = _add_mat()
+	_level().add_child(d)
+	d.global_position = at
+	return d
+
+
+## Всплывающий текст над объектом.
+func float_text(n: Node, text: String, color_name: String) -> void:
+	if not is_instance_valid(n):
+		return
+	var c := Color.from_string(color_name.strip_edges(), Color.WHITE) if not color_name.strip_edges().is_empty() else Color.WHITE
+	var f := GdeFloatText.make(text, c, 16)
+	_level().add_child(f)
+	var r := aabb(n)
+	f.global_position = Vector2(r.get_center().x, r.position.y - 4.0) if r.size != Vector2.ZERO else pos_of(n)
+
+
+## Стоп-кадр: игра замирает на мгновение — удар кажется тяжелее.
+var _hitstop_scale: float = -1.0
+var _hitstop_until: int = 0
+
+
+func hitstop(seconds: float) -> void:
+	var ms := int(clampf(seconds, 0.0, 2.0) * 1000.0)
+	if ms <= 0:
+		return
+	if _hitstop_scale < 0.0:
+		_hitstop_scale = Engine.time_scale
+	_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + ms)
+	Engine.time_scale = 0.0
+	# Таймер в настоящем времени: игровое сейчас стоит.
+	get_tree().create_timer(float(ms) / 1000.0, true, false, true).timeout.connect(_end_hitstop)
+
+
+func _end_hitstop() -> void:
+	if _hitstop_scale < 0.0 or Time.get_ticks_msec() < _hitstop_until - 5:
+		return
+	Engine.time_scale = _hitstop_scale
+	_hitstop_scale = -1.0
+
+
+func in_hitstop() -> bool:
+	return _hitstop_scale >= 0.0
+
+
+## Слой поверх всего — вспышка и затемнение.
+var _overlay: CanvasLayer = null
+var _flash: ColorRect = null
+var _fade: ColorRect = null
+var _fading: bool = false
+
+
+func _screen_rect(layer_index: int) -> ColorRect:
+	if _overlay == null:
+		_overlay = CanvasLayer.new()
+		_overlay.layer = 120
+		_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_overlay)
+	var r := ColorRect.new()
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.color = Color(0, 0, 0, 0)
+	r.z_index = layer_index
+	_overlay.add_child(r)
+	return r
+
+
+func _tween() -> Tween:
+	# Анимации экрана идут и на паузе, и в стоп-кадре.
+	var t := get_tree().create_tween()
+	t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	t.set_ignore_time_scale(true)
+	return t
+
+
+## Вспышка экрана: белая при взрыве, красная при уроне.
+func screen_flash(color_name: String, seconds: float, strength: float) -> void:
+	if _flash == null:
+		_flash = _screen_rect(0)
+	var c := Color.from_string(color_name.strip_edges(), Color.WHITE) if not color_name.strip_edges().is_empty() else Color.WHITE
+	c.a = clampf(strength, 0.0, 1.0)
+	_flash.color = c
+	var t := _tween()
+	t.tween_property(_flash, "color:a", 0.0, maxf(0.01, seconds)).set_ease(Tween.EASE_OUT)
+
+
+## Перейти на сцену через затемнение: экран темнеет, сцена меняется, светлеет.
+func change_scene_fade(path: String, seconds: float, color_name: String) -> void:
+	if _fading:
+		return
+	if _fade == null:
+		_fade = _screen_rect(1)
+	var c := Color.from_string(color_name.strip_edges(), Color.BLACK) if not color_name.strip_edges().is_empty() else Color.BLACK
+	c.a = 0.0
+	_fade.color = c
+	_fading = true
+	var half := maxf(0.01, seconds * 0.5)
+	var t := _tween()
+	t.tween_property(_fade, "color:a", 1.0, half)
+	t.tween_callback(func() -> void:
+		get_tree().paused = false
+		change_scene(path))
+	t.tween_interval(0.05)
+	t.tween_property(_fade, "color:a", 0.0, half)
+	t.tween_callback(func() -> void: _fading = false)
+
+
+func is_fading() -> bool:
+	return _fading
+
+
+# ---------------------------------------------------------------- списки ---
+
+## Список — переменная сцены, в которой лежит массив: инвентарь, очередь
+## волн, реплики. Элементы — числа или текст; сравниваются как текст,
+## поэтому 5 и «5» — одно и то же.
+func _list(path: String, create: bool) -> Array:
+	var v: Variant = var_get(path, null)
+	if v is Array:
+		return v
+	var a: Array = []
+	if create:
+		var_set(path, a)
+	return a
+
+
+func _as_text(v: Variant) -> String:
+	return num_str(float(v)) if (v is float or v is int) else str(v)
+
+
+func list_add(path: String, value: Variant) -> void:
+	_list(path, true).append(value)
+
+
+func list_remove_value(path: String, text: String) -> void:
+	var a := _list(path, false)
+	for i in a.size():
+		if _as_text(a[i]) == text:
+			a.remove_at(i)
+			return
+
+
+func list_remove_at(path: String, index: float) -> void:
+	var a := _list(path, false)
+	var i := int(index)
+	if i >= 0 and i < a.size():
+		a.remove_at(i)
+
+
+func list_clear(path: String) -> void:
+	_list(path, true).clear()
+
+
+func list_shuffle(path: String) -> void:
+	_list(path, false).shuffle()
+
+
+## Вынуть первый элемент в переменную сцены: очередь волн, реплик.
+func list_take_first(path: String, target: String) -> void:
+	var a := _list(path, false)
+	var_set(target, a.pop_front() if not a.is_empty() else "")
+
+
+func list_contains(path: String, text: String) -> bool:
+	for v: Variant in _list(path, false):
+		if _as_text(v) == text:
+			return true
+	return false
+
+
+func list_count(path: String) -> float:
+	return float(_list(path, false).size())
+
+
+func list_item(path: String, index: float) -> String:
+	var a := _list(path, false)
+	var i := int(index)
+	return _as_text(a[i]) if i >= 0 and i < a.size() else ""
+
+
+func list_number(path: String, index: float) -> float:
+	var a := _list(path, false)
+	var i := int(index)
+	if i < 0 or i >= a.size():
+		return 0.0
+	var v: Variant = a[i]
+	return float(v) if (v is float or v is int) else float(str(v)) if str(v).is_valid_float() else 0.0
+
+
+func list_random(path: String) -> String:
+	var a := _list(path, false)
+	return _as_text(a.pick_random()) if not a.is_empty() else ""
+
+
+func list_join(path: String, sep: String) -> String:
+	var parts := PackedStringArray()
+	for v: Variant in _list(path, false):
+		parts.append(_as_text(v))
+	return sep.join(parts)
+
+
+# ---------------------------------------------------- значения на экране ---
+
+## Надпись поверх игры вместо консоли: подпись -> {"text", "at": мс}.
+## Значение, которое перестали показывать, через полсекунды исчезает.
+var _watch: Dictionary = {}
+var _log: Array = []
+var _watch_label: Label = null
+const WATCH_TTL_MS := 500
+const LOG_TTL_MS := 6000
+const LOG_LINES := 8
+
+
+func show_value(label: String, value: String) -> void:
+	_watch[label] = {"text": value, "at": Time.get_ticks_msec()}
+	_ensure_watch_label()
+
+
+func screen_log(text: String) -> void:
+	_log.append({"text": text, "at": Time.get_ticks_msec()})
+	while _log.size() > LOG_LINES:
+		_log.pop_front()
+	_ensure_watch_label()
+
+
+func clear_screen_values() -> void:
+	_watch.clear()
+	_log.clear()
+
+
+func _ensure_watch_label() -> void:
+	if _watch_label != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 128
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	_watch_label = Label.new()
+	_watch_label.position = Vector2(8, 6)
+	_watch_label.add_theme_font_size_override("font_size", 14)
+	_watch_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.85))
+	_watch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_watch_label.add_theme_constant_override("outline_size", 4)
+	_watch_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_watch_label)
+
+
+func _update_watch() -> void:
+	if _watch_label == null:
+		return
+	var now := Time.get_ticks_msec()
+	var lines := PackedStringArray()
+	for k: Variant in _watch.keys():
+		var w: Dictionary = _watch[k]
+		if now - int(w["at"]) > WATCH_TTL_MS:
+			_watch.erase(k)
+		else:
+			lines.append("%s: %s" % [k, w["text"]] if not str(k).is_empty() else str(w["text"]))
+	var fresh: Array = []
+	for e: Dictionary in _log:
+		if now - int(e["at"]) <= LOG_TTL_MS:
+			fresh.append(e)
+	_log = fresh
+	if not _log.is_empty():
+		if not lines.is_empty():
+			lines.append("")
+		for e2: Dictionary in _log:
+			lines.append(str(e2["text"]))
+	_watch_label.text = "\n".join(lines)
+
+
+func screen_text() -> String:
+	_update_watch()
+	return _watch_label.text if _watch_label != null else ""
+
+
+# ------------------------------------------------------- таймеры объекта ---
+
+## Таймер экземпляра: у каждого врага свой, иначе десять врагов стреляли
+## хором. Хранится в метаданных объекта как время старта по часам Gde —
+## тикать каждый таймер каждого врага не нужно.
+func _otimer(n: Node, name: String) -> Dictionary:
+	var t: Dictionary = n.get_meta("__gde_timers", {})
+	if not t.has(name):
+		t[name] = {"start": _clock, "paused_at": -1.0}
+		n.set_meta("__gde_timers", t)
+	return t[name]
+
+
+func otimer(n: Node, name: String) -> float:
+	if not is_instance_valid(n):
+		return 0.0
+	var e := _otimer(n, name)
+	var until := float(e["paused_at"]) if float(e["paused_at"]) >= 0.0 else _clock
+	return until - float(e["start"])
+
+
+func otimer_reset(n: Node, name: String) -> void:
+	if not is_instance_valid(n):
+		return
+	var e := _otimer(n, name)
+	e["start"] = _clock
+	if float(e["paused_at"]) >= 0.0:
+		e["paused_at"] = _clock
+
+
+func otimer_pause(n: Node, name: String, paused: bool) -> void:
+	if not is_instance_valid(n):
+		return
+	var e := _otimer(n, name)
+	if paused and float(e["paused_at"]) < 0.0:
+		e["paused_at"] = _clock
+	elif not paused and float(e["paused_at"]) >= 0.0:
+		e["start"] = float(e["start"]) + _clock - float(e["paused_at"])
+		e["paused_at"] = -1.0
+
+
+# ------------------------------------------------------------ ожидание ---
+
+## Отложенные «Подождать N секунд»: {"runner": id раннера, "left", "fn"}.
+var _waits: Array = []
+
+
+func wait(runner: Node, seconds: float, fn: Callable) -> void:
+	_waits.append({"runner": runner.get_instance_id(), "left": maxf(0.0, seconds), "fn": fn})
+
+
+## Ожидания раннера идут вместе с его кадрами: на паузе стоят, а в начале
+## кадра, когда время вышло, выполняют отложенное — до событий листа.
+func _advance_waits(runner: Node, delta: float) -> void:
+	if _waits.is_empty():
+		return
+	var id := runner.get_instance_id()
+	var due: Array = []
+	for w: Dictionary in _waits:
+		if int(w["runner"]) == id:
+			w["left"] = float(w["left"]) - delta
+			if float(w["left"]) <= 0.0:
+				due.append(w)
+	for w: Dictionary in due:
+		_waits.erase(w)
+		var fn: Callable = w["fn"]
+		if fn.is_valid():
+			fn.call()
+
+
+## Сколько отложенного ждёт у раннера — для условия «идёт ожидание».
+func waits_pending(runner: Node) -> float:
+	var id := runner.get_instance_id()
+	var n := 0
+	for w: Dictionary in _waits:
+		if int(w["runner"]) == id:
+			n += 1
+	return float(n)
 
 
 func timer_value(runner: Node, name: String) -> float:
@@ -306,7 +878,12 @@ func begin_scene(initial: Dictionary) -> void:
 ## Состояние раннеров хранится по id экземпляра. Раннеры ушедшей сцены
 ## освобождены — их записи больше никому не нужны.
 func _forget_dead_runners() -> void:
-	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused]:
+	var alive: Array = []
+	for w: Dictionary in _waits:
+		if is_instance_id_valid(int(w["runner"])):
+			alive.append(w)
+	_waits = alive
+	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused, _touch]:
 		for id: Variant in store.keys():
 			if not is_instance_id_valid(int(id)):
 				store.erase(id)
@@ -514,6 +1091,8 @@ func _input(event: InputEvent) -> void:
 		_mouse_moved_acc = true
 		return
 	var k := event as InputEventKey
+	if k != null and not k.echo:
+		_track_key(k)
 	if k != null and k.pressed and not k.echo:
 		# Имя, а не код: в листе клавиша пишется словом, и сравнивать
 		# «последнюю нажатую» надо с тем же самым словом.
@@ -535,6 +1114,8 @@ func _process(delta: float) -> void:
 	_wheel_acc = 0.0
 	_mouse_prev = _mouse_now
 	_mouse_now = {}
+	_pad_prev = _pad_now
+	_pad_now = {}
 	for b in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
 		if Input.is_mouse_button_pressed(b):
 			_mouse_now[int(b)] = true
@@ -542,6 +1123,7 @@ func _process(delta: float) -> void:
 	_mouse_moved_acc = false
 	_clock += delta
 	_update_camera(delta)
+	_update_watch()
 
 
 func _keycode(name: String) -> int:
@@ -584,6 +1166,143 @@ func key_just_released(name: String) -> bool:
 	if down:
 		_keys_now[k] = true
 	return not down and _keys_prev.has(k)
+
+
+# ------------------------------------------- удержание и двойное нажатие ---
+
+## Клавиша -> когда её нажали (часы Gde). Ведётся по событиям ввода, а не
+## по опросу: удержание считается с настоящего нажатия, даже если условие
+## проверили не сразу.
+var _key_since: Dictionary = {}
+## Клавиша -> {"last": время нажатия, "prev": время прошлого, "frame": кадр}
+var _key_taps: Dictionary = {}
+## Клавиша -> {"held": сколько держали, "frame": кадр отпускания}
+var _key_released: Dictionary = {}
+
+
+func _track_key(k: InputEventKey) -> void:
+	var code := int(k.keycode if k.keycode != KEY_NONE else k.physical_keycode)
+	if k.pressed:
+		if _key_since.has(code):
+			return
+		_key_since[code] = _clock
+		var t: Dictionary = _key_taps.get(code, {"last": -1000.0, "prev": -1000.0, "frame": -1, "used": false})
+		# Третье нажатие подряд не делает второго «двойного».
+		t["prev"] = -1000.0 if bool(t.get("used", false)) else float(t["last"])
+		t["last"] = _clock
+		t["frame"] = Engine.get_process_frames()
+		t["used"] = false
+		_key_taps[code] = t
+	else:
+		var since: float = _key_since.get(code, _clock)
+		_key_since.erase(code)
+		_key_released[code] = {"held": _clock - since, "frame": Engine.get_process_frames()}
+
+
+## Сколько секунд клавиша удерживается сейчас; 0 — отпущена.
+func key_held_time(name: String) -> float:
+	var k := _keycode(name)
+	if k == KEY_NONE or not _key_since.has(k):
+		return 0.0
+	if not Input.is_key_pressed(k):
+		_key_since.erase(k)
+		return 0.0
+	return _clock - float(_key_since[k])
+
+
+func key_held(name: String, seconds: float) -> bool:
+	return key_held_time(name) >= seconds
+
+
+## Отпустили в этом кадре, продержав не меньше seconds: заряженный выстрел.
+func key_released_after(name: String, seconds: float) -> bool:
+	var k := _keycode(name)
+	var r: Dictionary = _key_released.get(k, {})
+	return not r.is_empty() and int(r["frame"]) == Engine.get_process_frames() and float(r["held"]) >= seconds
+
+
+## Второе нажатие не позже window секунд после первого — в этом кадре.
+func key_double_tap(name: String, window: float) -> bool:
+	var k := _keycode(name)
+	var t: Dictionary = _key_taps.get(k, {})
+	if t.is_empty() or int(t["frame"]) != Engine.get_process_frames():
+		return false
+	var ok := float(t["last"]) - float(t["prev"]) <= window
+	if ok:
+		t["used"] = true
+	return ok
+
+
+# --------------------------------------------------------------- геймпад ---
+
+const PAD_BUTTONS := {
+	"A": JOY_BUTTON_A, "B": JOY_BUTTON_B, "X": JOY_BUTTON_X, "Y": JOY_BUTTON_Y,
+	"Back": JOY_BUTTON_BACK, "Select": JOY_BUTTON_BACK, "Guide": JOY_BUTTON_GUIDE, "Start": JOY_BUTTON_START,
+	"L3": JOY_BUTTON_LEFT_STICK, "R3": JOY_BUTTON_RIGHT_STICK,
+	"LB": JOY_BUTTON_LEFT_SHOULDER, "RB": JOY_BUTTON_RIGHT_SHOULDER,
+	"Up": JOY_BUTTON_DPAD_UP, "Down": JOY_BUTTON_DPAD_DOWN,
+	"Left": JOY_BUTTON_DPAD_LEFT, "Right": JOY_BUTTON_DPAD_RIGHT,
+}
+## Мёртвая зона стиков: старый геймпад в покое показывает не ноль.
+const STICK_DEADZONE := 0.2
+
+var _pad_now: Dictionary = {}
+var _pad_prev: Dictionary = {}
+
+
+## Первый подключённый геймпад.
+func _pad() -> int:
+	var pads := Input.get_connected_joypads()
+	return pads[0] if not pads.is_empty() else 0
+
+
+func _pad_down(name: String) -> bool:
+	var n := name.strip_edges()
+	if n == "LT" or n == "RT":
+		return Input.get_joy_axis(_pad(), JOY_AXIS_TRIGGER_LEFT if n == "LT" else JOY_AXIS_TRIGGER_RIGHT) > 0.5
+	if not PAD_BUTTONS.has(n):
+		_warn_once(self, "pad:" + n, GdeI18n.t("GDevents: неизвестная кнопка геймпада «%s». Есть: %s")
+				% [n, ", ".join(PackedStringArray(PAD_BUTTONS.keys() + ["LT", "RT"]))])
+		return false
+	return Input.is_joy_button_pressed(_pad(), PAD_BUTTONS[n])
+
+
+func pad_pressed(name: String) -> bool:
+	var down := _pad_down(name)
+	if down:
+		_pad_now[name] = true
+	return down
+
+
+func pad_just_pressed(name: String) -> bool:
+	var down := pad_pressed(name)
+	return down and not _pad_prev.has(name)
+
+
+func pad_connected() -> bool:
+	return not Input.get_connected_joypads().is_empty()
+
+
+func stick(axis: int) -> float:
+	var v := Input.get_joy_axis(_pad(), axis as JoyAxis)
+	if absf(v) < STICK_DEADZONE:
+		return 0.0
+	# После мёртвой зоны — снова от 0 до 1, без скачка.
+	return signf(v) * (absf(v) - STICK_DEADZONE) / (1.0 - STICK_DEADZONE)
+
+
+## Вибрация: слабый и сильный моторы от 0 до 1. Без геймпада на телефоне —
+## вибрация телефона.
+func vibrate(weak: float, strong: float, seconds: float) -> void:
+	if pad_connected():
+		Input.start_joy_vibration(_pad(), clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), maxf(0.0, seconds))
+	elif OS.has_feature("mobile"):
+		Input.vibrate_handheld(int(maxf(0.0, seconds) * 1000.0))
+
+
+func stop_vibration() -> void:
+	if pad_connected():
+		Input.stop_joy_vibration(_pad())
 
 
 ## Нажата хоть какая-нибудь клавиша — удобно для заставок и меню.
@@ -681,20 +1400,43 @@ func aabb(n: Node) -> Rect2:
 		for p: Vector2 in cp.polygon:
 			rp = rp.expand(p)
 		return Rect2(cp.global_position + rp.position, rp.size)
-	if n is Sprite2D:
-		var s := n as Sprite2D
+	# Формы нет — по картинке. Спрайт ищем по всему объекту: у «Node2D со
+	# спрайтом внутри» раньше выходил нулевой прямоугольник, и «курсор над
+	# объектом», «щелчок по объекту» и столкновения без форм молчали.
+	var spr := _find_sprite(n)
+	if spr is Sprite2D:
+		var s := spr as Sprite2D
 		if s.texture != null:
-			var sz := s.texture.get_size() * s.global_scale
-			return Rect2(s.global_position - sz * 0.5, sz)
-	if n is AnimatedSprite2D:
-		var a := n as AnimatedSprite2D
+			var sr := s.get_rect()
+			var gs := s.global_scale.abs()
+			return Rect2(s.global_position + sr.position * gs, sr.size * gs)
+	if spr is AnimatedSprite2D:
+		var a := spr as AnimatedSprite2D
 		var fr := a.sprite_frames
 		if fr != null and fr.has_animation(a.animation):
 			var tex := fr.get_frame_texture(a.animation, a.frame)
 			if tex != null:
-				var sz2 := tex.get_size() * a.global_scale
-				return Rect2(a.global_position - sz2 * 0.5, sz2)
+				var sz2 := tex.get_size() * a.global_scale.abs()
+				var at := a.global_position + a.offset * a.global_scale.abs()
+				if not a.centered:
+					at += sz2 * 0.5
+				return Rect2(at - sz2 * 0.5, sz2)
 	return Rect2(n2.global_position, Vector2.ZERO)
+
+
+## Первый спрайт объекта: сам узел или ближайший вглубь.
+func _find_sprite(n: Node) -> Node:
+	if n is Sprite2D or n is AnimatedSprite2D:
+		return n
+	for c: Node in n.get_children():
+		if c is Sprite2D or c is AnimatedSprite2D:
+			return c
+	for c: Node in n.get_children():
+		if not (c is GdeBehavior):
+			var r := _find_sprite(c)
+			if r != null:
+				return r
+	return null
 
 
 ## Столкновение двух объектов.
@@ -727,7 +1469,76 @@ func overlaps(a: Node, b: Node) -> bool:
 
 	if area_a != null or area_b != null:
 		return false
-	return aabb(a).intersects(aabb(b))
+	# Касание — тоже столкновение: тела не проникают друг в друга, и
+	# персонаж, стоящий на враге, иначе с ним «не сталкивался».
+	return aabb(a).grow(1.0).intersects(aabb(b))
+
+
+# ------------------------------------------------------------- касания ---
+
+## раннер -> номер условия -> {"frame", "prev": пары, "now": пары}
+var _touch: Dictionary = {}
+
+
+func _touch_state(runner: Node, idx: int) -> Dictionary:
+	var rid := runner.get_instance_id()
+	var per: Dictionary = _touch.get(rid, {})
+	var st: Dictionary = per.get(idx, {"frame": -1, "prev": {}, "now": {}})
+	var f := int(_runner_frames.get(rid, 0))
+	if int(st["frame"]) != f:
+		# Новый кадр листа: что касалось в прошлый раз — теперь «прежде».
+		st["prev"] = st["now"]
+		st["now"] = {}
+		st["frame"] = f
+	per[idx] = st
+	_touch[rid] = per
+	return st
+
+
+static func _pair_id(a: Node, b: Node) -> String:
+	return "%d:%d" % [a.get_instance_id(), b.get_instance_id()]
+
+
+## «Только что столкнулся»: касаются сейчас, а в прошлом кадре — нет.
+func touch_began(runner: Node, idx: int, a: Node, b: Node) -> bool:
+	var st := _touch_state(runner, idx)
+	var pid := _pair_id(a, b)
+	if not overlaps(a, b):
+		return false
+	(st["now"] as Dictionary)[pid] = true
+	return not (st["prev"] as Dictionary).has(pid)
+
+
+## «Касание закончилось»: в прошлом кадре касались, а сейчас — нет.
+func touch_ended(runner: Node, idx: int, a: Node, b: Node) -> bool:
+	var st := _touch_state(runner, idx)
+	var pid := _pair_id(a, b)
+	if overlaps(a, b):
+		(st["now"] as Dictionary)[pid] = true
+		return false
+	return (st["prev"] as Dictionary).has(pid)
+
+
+## С какой стороны a касается b: 0 — сверху (a стоит на b), 1 — снизу,
+## 2 — сбоку. Сторону решает, по какой оси прямоугольники перекрылись
+## меньше: приземлившийся перекрывается по высоте на пиксель, а по
+## ширине — на всю ступню.
+func touch_side(a: Node, b: Node, side: int) -> bool:
+	if not overlaps(a, b):
+		return false
+	var ra := aabb(a).grow(1.0)
+	var rb := aabb(b)
+	if ra.size == Vector2.ZERO or rb.size == Vector2.ZERO:
+		return false
+	var ox := minf(ra.end.x, rb.end.x) - maxf(ra.position.x, rb.position.x)
+	var oy := minf(ra.end.y, rb.end.y) - maxf(ra.position.y, rb.position.y)
+	var vertical := oy <= ox
+	match side:
+		0:
+			return vertical and ra.get_center().y < rb.get_center().y
+		1:
+			return vertical and ra.get_center().y > rb.get_center().y
+	return not vertical
 
 
 func pos_of(n: Node) -> Vector2:
@@ -1215,6 +2026,39 @@ func pick_all(ctx: GdePickContext, obj: String) -> bool:
 
 
 ## Ближайший к другому объекту. Сужает оба списка: остаётся одна пара.
+## Взять все экземпляры в радиусе от точки: взрыв задевает всех рядом.
+func pick_in_radius(ctx: GdePickContext, obj: String, x: float, y: float, radius: float) -> bool:
+	var at := Vector2(x, y)
+	var r2 := radius * radius
+	var kept: Array = []
+	for n: Node in ctx.pick(obj):
+		if is_instance_valid(n) and pos_of(n).distance_squared_to(at) <= r2:
+			kept.append(n)
+	ctx.set_pick(obj, kept)
+	return not kept.is_empty()
+
+
+## То же вокруг объекта: остаются те, кто ближе радиуса хоть к одному
+## отобранному центру. Центры не трогаются.
+func pick_in_radius_of(ctx: GdePickContext, obj: String, center: String, radius: float) -> bool:
+	var r2 := radius * radius
+	var centers: Array = []
+	for c: Node in ctx.pick(center):
+		if is_instance_valid(c):
+			centers.append(pos_of(c))
+	var kept: Array = []
+	for n: Node in ctx.pick(obj):
+		if not is_instance_valid(n):
+			continue
+		var p := pos_of(n)
+		for c: Vector2 in centers:
+			if p.distance_squared_to(c) <= r2:
+				kept.append(n)
+				break
+	ctx.set_pick(obj, kept)
+	return not kept.is_empty()
+
+
 func pick_nearest_to(ctx: GdePickContext, obj: String, other: String) -> bool:
 	var best: Node = null
 	var best_other: Node = null

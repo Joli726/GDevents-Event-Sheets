@@ -62,7 +62,7 @@ signal target_lost
 ## @en Turn speed, degrees per second.
 @export_range(0.0, 30.0, 0.5) var rotation_speed: float = 0.0
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = false
 
 var _vel: Vector2 = Vector2.ZERO

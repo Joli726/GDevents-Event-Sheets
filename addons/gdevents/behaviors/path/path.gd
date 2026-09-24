@@ -98,10 +98,10 @@ var preset: int = 1
 ## @group.en Look
 @export_group("Вид")
 ## Поворот объекта по направлению движения.
-## @en Rotate the object toward the movement direction.
+## @en Rotate the object — toward the movement direction.
 @export var rotate_object: bool = false
 ## Отражение спрайта по направлению движения.
-## @en Flip the sprite toward the movement direction.
+## @en Flip the sprite — toward the movement direction.
 @export var flip_sprite: bool = false
 
 var _origin: Vector2 = Vector2.ZERO

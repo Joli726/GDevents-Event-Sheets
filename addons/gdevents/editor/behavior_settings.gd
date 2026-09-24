@@ -311,7 +311,18 @@ func _editor_for(p: Dictionary, meta: Dictionary = {}) -> Control:
 		_rows[nm]["show"] = show_scene
 		return row2
 
-	# Точки пути, цвета и прочее — там, где их удобно править мышью.
+	if t == TYPE_COLOR:
+		var cp := ColorPickerButton.new()
+		cp.custom_minimum_size = Vector2(80, 0)
+		cp.edit_alpha = hint != PROPERTY_HINT_COLOR_NO_ALPHA
+		cp.color = _values[nm] if _values[nm] is Color else Color.WHITE
+		# Пишем по отпусканию, а не на каждый шаг мыши: иначе сцена
+		# перезаписывалась бы десятки раз за одно движение.
+		cp.popup_closed.connect(func() -> void: _changed(nm, cp.color))
+		_rows[nm]["show"] = func(v: Variant) -> void: cp.color = v if v is Color else Color.WHITE
+		return cp
+
+	# Точки пути и прочее — там, где их удобно править мышью.
 	var row3 := HBoxContainer.new()
 	var note := _dim(_complex_note(_values[nm]))
 	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL

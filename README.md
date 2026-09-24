@@ -10,9 +10,13 @@ readable GDScript with no interpreter at runtime.
   loops, groups, drag and drop, undo, errors shown right on the row.
 - **Object picking as in GDevelop**: "Bullet collides with Enemy → Delete
   Bullet" deletes exactly the bullets that hit.
-- **14 ready-made behaviors** — platformer character, top-down movement,
-  shooting, health, damage, pickups, spawner, path, follow and more — with
-  a settings window, presets and a code view.
+- **34 ready-made behaviors** — platformer character with ladders, a
+  patrolling enemy, pathfinding, homing missiles, cars, moving and crumbling
+  platforms, checkpoints, melee combos, abilities, states, health bars,
+  dialogues, juice and more — with a settings window, presets and a code
+  view.
+- **244 instructions**: touches that fire once, "wait N seconds", object
+  timers, gamepad, effects, lists and more.
 - **Your own behaviors and extensions**: one `.gd` file with a few comment
   tags becomes new conditions, actions and expressions. Built-in behaviors
   can be copied and changed, with versions and a way back to the default.
