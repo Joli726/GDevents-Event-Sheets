@@ -122,6 +122,13 @@ func _scan_node(n: Node) -> void:
 
 func _on_node_added(n: Node) -> void:
 	_try_tag(n)
+	# Появилась Area2D — предки больше не «без Area2D» (см. find_area).
+	if n is Area2D:
+		var p := n.get_parent()
+		while p != null:
+			if p.has_meta("__gde_noarea"):
+				p.remove_meta("__gde_noarea")
+			p = p.get_parent()
 
 
 func _try_tag(n: Node) -> void:
@@ -448,6 +455,237 @@ func any_of(ctx: GdePickContext, branches: Array) -> bool:
 		for obj2: String in union:
 			ctx.set_pick(obj2, (union[obj2] as Dictionary).keys())
 	return hit
+
+
+# ---------------------------------------------------- столкновения, быстро ---
+
+## «A сталкивается с B» на многих объектах. Проверка «каждый с каждым» при
+## 500 врагах и 300 пулях — 150 000 пар за кадр и полторы секунды на кадр.
+## Здесь то же самое правило, что в overlaps(), но пары ищутся быстро:
+## объекты с Area2D спрашивают у физики своих соседей, остальные раскладываются
+## по сетке ячеек, и сравниваются только соседи по ячейкам.
+func filter_collision(ctx: GdePickContext, a: String, b: String) -> bool:
+	var la := ctx.pick(a)
+	var lb := ctx.pick(b)
+	var hit := _collision_hits(la, lb)
+	var keep_a: Dictionary = hit[0]
+	var keep_b: Dictionary = hit[1]
+	var ka: Array = []
+	for x: Node in la:
+		if is_instance_valid(x) and (keep_a.has(x) or (a == b and keep_b.has(x))):
+			ka.append(x)
+	ctx.set_pick(a, ka)
+	if a != b:
+		var kb: Array = []
+		for y: Node in lb:
+			if is_instance_valid(y) and keep_b.has(y):
+				kb.append(y)
+		ctx.set_pick(b, kb)
+	return not ka.is_empty()
+
+
+## «НЕ сталкивается»: остаются экземпляры A, которые не касаются ни одного B.
+func filter_collision_not(ctx: GdePickContext, a: String, b: String) -> bool:
+	var la := ctx.pick(a)
+	var hit := _collision_hits(la, ctx.pick(b))
+	var keep_a: Dictionary = hit[0]
+	var kept: Array = []
+	for x: Node in la:
+		if is_instance_valid(x) and not keep_a.has(x):
+			kept.append(x)
+	ctx.set_pick(a, kept)
+	return not kept.is_empty()
+
+
+## Условие на паре, которое бывает верным только для касающихся (касания
+## сверху, сбоку, «только что столкнулся»): предикат зовётся лишь для пар,
+## найденных быстрой проверкой, а не для каждой пары. extra — пары, которые
+## проверить надо, даже если они уже не касаются («касание закончилось»).
+func filter_pair_touching(ctx: GdePickContext, a: String, b: String, pred: Callable, extra: Array = []) -> bool:
+	var la := ctx.pick(a)
+	var lb := ctx.pick(b)
+	var keep_a: Dictionary = {}
+	var keep_b: Dictionary = {}
+	for p: Array in _touch_candidates(la, lb, extra):
+		if pred.call(p[0], p[1]):
+			keep_a[p[0]] = true
+			keep_b[p[1]] = true
+	var ka: Array = []
+	for x: Node in la:
+		if is_instance_valid(x) and (keep_a.has(x) or (a == b and keep_b.has(x))):
+			ka.append(x)
+	ctx.set_pick(a, ka)
+	if a != b:
+		var kb: Array = []
+		for y: Node in lb:
+			if is_instance_valid(y) and keep_b.has(y):
+				kb.append(y)
+		ctx.set_pick(b, kb)
+	return not ka.is_empty()
+
+
+func filter_pair_touching_not(ctx: GdePickContext, a: String, b: String, pred: Callable, extra: Array = []) -> bool:
+	var la := ctx.pick(a)
+	var hit: Dictionary = {}
+	for p: Array in _touch_candidates(la, ctx.pick(b), extra):
+		if not hit.has(p[0]) and pred.call(p[0], p[1]):
+			hit[p[0]] = true
+	var kept: Array = []
+	for x: Node in la:
+		if is_instance_valid(x) and not hit.has(x):
+			kept.append(x)
+	ctx.set_pick(a, kept)
+	return not kept.is_empty()
+
+
+func _touch_candidates(la: Array, lb: Array, extra: Array) -> Array:
+	var pairs: Array = []
+	_collision_hits(la, lb, pairs)
+	if not extra.is_empty():
+		var in_a: Dictionary = {}
+		var in_b: Dictionary = {}
+		for x: Node in la:
+			in_a[x] = true
+		for y: Node in lb:
+			in_b[y] = true
+		var seen: Dictionary = {}
+		for p: Array in pairs:
+			seen[_pair_id(p[0], p[1])] = true
+		for q: Array in extra:
+			if is_instance_valid(q[0]) and is_instance_valid(q[1]) and in_a.has(q[0]) and in_b.has(q[1]) \
+					and not seen.has(_pair_id(q[0], q[1])):
+				pairs.append(q)
+	return pairs
+
+
+## Пары, касавшиеся в прошлом кадре листа, — для «касание закончилось».
+## Зовётся каждый кадр, даже когда рядом никого нет: заодно переводит память
+## касаний на новый кадр, иначе «только что столкнулся» помнил бы касание,
+## которое уже закончилось.
+func touch_prev_pairs(runner: Node, idx: int) -> Array:
+	var out: Array = []
+	for pid: String in (_touch_state(runner, idx)["prev"] as Dictionary):
+		var ids := pid.split(":")
+		var a := instance_from_id(int(ids[0]))
+		var b := instance_from_id(int(ids[1]))
+		if a is Node and b is Node:
+			out.append([a, b])
+	return out
+
+
+## [столкнувшиеся из la, столкнувшиеся из lb] — множествами. pairs, если
+## передан, получает и сами пары [a, b] (каждую один раз).
+func _collision_hits(la: Array, lb: Array, pairs: Variant = null) -> Array:
+	var keep_a: Dictionary = {}
+	var keep_b: Dictionary = {}
+	var seen: Dictionary = {}
+	var collect := pairs is Array
+	var in_a: Dictionary = {}
+	var in_b: Dictionary = {}
+	var plain_a: Array = []
+	var plain_b: Array = []
+	var area_a: Array = []
+	var area_b: Array = []
+	for x: Node in la:
+		if is_instance_valid(x):
+			in_a[x] = true
+			var ar := find_area(x)
+			if ar != null:
+				area_a.append([x, ar])
+			else:
+				plain_a.append(x)
+	for y: Node in lb:
+		if is_instance_valid(y):
+			in_b[y] = true
+			var ar2 := find_area(y)
+			if ar2 != null:
+				area_b.append([y, ar2])
+			else:
+				plain_b.append(y)
+	# С физикой: соседи Area2D, поднятые до своего экземпляра другой стороны.
+	for pair: Array in area_a:
+		for o: Node in _area_neighbours(pair[1]):
+			for y2: Node in _owners(o, in_b):
+				if y2 != pair[0]:
+					keep_a[pair[0]] = true
+					keep_b[y2] = true
+					if collect:
+						_add_pair(pairs, seen, pair[0], y2)
+	for pair2: Array in area_b:
+		for o2: Node in _area_neighbours(pair2[1]):
+			for x2: Node in _owners(o2, in_a):
+				if x2 != pair2[0]:
+					keep_a[x2] = true
+					keep_b[pair2[0]] = true
+					if collect:
+						_add_pair(pairs, seen, x2, pair2[0])
+	# Без физики: габариты по сетке. Касание краями — тоже столкновение.
+	if not plain_a.is_empty() and not plain_b.is_empty():
+		var rects: Array = []
+		var cell := 64.0
+		for y3: Node in plain_b:
+			var r := aabb(y3)
+			rects.append(r)
+			cell = maxf(cell, maxf(r.size.x, r.size.y))
+		var grid: Dictionary = {}
+		for i in range(plain_b.size()):
+			var rb: Rect2 = rects[i]
+			for c: Vector2i in _cells(rb, cell):
+				if not grid.has(c):
+					grid[c] = []
+				(grid[c] as Array).append(i)
+		for x3: Node in plain_a:
+			var ra := aabb(x3).grow(1.0)
+			var tried: Dictionary = {}
+			for c2: Vector2i in _cells(ra, cell):
+				for i2: int in grid.get(c2, []):
+					if tried.has(i2):
+						continue
+					tried[i2] = true
+					var y4: Node = plain_b[i2]
+					if y4 != x3 and ra.intersects(rects[i2]):
+						keep_a[x3] = true
+						keep_b[y4] = true
+						if collect:
+							_add_pair(pairs, seen, x3, y4)
+	return [keep_a, keep_b]
+
+
+static func _add_pair(pairs: Array, seen: Dictionary, x: Node, y: Node) -> void:
+	var k := _pair_id(x, y)
+	if not seen.has(k):
+		seen[k] = true
+		pairs.append([x, y])
+
+
+static func _cells(r: Rect2, cell: float) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var x0 := floori(r.position.x / cell)
+	var y0 := floori(r.position.y / cell)
+	var x1 := floori((r.position.x + r.size.x) / cell)
+	var y1 := floori((r.position.y + r.size.y) / cell)
+	for cx in range(x0, x1 + 1):
+		for cy in range(y0, y1 + 1):
+			out.append(Vector2i(cx, cy))
+	return out
+
+
+func _area_neighbours(ar: Area2D) -> Array:
+	var out: Array = []
+	out.append_array(ar.get_overlapping_areas())
+	out.append_array(ar.get_overlapping_bodies())
+	return out
+
+
+## Экземпляры из множества, внутри которых лежит нода (она сама или предок).
+static func _owners(n: Node, set: Dictionary) -> Array:
+	var out: Array = []
+	var p := n
+	while p != null:
+		if set.has(p):
+			out.append(p)
+		p = p.get_parent()
+	return out
 
 
 # -------------------------------------------------------------- кадр/время ---
@@ -1492,20 +1730,28 @@ func find_area(n: Node) -> Area2D:
 		var cached: Variant = n.get_meta("__gde_area")
 		if is_instance_valid(cached):
 			return cached
+	# «Area2D нет» тоже запоминаем: поиск по поддереву у сотен объектов в
+	# каждом условии столкновения стоил больше самой проверки. Добавленная
+	# позже Area2D снимает отметку с предков (_on_node_added).
+	if n.has_meta("__gde_noarea"):
+		return null
 	var found := _search_area(n)
 	if found != null:
 		n.set_meta("__gde_area", found)
+	elif n.is_inside_tree():
+		n.set_meta("__gde_noarea", true)
 	return found
 
 
 func _search_area(n: Node) -> Area2D:
 	if n is Area2D:
 		return n as Area2D
-	for c: Node in n.get_children():
-		var r := _search_area(c)
-		if r != null:
-			return r
-	return null
+	if n.get_child_count() == 0:
+		return null
+	# Поиск движком, а не рекурсией на GDScript: у сотен объектов в кадре
+	# разница заметна. Порядок тот же — в глубину, первый найденный.
+	var found := n.find_children("*", "Area2D", true, false)
+	return found[0] as Area2D if not found.is_empty() else null
 
 
 ## Принадлежит ли нода поддереву объекта.
@@ -1516,6 +1762,23 @@ func _is_within(n: Node, root: Node) -> bool:
 			return true
 		p = p.get_parent()
 	return false
+
+
+## Форма столкновения объекта — с запоминанием. aabb() зовут сотни раз за
+## кадр, и обход детей каждый раз стоил дороже самой проверки. Запомненная
+## форма проверяется: жива, всё ещё внутри объекта и с формой.
+func _shape_of(n: Node) -> Node:
+	if n.has_meta("__gde_shape"):
+		var c: Variant = n.get_meta("__gde_shape")
+		if is_instance_valid(c) and (c == n or n.is_ancestor_of(c)):
+			if c is CollisionShape2D and (c as CollisionShape2D).shape != null:
+				return c
+			if c is CollisionPolygon2D and (c as CollisionPolygon2D).polygon.size() > 0:
+				return c
+	var found := _find_shape(n)
+	if found != null:
+		n.set_meta("__gde_shape", found)
+	return found
 
 
 func _find_shape(n: Node) -> Node:
@@ -1536,7 +1799,7 @@ func aabb(n: Node) -> Rect2:
 	var n2 := main(n)
 	if n2 == null:
 		return Rect2()
-	var shape_node := _find_shape(n)
+	var shape_node := _shape_of(n)
 	if shape_node is CollisionShape2D:
 		var cs := shape_node as CollisionShape2D
 		var sh := cs.shape

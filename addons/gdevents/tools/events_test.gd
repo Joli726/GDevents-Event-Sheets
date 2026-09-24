@@ -59,6 +59,8 @@ func _ready() -> void:
 	_test_error_points_to_event()
 	print("—— функции из событий ——")
 	_test_functions()
+	print("—— быстрые столкновения ——")
+	await _test_fast_collision()
 	_finish()
 
 
@@ -712,6 +714,61 @@ func _test_functions() -> void:
 	_eq(Gde.var_get("bumps"), 2.0, "функция из подключённого листа доступна")
 	_free([r2])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(lib))
+
+
+# -------------------------------------------------------- быстрые столкновения ---
+
+## Быстрая проверка столкновений (сетка и соседи физики) должна отбирать
+## ровно тех же, что и честная проверка каждой пары через overlaps().
+func _test_fast_collision() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for round_i in range(3):
+		var nodes: Array = []
+		for i in range(40):
+			nodes.append(_rand_thing("Enemy", rng, round_i))
+		for j in range(30):
+			nodes.append(_rand_thing("Coin", rng, round_i))
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		for pair: Array in [["Coin", "Enemy"], ["Enemy", "Enemy"]]:
+			var fast := Gde.new_context()
+			var slow := Gde.new_context()
+			var rf := Gde.filter_collision(fast, pair[0], pair[1])
+			var rs := Gde.filter_pair(slow, pair[0], pair[1], func(x: Node, y: Node) -> bool: return Gde.overlaps(x, y))
+			var same := rf == rs and _same_set(fast.pick(pair[0]), slow.pick(pair[0])) and _same_set(fast.pick(pair[1]), slow.pick(pair[1]))
+			var fn := Gde.new_context()
+			var sn := Gde.new_context()
+			Gde.filter_collision_not(fn, pair[0], pair[1])
+			Gde.filter_pair_not(sn, pair[0], pair[1], func(x: Node, y: Node) -> bool: return Gde.overlaps(x, y))
+			same = same and _same_set(fn.pick(pair[0]), sn.pick(pair[0]))
+			_ok(same, "раскладка %d, %s × %s: быстрая проверка = проверка каждой пары (%d отобрано)"
+					% [round_i + 1, pair[0], pair[1], fast.pick(pair[0]).size()])
+		_free(nodes)
+
+
+## Раскладка 0 — без физики, 1 — все с Area2D, 2 — вперемешку и разного размера.
+func _rand_thing(obj: String, rng: RandomNumberGenerator, mode: int) -> Node2D:
+	var area := mode == 1 or (mode == 2 and rng.randf() < 0.5)
+	var n: Node2D = Area2D.new() if area else Node2D.new()
+	n.position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
+	var cs := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(rng.randf_range(4, 90), rng.randf_range(4, 60)) if mode == 2 else Vector2(16, 16)
+	cs.shape = rect
+	n.add_child(cs)
+	add_child(n)
+	n.add_to_group(Gde.GROUP_PREFIX + obj)
+	return n
+
+
+func _same_set(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for x: Variant in a:
+		if not b.has(x):
+			return false
+	return true
 
 
 # ------------------------------------------------------------------ лист ---

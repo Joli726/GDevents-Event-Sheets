@@ -545,10 +545,22 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 			var b := _object_arg(d, args, 1, id)
 			if a == "" or b == "":
 				return "false"
+			# Быстрая проверка всей пары списков сразу (столкновения): без
+			# лямбды на каждую пару экземпляров.
+			if d.has("pair_fn"):
+				return "Gde.%s%s(%s, %s, %s)" % [str(d["pair_fn"]), "_not" if inverted else "", ctx, _quote(a), _quote(b)]
 			var av := _tmp("_a")
 			var bv := _tmp("_b")
-			var pred2 := _fill(_template(d, "pred", id), _memory_subs(_template(d, "pred", id),
-					{"ctx": ctx, "self": "self", "a": av, "b": bv}), args, bare)
+			var subs2 := _memory_subs(_template(d, "pred", id), {"ctx": ctx, "self": "self", "a": av, "b": bv})
+			var pred2 := _fill(_template(d, "pred", id), subs2, args, bare)
+			# Верно только для касающихся — предикат только на парах рядом.
+			if d.get("touching", false):
+				var extra := ""
+				if d.has("touching_extra"):
+					extra = ", " + _fill(str(d["touching_extra"]), subs2, args, bare)
+				return "%s(%s, %s, %s, func(%s, %s): return %s%s)" % [
+						"Gde.filter_pair_touching_not" if inverted else "Gde.filter_pair_touching",
+						ctx, _quote(a), _quote(b), av, bv, pred2, extra]
 			var fn2 := "Gde.filter_pair_not" if inverted else "Gde.filter_pair"
 			return "%s(%s, %s, %s, func(%s, %s): return %s)" % [fn2, ctx, _quote(a), _quote(b), av, bv, pred2]
 		_:

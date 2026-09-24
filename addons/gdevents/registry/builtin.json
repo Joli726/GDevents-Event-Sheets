@@ -97,6 +97,7 @@
         }
       ],
       "pred": "Gde.overlaps({a}, {b})",
+      "pair_fn": "filter_collision",
       "description": "Объекты соприкасаются. В выборке остаются только столкнувшиеся пары — дальше действия работают именно с ними."
     },
     "object.distance": {
@@ -871,7 +872,7 @@
           "label": "С чем"
         }
       ],
-      "pred": "Gde.touch_began({self}, {once}, {a}, {b})",
+      "pred": "Gde.touch_began({self}, {once}, {a}, {b})", "touching": true, "touching_extra": "Gde.touch_prev_pairs({self}, {once})",
       "description": "Срабатывает один раз — в момент касания. Для урона, звука, очков: «сталкивается» истинно каждый кадр, пока объекты касаются, и действие по нему повторялось бы."
     },
     "object.collision_end": {
@@ -888,7 +889,7 @@
           "label": "С чем"
         }
       ],
-      "pred": "Gde.touch_ended({self}, {once}, {a}, {b})",
+      "pred": "Gde.touch_ended({self}, {once}, {a}, {b})", "touching": true, "touching_extra": "Gde.touch_prev_pairs({self}, {once})",
       "description": "Срабатывает один раз, когда объекты перестали касаться: вышел из воды, сошёл с кнопки, покинул зону."
     },
     "object.touch_top": {
@@ -905,7 +906,7 @@
           "label": "С чем"
         }
       ],
-      "pred": "Gde.touch_side({a}, {b}, 0)",
+      "pred": "Gde.touch_side({a}, {b}, 0)", "touching": true,
       "description": "Первый объект стоит или приземлился на второй — прыжок врагу на голову, как в Марио."
     },
     "object.touch_bottom": {
@@ -922,7 +923,7 @@
           "label": "С чем"
         }
       ],
-      "pred": "Gde.touch_side({a}, {b}, 1)",
+      "pred": "Gde.touch_side({a}, {b}, 1)", "touching": true,
       "description": "Первый объект упёрся во второй снизу — удар головой о блок."
     },
     "object.touch_side": {
@@ -939,7 +940,7 @@
           "label": "С чем"
         }
       ],
-      "pred": "Gde.touch_side({a}, {b}, 2)",
+      "pred": "Gde.touch_side({a}, {b}, 2)", "touching": true,
       "description": "Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага."
     },
     "system.waiting": {
