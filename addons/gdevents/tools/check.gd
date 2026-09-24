@@ -1,8 +1,8 @@
 ## Проверка своего файла — поведения, расширения или листа событий:
-##   godot --headless --quit-after 3000 res://addons/gdevents/tools/check.tscn -- res://behaviors/enemy_shoot/enemy_shoot.gd
-##   godot --headless --quit-after 3000 res://addons/gdevents/tools/check.tscn -- res://extensions/weather/weather.gd
-##   godot --headless --quit-after 3000 res://addons/gdevents/tools/check.tscn -- res://events/level.gdes.json
-##   godot --headless --quit-after 3000 res://addons/gdevents/tools/check.tscn            # всё своё сразу
+##   godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn -- res://behaviors/enemy_shoot/enemy_shoot.gd
+##   godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn -- res://extensions/weather/weather.gd
+##   godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn -- res://events/level.gdes.json
+##   godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn            # всё своё сразу
 ## Язык отчёта: -- --lang=ru (или en) после остальных аргументов.
 ##
 ## ✓ — всё хорошо, ✗ — ошибка (код выхода 1), ! — работает, но стоит поправить.

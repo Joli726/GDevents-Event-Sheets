@@ -813,5 +813,8 @@
 	"ошибки сборки: %s": "build errors: %s",
 	"условие собралось в «false» — у него нет шаблона кода": "the condition was built as “false” — it has no code template",
 	"собранный код не компилируется": "the built code does not compile",
-	"ошибка в игре: %s": "error in the game: %s"
+	"ошибка в игре: %s": "error in the game: %s",
+	"Виды параметров: object — объект листа (его отобранные экземпляры); objname — имя объекта; number — числовое выражение; string — текстовое выражение, текст в кавычках: %s; raw — голый текст без кавычек (клавиша, анимация, таймер, путь к файлу); varname — имя переменной, можно hp или player.hp; cmpop — = ≠ < > ≤ ≥; modop — = + - * /.": "Parameter kinds: object — a sheet object (its picked instances); objname — an object name; number — a number expression; string — a text expression, text in quotes: %s; raw — bare text without quotes (key, animation, timer, file path); varname — a variable name, hp or player.hp; cmpop — = ≠ < > ≤ ≥; modop — = + - * /.",
+	"Каждый параметр в листе — строка JSON: %s.": "Every parameter in a sheet is a JSON string: %s.",
+	"Поведение %s «%s»": "Behavior %s “%s”"
 }

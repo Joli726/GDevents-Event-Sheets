@@ -426,13 +426,14 @@ static func _pick(entry: Dictionary, what: String, variants: Dictionary) -> Stri
 	return GdeI18n.pick(variants)
 
 
-## Язык основного текста: "ru", "en" или "*" — без букв, годится для всех.
+## Язык основного текста: "ru", "en" или "*" — годится для всех: без букв
+## или одни заглавные латинские, как X, Y, HP, RGB.
 static func _text_lang(text: String) -> String:
 	for ch: int in text.to_utf32_buffer().to_int32_array():
 		if (ch >= 0x410 and ch <= 0x44F) or ch == 0x401 or ch == 0x451:
 			return "ru"
 	for ch2: int in text.to_utf32_buffer().to_int32_array():
-		if (ch2 >= 0x41 and ch2 <= 0x5A) or (ch2 >= 0x61 and ch2 <= 0x7A):
+		if ch2 >= 0x61 and ch2 <= 0x7A:
 			return "en"
 	return "*"
 
