@@ -20,6 +20,13 @@ const GRID := preload("res://addons/gdevents/behaviors/grid_step/grid_step.gd")
 const PLATFORMER := preload("res://addons/gdevents/behaviors/platformer/platformer.gd")
 const PLATFORM := preload("res://addons/gdevents/behaviors/platform/platform.gd")
 const LADDER := preload("res://addons/gdevents/behaviors/ladder/ladder.gd")
+const PUSHABLE := preload("res://addons/gdevents/behaviors/pushable/pushable.gd")
+const CHECKPOINT := preload("res://addons/gdevents/behaviors/checkpoint/checkpoint.gd")
+const DESTRUCTIBLE := preload("res://addons/gdevents/behaviors/destructible/destructible.gd")
+const HEALTH := preload("res://addons/gdevents/behaviors/health/health.gd")
+const RUNNER_SCENE := "user://gde_scenario_runner.tscn"
+
+const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible"]
 
 var _fails: int = 0
 var _checks: int = 0
@@ -33,16 +40,14 @@ func _ready() -> void:
 		{"name": "Player", "scene": "res://addons/gdevents/tests/player_virtual.tscn"},
 		{"name": "Enemy", "scene": "res://addons/gdevents/tests/enemy_virtual.tscn"},
 		{"name": "Boss", "scene": "res://addons/gdevents/tests/boss_virtual.tscn"},
+		{"name": "Runner", "scene": RUNNER_SCENE},
 	])
-	await _patrol_enemy()
-	await _pathfinder()
-	await _homing()
-	await _orbit()
-	await _flock()
-	await _car()
-	await _grid_step()
-	await _platforms()
-	await _ladder()
+	# Один сценарий: GDE_SCENARIO=pushable godot --headless … — удобно, когда чинишь.
+	var only := OS.get_environment("GDE_SCENARIO")
+	for name: String in SCENARIOS:
+		if not only.is_empty() and name != only:
+			continue
+		await call("_" + name)
 	_report()
 
 
@@ -564,6 +569,180 @@ func _ladder() -> void:
 	_ok(not bool(pb.call("is_climbing")), "лестница: стоя на полу, «вниз» не цепляется за лестницу")
 	w.queue_free()
 	await _frames(2)
+
+
+func _pushable() -> void:
+	print("— Толкаемый")
+	var w := _world()
+	w.position = Vector2(0, 18000)
+	_static(w, Vector2(0, 200), Vector2(3000, 20))      # пол, верх на 190
+	var crate := _character(w, Vector2(100, 170), Vector2(40, 40))
+	var cb := _beh(crate, PUSHABLE, {"push_speed": 90.0})
+	var hp: Array = _hero(w, Vector2(40, 170))
+	var hero: CharacterBody2D = hp[0]
+	await _frames(10)
+	var x0 := crate.position.x
+	_ok(not bool(cb.call("is_pushed")), "ящик: персонаж стоит рядом — не толкает")
+	for i in 60:
+		(hp[1] as Node).call("simulate_right")
+		await get_tree().physics_frame
+	_ok(bool(cb.call("is_pushed")), "ящик: персонаж упёрся — толкает")
+	_ok(crate.position.x - x0 > 40.0, "ящик: сдвинулся (на %.0f px)" % (crate.position.x - x0))
+	_ok(hero.position.x < crate.position.x, "ящик: персонаж идёт за ним, а не сквозь")
+	await _frames(15)
+	var x1 := crate.position.x
+	await _frames(10)
+	_ok(absf(crate.position.x - x1) < 0.5 and not bool(cb.call("is_pushed")), "ящик: отпустили — стоит")
+	# Стена: ящик упирается и не проходит сквозь.
+	_static(w, Vector2(crate.position.x + 60.0, 150), Vector2(20, 80))
+	for i in 90:
+		(hp[1] as Node).call("simulate_right")
+		await get_tree().physics_frame
+	_ok(crate.position.x < x1 + 45.0, "ящик: упёрся в стену")
+	w.queue_free()
+	await _frames(2)
+
+
+func _checkpoint() -> void:
+	print("— Контрольная точка")
+	var w := _world()
+	w.position = Vector2(0, 20000)
+	_static(w, Vector2(0, 200), Vector2(3000, 20))
+	var flag1 := _flag(w, Vector2(300, 170))
+	var c1 := _beh(flag1, CHECKPOINT, {"player_object": "Player", "respawn_delay": 0.2, "offset_y": -10.0})
+	var flag2 := _flag(w, Vector2(900, 170))
+	var c2 := _beh(flag2, CHECKPOINT, {"player_object": "Player", "respawn_delay": 0.2})
+	var hp: Array = _hero(w, Vector2(100, 170))
+	var hero: CharacterBody2D = hp[0]
+	hero.add_to_group(Gde.GROUP_PREFIX + "Player")
+	var health := _beh(hero, HEALTH, {"max_health": 3.0, "invulnerable_time": 0.0, "blink_on_hit": false})
+	await _frames(5)
+	_ok(not bool(c1.call("is_active")), "точка: пока не задета — не текущая")
+	var active := false
+	for i in 90:
+		(hp[1] as Node).call("simulate_right")
+		await get_tree().physics_frame
+		if bool(c1.call("is_active")):
+			active = true
+			break
+	_ok(active and hero.global_position.x - w.global_position.x > 250.0, "точка: пробежал через флаг — он стал текущим")
+	for i in 30:
+		(hp[1] as Node).call("simulate_right")
+		await get_tree().physics_frame
+	var far := hero.global_position.x
+	health.call("kill")
+	await _frames(20)
+	_ok(absf(hero.global_position.x - flag1.global_position.x) < 1.0 and far - hero.global_position.x > 100.0,
+			"точка: после смерти появился у флага")
+	_ok(bool(health.call("is_alive")) and float(health.get("current")) == 3.0, "точка: здоровье полное")
+	_ok(bool(health.call("is_invulnerable")), "точка: короткая неуязвимость после появления")
+	# Вторая точка перехватывает.
+	hero.global_position = flag2.global_position + Vector2(0, -2)
+	await _frames(5)
+	_ok(bool(c2.call("is_active")) and not bool(c1.call("is_active")), "точка: задел вторую — первая погасла")
+	# Игрок удаляется при смерти — точка создаёт его заново.
+	var proto := CharacterBody2D.new()
+	proto.add_child(_rect(Vector2(20, 40)))
+	var hb := Node.new()
+	hb.name = "Health"
+	hb.set_script(HEALTH)
+	hb.set("destroy_on_death", true)
+	proto.add_child(hb)
+	for c: Node in proto.get_children():
+		c.owner = proto
+	var ps := PackedScene.new()
+	ps.pack(proto)
+	proto.free()
+	ResourceSaver.save(ps, RUNNER_SCENE)
+	var runner := (load(RUNNER_SCENE) as PackedScene).instantiate() as Node2D
+	runner.position = Vector2(1500, 170)
+	w.add_child(runner)
+	var flag3 := _flag(w, Vector2(1500, 170))
+	var c3 := _beh(flag3, CHECKPOINT, {"player_object": "Runner", "respawn_delay": 0.1, "is_start": true})
+	await _frames(5)
+	Gde.behavior(runner, "Health").call("kill")
+	await _frames(15)
+	var runners := Gde.all_instances("Runner")
+	_ok(runners.size() == 1 and runners[0] != runner and (runners[0] as Node2D).global_position.distance_to(flag3.global_position) < 1.0,
+			"точка: удалённого при смерти игрока создала заново у себя")
+	_eq(c3.call("respawn_count"), 1.0, "точка: считает возрождения")
+	for r: Node in runners:
+		r.queue_free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RUNNER_SCENE))
+	w.queue_free()
+	await _frames(2)
+
+
+## Флажок с зоной касания.
+func _flag(w: Node, at: Vector2) -> Node2D:
+	var a := Area2D.new()
+	a.position = at
+	a.add_child(_rect(Vector2(20, 60)))
+	w.add_child(a)
+	return a
+
+
+func _destructible() -> void:
+	print("— Разрушаемое с добычей")
+	var w := _world()
+	w.position = Vector2(0, 22000)
+	var coin := Node2D.new()
+	coin.name = "Coin"
+	var coin_scene := PackedScene.new()
+	coin_scene.pack(coin)
+	coin.free()
+	var crate := _sprite_box(w, Vector2(0, 0))
+	var db := _beh(crate, DESTRUCTIBLE, {"loot_1": coin_scene, "chance_1": 100.0, "count_1": 3,
+			"loot_2": coin_scene, "chance_2": 0.0})
+	var got: Array = []
+	db.connect("broken", func(loot: Array) -> void: got.append_array(loot))
+	db.call("break_now")
+	await _frames(1)
+	var shards := 0
+	for c: Node in get_children():
+		if c is GdeDebris:
+			shards += 1
+	_eq(shards, 9, "разрушаемое: разлетелось на 3×3 осколка")
+	_eq(got.size(), 3, "разрушаемое: выпало ровно три монеты (шанс 100%), второго предмета нет (шанс 0%)")
+	_ok(not is_instance_valid(crate) or crate.is_queued_for_deletion(), "разрушаемое: сам объект удалён")
+	await _frames(70)
+	var left := 0
+	for c: Node in get_children():
+		if c is GdeDebris:
+			left += 1
+	_eq(left, 0, "разрушаемое: осколки растаяли сами")
+	for n: Node in got:
+		n.queue_free()
+	# От «Здоровья» и от касания.
+	var c2 := _sprite_box(w, Vector2(200, 0))
+	var d2 := _beh(c2, DESTRUCTIBLE, {"shards_x": 0})
+	var h2 := _beh(c2, HEALTH, {"max_health": 1.0})
+	var broke: Array[bool] = [false, false]
+	d2.connect("broken", func(_l: Array) -> void: broke[0] = true)
+	await _frames(2)
+	h2.call("kill")
+	_ok(broke[0], "разрушаемое: «Здоровье» кончилось — разрушилось")
+	var c3 := _sprite_box(w, Vector2(400, 0))
+	var d3 := _beh(c3, DESTRUCTIBLE, {"shards_x": 0, "break_on_touch": "Enemy"})
+	d3.connect("broken", func(_l: Array) -> void: broke[1] = true)
+	await _frames(2)
+	_ok(not broke[1], "разрушаемое: без касания — цело")
+	var bullet := _tagged(w, "Enemy", Vector2(400, 0))
+	bullet.add_child(_rect(Vector2(8, 8)))
+	await _frames(2)
+	_ok(broke[1], "разрушаемое: коснулся объект из «ломаться от касания» — разрушилось")
+	w.queue_free()
+	await _frames(2)
+
+
+func _sprite_box(w: Node, at: Vector2) -> Node2D:
+	var n := _node(w, at)
+	var img := Image.create(24, 24, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.8, 0.5, 0.2))
+	var s := Sprite2D.new()
+	s.texture = ImageTexture.create_from_image(img)
+	n.add_child(s)
+	return n
 
 
 # ---------------------------------------------------------------- мир ---

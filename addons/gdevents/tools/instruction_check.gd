@@ -83,9 +83,25 @@ func prepare() -> void:
 	OS.add_logger(_catcher)
 
 
+## Действие удалило подопытного («Разрушить», «Удалить»…) — создаём
+## нового, иначе все следующие проверки прошли бы вхолостую, без объекта.
+func _revive_hero() -> void:
+	if is_instance_valid(_hero) and not _hero.is_queued_for_deletion() \
+			and _hero.is_in_group(Gde.GROUP_PREFIX + HERO):
+		return
+	if is_instance_valid(_hero) and not _hero.is_queued_for_deletion():
+		_hero.free()
+	_hero = (load(HERO_SCENE) as PackedScene).instantiate()
+	add_child(_hero)
+
+
 ## Убрать подопытного, пока он ещё что-нибудь не создал из удалённой сцены.
 func finish() -> void:
 	OS.remove_logger(_catcher)
+	# Всех: «Точка появления» на подопытном успевает наплодить его копий.
+	for n: Node in get_tree().get_nodes_in_group(Gde.GROUP_PREFIX + HERO):
+		if is_instance_valid(n) and n != _hero:
+			n.free()
 	if is_instance_valid(_hero):
 		_hero.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(HERO_SCENE))
@@ -181,6 +197,7 @@ func _run(conds: Array, acts: Array) -> String:
 	runner.call("_process", 0.016)
 	remove_child(runner)
 	runner.free()
+	_revive_hero()
 	if not _catcher.errors.is_empty():
 		return GdeI18n.t("ошибка в игре: %s") % "; ".join(_catcher.errors.slice(0, 2))
 	return ""
