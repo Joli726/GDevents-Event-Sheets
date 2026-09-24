@@ -439,7 +439,12 @@ func _test_effects() -> void:
 func _test_hitstop_flash_fade() -> void:
 	Gde.hitstop(0.1)
 	_ok(Engine.time_scale == 0.0 and Gde.in_hitstop(), "стоп-кадр: игра замерла")
-	await _wait_ms(180)
+	# Отпускает кадр, пришедший после 0,1 с; под нагрузкой он может прийти
+	# позже — ждём до секунды, а «не залип навсегда» проверяем честно.
+	await _wait_ms(100)
+	var t0 := Time.get_ticks_msec()
+	while Gde.in_hitstop() and Time.get_ticks_msec() - t0 < 1000:
+		await get_tree().process_frame
 	_ok(Engine.time_scale == 1.0 and not Gde.in_hitstop(), "стоп-кадр: через 0.1 с отпустило")
 	Gde.screen_flash("red", 0.15, 0.8)
 	await get_tree().process_frame
@@ -810,6 +815,13 @@ func _test_camera_follow() -> void:
 	Gde._on_frame_pre_draw()
 	_ok(cam != null and cam.global_position == after_step and after_step.x > 1500.0,
 			"персонаж ходит на шаге физики — между шагами камера стоит")
+	# Сглаживание физики — только для того, за кем следим, и для камеры:
+	# остальное в игре (то, что двигают события каждый кадр) его не получает.
+	var tree := get_tree()
+	_ok(tree.physics_interpolation and tree.root.physics_interpolation_mode == Node.PHYSICS_INTERPOLATION_MODE_OFF
+			and hero.physics_interpolation_mode == Node.PHYSICS_INTERPOLATION_MODE_ON
+			and cam != null and cam.physics_interpolation_mode == Node.PHYSICS_INTERPOLATION_MODE_ON,
+			"персонаж на шаге физики — сглаживание включено только ему и камере")
 	# Персонаж, который ходит каждый кадр (вид сверху), — камера каждый кадр.
 	hero.position = Vector2(2600, 300)
 	Gde._on_frame_pre_draw()
@@ -817,10 +829,16 @@ func _test_camera_follow() -> void:
 	Gde._physics_process(1.0 / 60.0)
 	_ok(cam != null and after_frame.x > after_step.x and cam.global_position == after_frame,
 			"персонаж ходит каждый кадр — камера каждый кадр, на шаге физики не дёргается")
+	_ok(hero.physics_interpolation_mode != Node.PHYSICS_INTERPOLATION_MODE_ON,
+			"персонаж ходит каждый кадр — сглаживание с него снято")
 	_free([r2, hero])
 	Gde.camera_stop_follow()
 	if cam != null:
 		cam.free()
+	# Остальные тесты идут без сглаживания, как обычная игра.
+	tree.physics_interpolation = false
+	tree.root.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_INHERIT
+	Gde._own_interp = false
 
 
 # ------------------------------------------------------------------ лист ---
