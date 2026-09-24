@@ -240,6 +240,21 @@ func _ident() -> Array:
 		var fsubs := {"ctx": _ctx, "self": "self"}
 		return [_fill(def["template"], fsubs, args), def.get("type", "number")]
 
+	# Выражение расширения: Clock::Hour().
+	if _is_op("::"):
+		_next()
+		if _peek()["t"] != "id":
+			_err(GdeI18n.t("после «%s::» ожидалось имя функции") % name)
+			return ["0.0", "number"]
+		var efn: String = str(_next()["v"])
+		var edef: Variant = _reg.ext_expr(name, efn) if _reg != null and _reg.has_method("ext_expr") else null
+		if edef == null:
+			_err(GdeI18n.t("у расширения «%s» нет выражения «%s»") % [name, efn])
+			_skip_args()
+			return ["0.0", "number"]
+		var eargs := _args(edef)
+		return [_fill(edef["template"], {"ctx": _ctx, "self": "self"}, eargs), edef.get("type", "number")]
+
 	if _is_op("."):
 		_next()
 		if _peek()["t"] != "id":

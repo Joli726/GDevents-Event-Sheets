@@ -1,8 +1,8 @@
 ## Безголовый тест всей библиотеки инструкций:
 ##   godot --headless res://addons/gdevents/tools/library_test.tscn
 ##
-## Каждое условие (и с «НЕ»), каждое действие и каждое выражение — встроенные
-## и из поведений — собирается в отдельный лист, компилируется и дважды
+## Каждое условие (и с «НЕ»), каждое действие и каждое выражение — встроенные,
+## из поведений и из расширений — собирается в отдельный лист, компилируется и дважды
 ## выполняется на живом объекте со всеми поведениями разом. Руками столько не
 ## перепроверить, а поломки тут тихие: так нашлись условия, которые всегда
 ## были «false», «Удалить все», ломавшее скрипт, и настройки-галочки,
@@ -96,6 +96,11 @@ func _ready() -> void:
 		for name: String in ((_reg.behaviors[b] as Dictionary).get("expressions", {}) as Dictionary):
 			n_expr += 1
 			_run_expr("Hero.%s::%s" % [b, name], _reg.behavior_expr(b, name))
+	# Выражения расширений: Clock::Hour() и т. п.
+	for key: String in _reg.ext_expressions:
+		n_expr += 1
+		var parts := key.split("::")
+		_run_expr(key, _reg.ext_expr(parts[0], parts[1]))
 	_summary("выражений", n_expr, before)
 
 	OS.remove_logger(_catcher)

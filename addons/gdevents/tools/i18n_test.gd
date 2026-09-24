@@ -117,6 +117,15 @@ func _test_library() -> void:
 			for what: Variant in ((e["untranslated"] as Dictionary).get(lang, []) as Array):
 				gaps.append("%s: %s" % [b, what])
 		_ok(gaps.is_empty(), "%s: у встроенных поведений переведено всё%s" % [lang, _list(gaps)])
+		var ext_gaps: Array[String] = []
+		for x: String in reg.extensions:
+			var xe: Dictionary = reg.extensions[x]
+			if not str(xe["path"]).begins_with(GdeRegistry.EXTENSION_DIRS[0]):
+				continue
+			for what2: Variant in ((xe["untranslated"] as Dictionary).get(lang, []) as Array):
+				ext_gaps.append("%s: %s" % [x, what2])
+		_ok(not reg.extensions.is_empty() and ext_gaps.is_empty(),
+				"%s: у встроенных расширений переведено всё%s" % [lang, _list(ext_gaps)])
 		GdeI18n.set_language(GdeI18n.SOURCE, false)
 
 

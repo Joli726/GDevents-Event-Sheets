@@ -752,5 +752,9 @@
 	"Имя последней нажатой клавиши.": "The name of the last key pressed.",
 	"Сколько экземпляров объекта живо в сцене — всех, а не отобранных.": "How many instances of the object are alive in the scene — all of them, not just the picked ones.",
 	"Куда смотрит объект: 1 — вправо, −1 — влево. Умножьте на скорость, и снаряд полетит в ту же сторону.": "Where the object faces: 1 — right, −1 — left. Multiply by a speed, and a projectile flies the same way.",
-	"1, если объект отражён по горизонтали, иначе 0.": "1 if the object is flipped horizontally, otherwise 0."
+	"1, если объект отражён по горизонтали, иначе 0.": "1 if the object is flipped horizontally, otherwise 0.",
+	"расширение «%s», %s(): объект может быть только первым параметром условия или действия": "extension “%s”, %s(): an object can only be the first parameter of a condition or an action",
+	"расширение «%s» объявлено дважды: %s и %s": "extension “%s” is declared twice: %s and %s",
+	"у расширения «%s» нет выражения «%s»": "extension “%s” has no expression “%s”",
+	"Выражение расширения": "Extension expression"
 }

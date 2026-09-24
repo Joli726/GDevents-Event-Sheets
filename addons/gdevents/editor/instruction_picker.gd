@@ -366,7 +366,9 @@ func _rebuild_tree(select_first: bool) -> void:
 		if not groups.has(gname):
 			var gi := _tree.create_item(root)
 			gi.set_text(0, gname)
-			gi.set_icon(0, GdeIcons.for_group(gname))
+			# У расширения своя иконка — ей и помечаем его группу.
+			gi.set_icon(0, GdeIcons.get_icon(str(def["icon"])) if def.has("extension") and def.has("icon")
+					else GdeIcons.for_group(gname))
 			gi.set_icon_max_width(0, 16)
 			gi.set_selectable(0, false)
 			gi.set_custom_color(0, Color(0.62, 0.72, 0.88))

@@ -34,6 +34,8 @@ func _ready() -> void:
 	_test_missing_template()
 	_test_free_expr_subs()
 	_test_compile_check()
+	print("—— расширения ——")
+	await _test_extensions()
 	_finish()
 
 
@@ -198,6 +200,72 @@ func _test_compile_check() -> void:
 	_ok(GdeBuild.compile_error("extends Node\nfunc f() -> void:\n\tpass\n") == "", "проверка сборки пропускает рабочий код")
 	_ok(GdeBuild.compile_error("extends Node\nfunc f() -> void:\n\tvar x = {\"a\": %.10g}\n") != "",
 			"и ловит сломанный")
+
+
+# ------------------------------------------------------------ расширения ---
+
+const PROBE_DIR := "res://addons/gdevents/tests/extensions"
+
+
+## Расширение по-настоящему: лист с его действиями, условием и выражениями
+## собирается, выполняется на живых объектах и оставляет следы.
+func _test_extensions() -> void:
+	var reg := GdeRegistry.load_default()
+	reg.scan_extensions(PROBE_DIR)
+	_ok(reg.errors.is_empty(), "пробное расширение разобрано без ошибок: %s" % [reg.errors])
+	_eq(str((reg.actions.get("Probe::mark", {}) as Dictionary).get("kind", "")), "object",
+			"действие с Node первым параметром — объектное")
+	_eq(str((reg.actions.get("Probe::reset", {}) as Dictionary).get("kind", "")), "global", "без него — общее")
+	_ok(reg.ext_expressions.has("Probe::CallCount") and reg.ext_expressions.has("Probe::Tagged"),
+			"выражения расширения зарегистрированы как Probe::Имя")
+	_eq(str((reg.ext_expressions.get("Probe::Tagged", {}) as Dictionary).get("type", "")), "string",
+			"функция -> String — текстовое выражение")
+
+	var enemies := _spawn(2)
+	var sheet := {"objects": [{"name": "Enemy", "scene": ENEMY_SCENE}], "variables": {}, "events": [
+		{"type": "standard", "conditions": [], "actions": [
+			{"id": "Probe::reset", "params": []},
+			{"id": "Probe::mark", "params": ["Enemy", "7", "1", "\"hi\""]},
+			{"id": "var.modify", "params": ["count", "=", "Probe::CallCount()"]},
+			{"id": "var.set_string", "params": ["tag", "Probe::Tagged(\"x\")"]},
+		]},
+		{"type": "standard", "conditions": [{"id": "Probe::is_marked", "params": ["Enemy"]}], "actions": [
+			{"id": "var.modify", "params": ["marked", "=", "Count(Enemy)"]},
+		]},
+	]}
+	var r := GdeGenerator.generate(sheet, reg, "res://runtime_test_ext.gdes.json")
+	_ok((r["errors"] as Array).is_empty(), "лист с расширением собран: %s" % [r["errors"]])
+	var s := GDScript.new()
+	s.source_code = r["code"]
+	_ok(s.reload() == OK, "и компилируется")
+	var runner := Node2D.new()
+	runner.set_script(s)
+	add_child(runner)
+	runner.set_process(false)
+	runner.call("_process", 0.016)
+	_eq(enemies[0].get_meta("probe", []), [7, true, "hi"], "действие получило целое, флаг и текст своих типов")
+	_ok(enemies[1].has_meta("probe"), "объектное действие прошло по всем отобранным")
+	_eq(Gde.var_get("count"), 2.0, "выражение-число считает вызовы")
+	_eq(Gde.var_get("tag"), "probe:x", "выражение-текст вернуло строку")
+	_eq(Gde.var_get("marked"), 2.0, "объектное условие отобрало отмеченных")
+	runner.queue_free()
+	_clear()
+
+	# Объект не первым параметром — ошибка разбора, а не молча сломанный лист.
+	var bad_dir := "user://gde_bad_ext"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(bad_dir))
+	var f := FileAccess.open(bad_dir.path_join("bad.gd"), FileAccess.WRITE)
+	f.store_string("## @extension Bad\nextends GdeExtension\n\n## @action Сделать\nstatic func act(n: float, o: Node) -> void:\n\tpass\n")
+	f.close()
+	var reg2 := GdeRegistry.load_default()
+	reg2.scan_extensions(bad_dir)
+	_ok(not reg2.errors.is_empty() and not reg2.actions.has("Bad::act"), "объект не первым параметром — ошибка разбора")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(bad_dir.path_join("bad.gd")))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(bad_dir))
+
+
+func _eq(got: Variant, want: Variant, what: String) -> void:
+	_ok(str(got) == str(want), "%s (получено %s)" % [what, got] if str(got) != str(want) else what)
 
 
 # ---------------------------------------------------------------- итоги ---

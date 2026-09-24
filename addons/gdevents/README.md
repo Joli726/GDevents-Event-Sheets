@@ -231,6 +231,7 @@ godot --headless --quit-after 200 res://addons/gdevents/tests/selftest.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/runtime_test.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/library_test.tscn
 godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
+godot --headless --script res://addons/gdevents/tools/i18n_test.gd
 ```
 
 Первый — модель документа, буфер обмена, поиск поведений в сцене, понятность
@@ -512,6 +513,58 @@ func cooldown_left() -> float: ...
 
 У каждого поведения есть сигналы (`jumped`, `landed`, `died`, `fired`…) —
 их можно подключать из обычного GDScript, мимо листа событий.
+
+## Свои события: расширения
+
+Поведение — это способность объекта: бегать, стрелять, получать урон.
+Для всего остального — своих условий, действий и выражений без привязки к
+поведению — есть **расширения**, как в GDevelop. Расширение — один файл
+`res://extensions/<имя>/<имя>.gd` со статическими функциями и той же
+разметкой, что у поведений:
+
+```gdscript
+## @extension Clock
+## @title Часы
+## @title.en Clock
+## @icon timer
+extends GdeExtension
+
+## @condition Сейчас от _PARAM0_ до _PARAM1_ часов
+## @condition.en It is between _PARAM0_ and _PARAM1_ o'clock
+## @param from С какого часа
+## @param.en from From hour
+static func is_hour_between(from: float, to: float) -> bool: ...
+
+## @expression Текущий час, 0…23
+## @expression.en Current hour, 0…23
+static func hour() -> float: ...        # в листе: Clock::Hour()
+```
+
+- Условия и действия появляются в окне выбора в разделе «Общие», в группе
+  с названием расширения; выражения пишутся как `Clock::Hour()`.
+- Параметры — `float`, `int`, `bool`, `String`; к нужному типу значения из
+  листа приводятся сами.
+- Первый параметр типа `Node` (`Node2D`, `CharacterBody2D`…) делает условие
+  или действие **объектным**: оно работает с отобранными экземплярами, как
+  «Изменить X у ‹Объект›», а в функцию приходит сам экземпляр.
+- Состояние между вызовами — в `static var`; рантайм — через `Gde`.
+- `library_test` сам проверяет каждую инструкцию каждого расширения.
+
+Пример в поставке — `addons/gdevents/extensions/clock/clock.gd`: системное
+время, день недели и стрелка часов.
+
+## Языки
+
+Плагин работает на английском и русском. Язык спрашивается при первом
+запуске (по умолчанию английский), дальше меняется в конце панели
+инструментов или в «Настройках редактора → GDevents»; у каждого человека
+свой. Интерфейс и встроенная библиотека переводятся по словарю
+`i18n/<язык>.json`, где ключ — русский текст из кода. Поведения и
+расширения переводятся прямо в своём файле: `@title.en`, `@action.en`,
+`## @en …` под описанием настройки, `@options.en` для пунктов списка,
+`@group.en` над `@export_group`, `@param.en` для подписей параметров.
+Основной текст — на любом языке, перевод рядом. `i18n_test` следит, чтобы
+у плагина перевод был у всего.
 
 ## Чего пока нет
 

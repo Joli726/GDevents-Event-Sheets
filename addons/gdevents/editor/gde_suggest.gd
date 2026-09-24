@@ -109,6 +109,13 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 			"insert": "%s(" % name,
 			"hint": str(d.get("description", GdeI18n.t("Общее выражение"))),
 		})
+	for key: String in reg.ext_expressions:
+		var e: Dictionary = reg.ext_expressions[key]
+		out.append({
+			"text": "%s(%s)" % [key, _args(e)],
+			"insert": "%s(" % key,
+			"hint": str(e.get("description", GdeI18n.t("Выражение расширения"))),
+		})
 	return out
 
 

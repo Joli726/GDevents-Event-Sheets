@@ -9,6 +9,8 @@ extends RefCounted
 
 const BUILTIN_PATH := "res://addons/gdevents/registry/builtin.json"
 const BEHAVIOR_DIRS := ["res://addons/gdevents/behaviors", "res://behaviors"]
+## Расширения — свои условия, действия и выражения без поведения.
+const EXTENSION_DIRS := ["res://addons/gdevents/extensions", "res://extensions"]
 
 var conditions: Dictionary = {}
 var actions: Dictionary = {}
@@ -16,6 +18,12 @@ var expressions: Dictionary = {}
 var object_expressions: Dictionary = {}
 var operators: Dictionary = {}
 var behaviors: Dictionary = {}
+## имя расширения -> {"path", "title", "description", "icon", "untranslated",
+## "conditions", "actions", "expressions"}. Условия и действия расширений
+## лежат и в общих conditions/actions под именами «Расширение::функция».
+var extensions: Dictionary = {}
+## «Clock::Hour» -> описание выражения расширения.
+var ext_expressions: Dictionary = {}
 var errors: Array[String] = []
 
 
@@ -24,6 +32,8 @@ static func load_default() -> GdeRegistry:
 	r.load_builtin(BUILTIN_PATH)
 	for d: String in BEHAVIOR_DIRS:
 		r.scan_behaviors(d)
+	for d2: String in EXTENSION_DIRS:
+		r.scan_extensions(d2)
 	return r
 
 
@@ -95,6 +105,16 @@ func object_expr(name: String) -> Variant:
 	return null
 
 
+## Выражение расширения: Clock::Hour().
+func ext_expr(ext: String, name: String) -> Variant:
+	var key := "%s::%s" % [ext, name]
+	if not ext_expressions.has(key):
+		return null
+	var d: Dictionary = (ext_expressions[key] as Dictionary).duplicate()
+	d["name"] = key
+	return d
+
+
 func behavior_expr(beh: String, name: String) -> Variant:
 	var b: Variant = behaviors.get(beh)
 	if b == null:
@@ -136,6 +156,13 @@ func scan_behaviors(dir_path: String) -> void:
 		_scan_behavior_file(f)
 
 
+func scan_extensions(dir_path: String) -> void:
+	if not DirAccess.dir_exists_absolute(dir_path):
+		return
+	for f: String in _gd_files(dir_path):
+		_scan_behavior_file(f, true)
+
+
 func _gd_files(root: String) -> Array[String]:
 	var out: Array[String] = []
 	var d := DirAccess.open(root)
@@ -162,23 +189,26 @@ func _gd_files(root: String) -> Array[String]:
 ## реестр просто перестал их выбрасывать. Из-за этого раньше в списке событий
 ## стояло «Свойство acceleration у Player (Platformer)» — строка, которая
 ## ничего не объясняет.
-func _scan_behavior_file(path: String) -> void:
+func _scan_behavior_file(path: String, extension: bool = false) -> void:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return
 	var src := f.get_as_text()
 	f.close()
-	if not src.contains("extends GdeBehavior"):
+	if not src.contains("extends GdeExtension" if extension else "extends GdeBehavior"):
 		return
 
 	var bname := _default_behavior_name(path)
 	# Любую метку можно продублировать на другом языке: @title.en, @action.en…
 	var re_note := RegEx.create_from_string(
-			"^\\s*##\\s*@(action|condition|expression|behavior|title|description|icon|target|needs|internal|param|options|group)(?:\\.([a-z]{2}))?(?=\\s|$)\\s*(.*)$")
+			"^\\s*##\\s*@(action|condition|expression|behavior|extension|title|description|icon|target|needs|internal|param|options|group)(?:\\.([a-z]{2}))?(?=\\s|$)\\s*(.*)$")
 	var re_doc := RegEx.create_from_string("^\\s*##\\s?(.*)$")
 	# Строка описания на другом языке: «## @en Maximum speed.»
 	var re_doc_lang := RegEx.create_from_string("^@([a-z]{2})\\s+(.*)$")
-	var re_func := RegEx.create_from_string("^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)")
+	# У расширений функции статические, а тип результата решает, число
+	# выражение или текст.
+	var re_func := RegEx.create_from_string(
+			"^\\s*(?:static\\s+)?func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*([\\w\\[\\]]+))?")
 	var re_export := RegEx.create_from_string(
 			"^\\s*@export\\w*(?:\\([^)]*\\))?\\s+var\\s+([A-Za-z_]\\w*)\\s*(?::\\s*([\\w\\[\\], ]+?))?\\s*(?:=|$)")
 	var re_group := RegEx.create_from_string("^\\s*@export_group\\s*\\(\\s*\"([^\"]*)\"")
@@ -221,7 +251,7 @@ func _scan_behavior_file(path: String) -> void:
 			var lang := m_note.get_string(2)
 			var v := m_note.get_string(3).strip_edges()
 			match k:
-				"behavior":
+				"behavior", "extension":
 					bname = v
 				"title":
 					title[lang] = v
@@ -319,8 +349,14 @@ func _scan_behavior_file(path: String) -> void:
 				var labels := {}
 				for pn: String in params:
 					labels[pn] = _pick(entry, "@param " + pn, params[pn])
-				_add_member(entry, bname, pending_kind, _pick(entry, m_fn.get_string(1), pending_text),
-						m_fn.get_string(1), m_fn.get_string(2), _pick_doc(entry, m_fn.get_string(1), doc), labels)
+				var sentence := _pick(entry, m_fn.get_string(1), pending_text)
+				var fdoc := _pick_doc(entry, m_fn.get_string(1), doc)
+				if extension:
+					_add_ext_member(entry, bname, pending_kind, sentence, m_fn.get_string(1),
+							m_fn.get_string(2), m_fn.get_string(3), fdoc, labels)
+				else:
+					_add_member(entry, bname, pending_kind, sentence,
+							m_fn.get_string(1), m_fn.get_string(2), fdoc, labels)
 			pending_kind = ""
 			pending_text = {}
 			params = {}
@@ -345,6 +381,9 @@ func _scan_behavior_file(path: String) -> void:
 		(entry["needs"] as Array).append(_parse_need(nd))
 	if str(entry["title"]).is_empty():
 		entry["title"] = bname
+	if extension:
+		_register_extension(entry, bname)
+		return
 	_retitle(entry, str(entry["title"]))
 
 	# Своя копия встроенного поведения в res://behaviors — не дубль, а замена:
@@ -397,6 +436,92 @@ static func _pick_doc(entry: Dictionary, what: String, doc: Dictionary) -> Strin
 ## Пункты @options на выбранном языке. Пусто — остаются как в @export_enum.
 static func _pick_list(options: Dictionary) -> Array:
 	return options.get(GdeI18n.language(), [])
+
+
+# ------------------------------------------------------------ расширения ---
+
+## Типы, которые делают параметр объектом листа: инструкция тогда работает
+## с отобранными экземплярами, а в функцию приходит сам экземпляр.
+static func _is_node_type(ty: String) -> bool:
+	return ty == "Node" or (ClassDB.class_exists(ty) and ClassDB.is_parent_class(ty, "Node"))
+
+
+## Условие, действие или выражение расширения из статической функции.
+func _add_ext_member(entry: Dictionary, ename: String, kind: String, sentence: String,
+		method: String, arglist: String, ret: String, doc: String, labels: Dictionary) -> void:
+	var params: Array = []
+	var call: Array[String] = []
+	var kinds: Array = []
+	var on_object := false
+	var i := 0
+	for a: String in arglist.split(",", false):
+		var s := a.strip_edges()
+		if s.is_empty():
+			continue
+		var nm := s.split(":")[0].split("=")[0].strip_edges()
+		var ty := s.split(":")[1].split("=")[0].strip_edges() if s.contains(":") else "float"
+		var label: String = labels.get(nm, nm)
+		if _is_node_type(ty):
+			if i != 0 or kind == "expression":
+				errors.append(GdeI18n.t("расширение «%s», %s(): объект может быть только первым параметром условия или действия")
+						% [ename, method])
+				return
+			on_object = true
+			params.append({"kind": "object", "label": labels.get(nm, GdeI18n.t("Объект"))})
+			call.append("{o}")
+		elif ty == "String" or ty == "StringName":
+			params.append({"kind": "string", "label": label})
+			kinds.append("string")
+			call.append("{%d}" % i)
+		else:
+			params.append({"kind": "number", "label": label})
+			kinds.append("number")
+			# Из листа приходят числа — к типу параметра приводим сами.
+			call.append(("bool({%d})" if ty == "bool" else ("int({%d})" if ty == "int" else "{%d}")) % i)
+		i += 1
+	var target := "preload(\"%s\").%s(%s)" % [str(entry["path"]), method, ", ".join(call)]
+	match kind:
+		"action":
+			entry["actions"][method] = {
+				"sentence": sentence, "description": doc, "params": params,
+				"kind": "object" if on_object else "global",
+				"code": target,
+			}
+		"condition":
+			var d := {
+				"sentence": sentence, "description": doc, "params": params,
+				"kind": "object" if on_object else "global",
+			}
+			d["pred" if on_object else "code"] = "bool(%s)" % target
+			entry["conditions"][method] = d
+		"expression":
+			var is_text := ret == "String" or ret == "StringName"
+			entry["expressions"][_pascal(method)] = {
+				"type": "string" if is_text else "number",
+				"params": kinds,
+				"description": sentence if doc.is_empty() else doc,
+				"template": ("str(%s)" if is_text else "float(%s)") % target,
+			}
+
+
+## Расширение — в общие таблицы: его условия и действия видны в окне выбора
+## и в генераторе так же, как встроенные, под именами «Расширение::функция».
+func _register_extension(entry: Dictionary, ename: String) -> void:
+	if extensions.has(ename) or behaviors.has(ename):
+		errors.append(GdeI18n.t("расширение «%s» объявлено дважды: %s и %s")
+				% [ename, str((extensions.get(ename, behaviors.get(ename, {})) as Dictionary).get("path", "")), entry["path"]])
+		return
+	extensions[ename] = entry
+	for table: String in ["conditions", "actions"]:
+		var target: Dictionary = conditions if table == "conditions" else actions
+		for m: String in (entry[table] as Dictionary):
+			var d: Dictionary = entry[table][m]
+			d["group"] = entry["title"]
+			d["icon"] = entry["icon"]
+			d["extension"] = ename
+			target["%s::%s" % [ename, m]] = d
+	for e: String in (entry["expressions"] as Dictionary):
+		ext_expressions["%s::%s" % [ename, e]] = entry["expressions"][e]
 
 
 ## Английское имя поведения нужно только коду. В глаза пользователю должно
