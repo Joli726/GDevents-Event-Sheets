@@ -1113,5 +1113,6 @@
 	"имя переменной": "variable name",
 	"  ✓ справочник совпадает с библиотекой": "  ✓ the reference matches the library",
 	"  ✗ справочник отстал от библиотеки: %s — пересоберите: godot --headless --script res://addons/gdevents/tools/make_reference.gd": "  ✗ the reference is behind the library: %s — rebuild it: godot --headless --script res://addons/gdevents/tools/make_reference.gd",
-	"—— проверок: 1, провалено: %d": "—— checks: 1, failed: %d"
+	"—— проверок: 1, провалено: %d": "—— checks: 1, failed: %d",
+	"Поведение снято. Вместе с ним удалено то, что оно создало само: %s": "The behavior is removed, together with what it had created itself: %s"
 }

@@ -5,7 +5,7 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.9.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
+**Version 0.9.1** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
 instructions, your own behaviors and extensions, scene and file checks, an
 English and Russian interface.
 
@@ -243,6 +243,14 @@ behavior in `res://behaviors/` gets it without a single extra line.
 shape and an `AnimatedSprite2D`. All that is left is to add sprites. What
 exactly will be created is written in the behavior picker in advance. If the
 needed node already exists in the scene, nothing is created.
+
+**A removed behavior takes its skeleton with it.** The nodes a behavior
+created itself are deleted with it. The skeleton stays whole if you put
+something of your own into it or another behavior of the object uses one of
+its nodes — for example, "Juice" uses the platformer's sprite: half a
+skeleton is worse than either, a body without a shape falls through the
+floor. Behaviors added before version 0.9.1 have no record of their
+skeleton — their nodes stay; delete them by hand.
 
 **No need to close the scene.** If it is open in a tab, the edit goes through
 the live tree and is saved through the editor — nothing is lost.

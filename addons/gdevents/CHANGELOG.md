@@ -8,6 +8,13 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.9.1
+
+- **Removing a behavior removes the nodes it created itself** (body, shape,
+  sprite, damage area…), unless something of yours is inside or another
+  behavior of the object uses them. · **Снятое поведение уносит свой
+  каркас** — узлы, которые оно создало само.
+
 ## 0.9.0
 
 - **Fast collisions**: "collides with", "has just collided", "touching from
