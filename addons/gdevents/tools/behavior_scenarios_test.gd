@@ -11,6 +11,9 @@ extends Node2D
 
 const PATROL := preload("res://addons/gdevents/behaviors/patrol_enemy/patrol_enemy.gd")
 const PATHFINDER := preload("res://addons/gdevents/behaviors/pathfinder/pathfinder.gd")
+const HOMING := preload("res://addons/gdevents/behaviors/homing/homing.gd")
+const ORBIT := preload("res://addons/gdevents/behaviors/orbit/orbit.gd")
+const SHOOT := preload("res://addons/gdevents/behaviors/shoot/shoot.gd")
 
 var _fails: int = 0
 var _checks: int = 0
@@ -23,9 +26,12 @@ func _ready() -> void:
 	Gde.register_objects([
 		{"name": "Player", "scene": "res://addons/gdevents/tests/player_virtual.tscn"},
 		{"name": "Enemy", "scene": "res://addons/gdevents/tests/enemy_virtual.tscn"},
+		{"name": "Boss", "scene": "res://addons/gdevents/tests/boss_virtual.tscn"},
 	])
 	await _patrol_enemy()
 	await _pathfinder()
+	await _homing()
+	await _orbit()
 	_report()
 
 
@@ -148,6 +154,118 @@ func _pathfinder() -> void:
 	await _frames(2)
 
 
+func _homing() -> void:
+	print("— Самонаведение")
+	var w := _world()
+	w.position = Vector2(0, 4000)
+	var t := _tagged(w, "Enemy", Vector2(0, 200))
+	var m := _node(w, Vector2(0, 0))
+	var b := _beh(m, HOMING, {"speed": 300.0, "turn_speed": 360.0, "arm_time": 0.0,
+			"view_angle": 360.0, "lifetime": 0.0})
+	var closest := INF
+	for i in 90:
+		await get_tree().physics_frame
+		closest = minf(closest, m.global_position.distance_to(t.global_position))
+	_ok(closest < 12.0, "наведение: развернулось и догнало цель (ближе всего %.0f px)" % closest)
+	m.queue_free()
+
+	# Медленный поворот: ракета проскакивает мимо, цель уходит из поля зрения.
+	var t2 := _tagged(w, "Enemy", Vector2(1000, 40))
+	t.queue_free()
+	var m2 := _node(w, Vector2(900, 0))
+	var b2 := _beh(m2, HOMING, {"speed": 400.0, "turn_speed": 20.0, "arm_time": 0.0,
+			"view_angle": 90.0, "lifetime": 0.0, "retarget": false})
+	var lost: Array[bool] = [false]
+	b2.connect("lost_target", func() -> void: lost[0] = true)
+	var closest2 := INF
+	for i in 40:
+		await get_tree().physics_frame
+		closest2 = minf(closest2, m2.global_position.distance_to(t2.global_position))
+	_ok(lost[0] and not bool(b2.call("has_target")), "наведение: проскочило и потеряло цель")
+	_ok(closest2 > 10.0, "наведение: с медленным поворотом — промах (ближе всего %.0f px)" % closest2)
+	m2.queue_free()
+
+	# Цель за спиной вне поля зрения — не захватывается.
+	var m3 := _node(w, Vector2(1300, 0))
+	var b3 := _beh(m3, HOMING, {"speed": 0.0, "view_angle": 90.0, "arm_time": 0.0, "lifetime": 0.0})
+	await _frames(3)
+	_ok(not bool(b3.call("has_target")), "наведение: цель за спиной не захвачена")
+	m3.global_rotation = PI
+	b3.call("launch", 180.0)
+	await _frames(3)
+	_ok(bool(b3.call("has_target")), "наведение: развернули к цели — захватило")
+
+	# «Выстрел» запускает самонаводящийся снаряд без прямолинейного полёта.
+	var proto := Node2D.new()
+	var hb := Node.new()
+	hb.name = "Homing"
+	hb.set_script(HOMING)
+	proto.add_child(hb)
+	hb.owner = proto
+	var ps := PackedScene.new()
+	ps.pack(proto)
+	proto.free()
+	var gun := _node(w, Vector2(1600, 0))
+	var sh := _beh(gun, SHOOT, {"bullet_scene": ps, "fire_rate": 0.0, "magazine": 0,
+			"spread": 0.0, "pellets": 1, "aim_by_flip": false, "offset_forward": 0.0})
+	var shots: Array[Node] = []
+	sh.connect("fired", func(n: Node) -> void: shots.append(n))
+	sh.call("fire_at_angle", 90.0)
+	await _frames(2)
+	_ok(shots.size() == 1, "выстрел: самонаводящийся снаряд создан")
+	if shots.size() == 1:
+		var bullet := shots[0]
+		_ok(Gde.behavior(bullet, "LinearMove", true) == null, "выстрел: прямолинейный полёт не добавлен")
+		_ok(absf(float(Gde.behavior(bullet, "Homing").call("heading")) - 90.0) < 1.0,
+				"выстрел: ракета стартует туда, куда выстрелили")
+		bullet.queue_free()
+	w.queue_free()
+	await _frames(2)
+
+
+func _orbit() -> void:
+	print("— Орбита")
+	var w := _world()
+	w.position = Vector2(0, 6000)
+	var boss := _tagged(w, "Boss", Vector2(0, 0))
+	var sats: Array[Node2D] = []
+	var behs: Array[Node] = []
+	for i in 3:
+		var s := _node(w, Vector2(100, 0))
+		sats.append(s)
+		behs.append(_beh(s, ORBIT, {"center_object": "Boss", "radius": 50.0,
+				"degrees_per_second": 90.0, "delete_with_center": true}))
+	await _frames(3)
+	var even := true
+	for s: Node2D in sats:
+		if absf(s.global_position.distance_to(boss.global_position) - 50.0) > 0.5:
+			even = false
+	_ok(even, "орбита: все на радиусе 50 от центра")
+	var a0 := float(behs[0].call("angle"))
+	var gaps: Array[float] = []
+	for i in 3:
+		var d := absf(angle_difference(deg_to_rad(float(behs[i].call("angle"))),
+				deg_to_rad(float(behs[(i + 1) % 3].call("angle")))))
+		gaps.append(rad_to_deg(d))
+	_ok(absf(gaps[0] - 120.0) < 1.0 and absf(gaps[1] - 120.0) < 1.0,
+			"орбита: трое встали поровну — через 120° (%.0f°, %.0f°)" % [gaps[0], gaps[1]])
+	await _frames(30)
+	var moved := rad_to_deg(absf(angle_difference(deg_to_rad(a0), deg_to_rad(float(behs[0].call("angle"))))))
+	_ok(absf(moved - 45.0) < 3.0, "орбита: за полсекунды повернулись на 45° (%.0f°)" % moved)
+	boss.global_position += Vector2(200, 0)
+	await _frames(2)
+	_ok(absf(sats[0].global_position.distance_to(boss.global_position) - 50.0) < 0.5, "орбита: следует за движущимся центром")
+	boss.queue_free()
+	await _frames(3)
+	var gone := true
+	for s: Node2D in sats:
+		if is_instance_valid(s) and s.is_inside_tree() and not s.is_queued_for_deletion():
+			gone = false
+	_ok(gone, "орбита: исчезли вместе с центром")
+	w.queue_free()
+	await _frames(2)
+
+
 # ---------------------------------------------------------------- мир ---
 
 func _world() -> Node2D:
@@ -183,6 +301,13 @@ func _character(w: Node, at: Vector2, size: Vector2) -> CharacterBody2D:
 	c.add_child(_rect(size))
 	w.add_child(c)
 	return c
+
+
+func _node(w: Node, at: Vector2) -> Node2D:
+	var n := Node2D.new()
+	n.position = at
+	w.add_child(n)
+	return n
 
 
 ## Экземпляр объекта листа без сцены: рантайм узнаёт его по группе.

@@ -313,6 +313,14 @@ func _spawn_one(o: Node2D, angle_deg: float) -> void:
 		if body != null:
 			speed += body.velocity.dot(dir) * inherit_velocity
 
+	# Самонаводящийся снаряд летит сам: прямолинейный полёт поверх него
+	# увёл бы ракету мимо цели. Направление ему задаёт поворот, поставленный выше.
+	var homing: Node = Gde.behavior(b, "Homing", true)
+	if homing != null:
+		homing.call("launch", angle_deg)
+		fired.emit(b)
+		return
+
 	var mv: Node = Gde.behavior(b, "LinearMove", true)
 	var created := false
 	if mv == null and auto_move:
