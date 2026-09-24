@@ -342,6 +342,52 @@ func filter_pair_not(ctx: GdePickContext, a: String, b: String, pred: Callable) 
 	return not kept.is_empty()
 
 
+## Вызов функции из событий. Параметры-объекты передаются выборкой: внутри
+## функции объект «target» — это отобранные сейчас экземпляры того объекта,
+## что указали при вызове. Функция-условие, вернув «истина», сужает выборку
+## вызывающего события так же, как встроенное условие.
+func call_fn(ctx: GdePickContext, aliases: Dictionary, fn: Callable) -> bool:
+	var sub := _fn_context(ctx, aliases)
+	var ok := bool(fn.call(sub))
+	if ok:
+		for alias: String in aliases:
+			ctx.set_pick(str(aliases[alias]), sub.pick(alias))
+	return ok
+
+
+## Условие-функция с «НЕ»: выборку не трогаем — «не сделала» не отбирает никого.
+func call_fn_not(ctx: GdePickContext, aliases: Dictionary, fn: Callable) -> bool:
+	return not bool(fn.call(_fn_context(ctx, aliases)))
+
+
+## Действие-функция: выборка вызывающего события не меняется.
+func call_fn_action(ctx: GdePickContext, aliases: Dictionary, fn: Callable) -> void:
+	fn.call(_fn_context(ctx, aliases))
+
+
+## «Вернуть: истина» в функции-условии: отобранные сейчас экземпляры
+## параметров-объектов уходят вызывающему. Если возвратов несколько (в цикле
+## или в разных событиях), выборки складываются.
+func fn_return(fc: GdePickContext, ctx: GdePickContext, names: Array) -> void:
+	for n: String in names:
+		var now := ctx.pick(n)
+		if not fc.returned:
+			fc.set_pick(n, now.duplicate())
+			continue
+		var cur := fc.pick(n)
+		for x: Node in now:
+			if not cur.has(x):
+				cur.append(x)
+	fc.returned = true
+
+
+func _fn_context(ctx: GdePickContext, aliases: Dictionary) -> GdePickContext:
+	var sub := ctx.copy()
+	for alias: String in aliases:
+		sub.set_pick(alias, ctx.pick(str(aliases[alias])).duplicate())
+	return sub
+
+
 ## Событие «Любое из условий» (ИЛИ). Каждое условие проверяется на своей
 ## копии выборки — и все, а не до первого истинного: условия с памятью
 ## («только что нажата», «один раз») должны видеть каждый кадр. В выборке

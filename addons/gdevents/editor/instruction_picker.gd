@@ -220,6 +220,9 @@ func _collect() -> Array:
 	var builtin: Dictionary = _reg.conditions if _kind == "conditions" else _reg.actions
 	for id: String in builtin:
 		out.append({"id": id, "def": builtin[id], "behavior": ""})
+	var own: Dictionary = _reg.sheet_conditions if _kind == "conditions" else _reg.sheet_actions
+	for id2: String in own:
+		out.append({"id": id2, "def": own[id2], "behavior": ""})
 	for bname: String in _reg.behaviors:
 		var table: Dictionary = (_reg.behaviors[bname] as Dictionary).get(_kind, {})
 		for m: String in table:

@@ -250,6 +250,7 @@ const EVENT_KEYS := {
 	"while": ["type", "disabled", "folded", "any", "locals", "conditions", "actions", "children"],
 	"group": ["type", "disabled", "folded", "name", "children"],
 	"include": ["type", "disabled", "sheet"],
+	"function": ["type", "disabled", "folded", "name", "kind", "sentence", "description", "params", "children"],
 	"comment": ["type", "disabled", "text"],
 }
 const COND_KEYS := ["id", "params", "inverted", "disabled"]

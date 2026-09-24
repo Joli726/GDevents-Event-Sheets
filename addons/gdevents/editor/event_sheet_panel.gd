@@ -154,6 +154,8 @@ func _build_ui() -> void:
 	am.add_icon_item(GdeIcons.get_icon("group"), GdeI18n.t("Группа"), 5)
 	am.add_icon_item(GdeIcons.get_icon("link"), GdeI18n.t("Подключить лист"), 6)
 	am.set_item_tooltip(am.item_count - 1, GdeI18n.t("События другого листа — управление игроком, пауза, счёт — собираются здесь, как будто их скопировали. Правка общего листа доходит до всех, кто его подключил"))
+	am.add_icon_item(GdeIcons.get_icon("function"), GdeI18n.t("Функция (своё действие или условие)"), 7)
+	am.set_item_tooltip(am.item_count - 1, GdeI18n.t("Своё действие или условие из событий: появится в окне выбора рядом со встроенными, в этом листе и во всех, кто его подключил"))
 	am.id_pressed.connect(_on_add_root_event)
 	bar.add_child(add_menu)
 
@@ -596,6 +598,9 @@ func _rebuild(recheck: bool = true) -> void:
 		c.queue_free()
 	if doc == null:
 		return
+	# Функции листа — в реестр, чтобы окно выбора и строки их знали.
+	if registry != null:
+		registry.set_sheet_functions(GdeFunctions.defs_for_sheet(doc.data, doc.path))
 	if recheck:
 		if _autosave != null and autosave_enabled:
 			_autosave.start()
@@ -765,6 +770,7 @@ func add_instruction(p: Array, kind: String) -> void:
 	_pending_add = p
 	_pending_kind = kind
 	_editing = []
+	doc.extra_objects = doc.function_objects(p)
 	_picker.open_add(registry, doc, kind, _preferred_object(p), accent)
 
 
@@ -779,6 +785,7 @@ func edit_instruction(p: Array, kind: String, index: int) -> void:
 		_set_status(GdeI18n.t("Инструкция «%s» больше не существует") % str(inst.get("id", "")), true)
 		return
 	_editing = [p, kind, index]
+	doc.extra_objects = doc.function_objects(p)
 	_picker.open_edit(registry, doc, kind, inst, accent)
 
 
@@ -915,6 +922,84 @@ func toggle_event_any(p: Array) -> void:
 		doc.set_event_field(p, "any", true)
 	else:
 		doc.erase_event_field(p, "any")
+
+
+## Параметры функции — строками «имя: вид: подпись».
+func edit_function_params(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	var e: Dictionary = doc.event_at(p)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = GdeI18n.t("Параметры функции «%s»") % str(e.get("name", ""))
+	var box := VBoxContainer.new()
+	var hint := Label.new()
+	hint.text = GdeI18n.t("По одному на строке: имя: вид: подпись. Вид — object (объект), number (число) или string (текст).\nВ фразе функции параметры — _PARAM0_, _PARAM1_… по порядку. Внутри функции объект-параметр пишется своим именем, число и текст — Variable(имя).")
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(460, 0)
+	hint.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(hint)
+	var te := TextEdit.new()
+	te.custom_minimum_size = Vector2(460, 150)
+	te.text = params_to_text(e.get("params", []))
+	te.placeholder_text = GdeI18n.t("target: object: Кого\namount: number: Сколько")
+	box.add_child(te)
+	var err := Label.new()
+	err.add_theme_color_override("font_color", Color(0.85, 0.55, 0.55))
+	box.add_child(err)
+	dlg.add_child(box)
+	dlg.get_ok_button().text = GdeI18n.t("Сохранить")
+	dlg.get_ok_button().pressed.connect(func():
+		var parsed := text_to_params(te.text)
+		if str(parsed["error"]) != "":
+			err.text = parsed["error"]
+			dlg.show.call_deferred()
+			return
+		doc.set_event_field(p, "params", parsed["params"])
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+static func params_to_text(params: Variant) -> String:
+	var lines: Array[String] = []
+	if params is Array:
+		for pr: Variant in params:
+			if pr is Dictionary:
+				var d: Dictionary = pr
+				var line := "%s: %s" % [d.get("name", ""), d.get("kind", "number")]
+				if str(d.get("label", "")) != "":
+					line += ": %s" % d["label"]
+				lines.append(line)
+	return "\n".join(lines)
+
+
+## {"params": Array, "error": ""}
+static func text_to_params(text: String) -> Dictionary:
+	var out: Array = []
+	var seen: Dictionary = {}
+	var n := 0
+	for raw: String in text.split("\n"):
+		n += 1
+		var line := raw.strip_edges()
+		if line.is_empty():
+			continue
+		var parts := line.split(":", true, 2)
+		var name := parts[0].strip_edges()
+		var kind := parts[1].strip_edges().to_lower() if parts.size() > 1 else "number"
+		var label := parts[2].strip_edges() if parts.size() > 2 else ""
+		if not name.is_valid_ascii_identifier():
+			return {"params": [], "error": GdeI18n.t("строка %d: имя «%s» — латинские буквы, цифры и _, не с цифры") % [n, name]}
+		if seen.has(name):
+			return {"params": [], "error": GdeI18n.t("строка %d: параметр «%s» уже есть") % [n, name]}
+		if not kind in GdeFunctions.PARAM_KINDS:
+			return {"params": [], "error": GdeI18n.t("строка %d: вид «%s» — нужно object, number или string") % [n, kind]}
+		seen[name] = true
+		var d := {"name": name, "kind": kind}
+		if not label.is_empty():
+			d["label"] = label
+		out.append(d)
+	return {"params": out, "error": ""}
 
 
 ## Локальные переменные события — строками «имя = значение».
@@ -1394,7 +1479,7 @@ func _on_event_menu(id: int) -> void:
 func _on_add_root_event(id: int) -> void:
 	if doc == null:
 		return
-	var types := ["standard", "comment", "foreach", "repeat", "while", "group", "include"]
+	var types := ["standard", "comment", "foreach", "repeat", "while", "group", "include", "function"]
 	if id < 0 or id >= types.size():
 		return
 	doc.add_event([], 9999, types[id])

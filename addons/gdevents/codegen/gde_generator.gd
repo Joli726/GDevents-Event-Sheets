@@ -36,6 +36,9 @@ var _include_at: int = -1
 var _include_sheet: String = ""
 ## Карта для ошибок во время игры: [строка комментария события, номер, что за событие].
 var _event_lines: Array = []
+## Функции из событий листа (GdeFunctions.collect) и та, что собирается сейчас.
+var _fns: Array = []
+var _in_fn: Dictionary = {}
 
 
 static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
@@ -47,6 +50,8 @@ static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -
 func _run(sheet: Dictionary, source_path: String) -> Dictionary:
 	if GdeInclude.has_includes(sheet.get("events", [])):
 		sheet = GdeInclude.expand(sheet, source_path)
+	_fns = GdeFunctions.collect(sheet.get("events", []))
+	var old_fns := _reg.set_sheet_functions(GdeFunctions.defs(_fns))
 	var objects: Array = sheet.get("objects", [])
 	for o: Dictionary in objects:
 		_objects[str(o.get("name", ""))] = true
@@ -65,9 +70,11 @@ func _run(sheet: Dictionary, source_path: String) -> Dictionary:
 		_line(1, "pass")
 	else:
 		_gen_events(events, 1, "")
+	_emit_functions()
 	_emit_event_map(source_path)
 
 	GdeExpr.known_objects = {}
+	_reg.set_sheet_functions(old_fns)
 	return {
 		"code": "\n".join(_out) + "\n",
 		"errors": _errors,
@@ -155,6 +162,8 @@ func _gen_event(e: Dictionary, indent: int, parent_ctx: String) -> void:
 			_gen_group(e, indent, parent_ctx)
 		"include":
 			_gen_include(e, indent, parent_ctx)
+		"function":
+			pass  # тело функции собирается отдельным методом в _emit_functions
 		"foreach":
 			_gen_foreach(e, indent, parent_ctx)
 		"repeat":
@@ -322,6 +331,107 @@ func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> boo
 	return emitted
 
 
+# ---------------------------------------------------------------- функции ---
+
+## Аргументы вызова функции: контекст, какие объекты под каким именем
+## параметра, и сама функция с числами и текстами.
+func _fn_call_args(d: Dictionary, args: Array, ctx: String) -> String:
+	var aliases: Array[String] = []
+	var values: Array[String] = []
+	var defs: Array = d.get("params", [])
+	var fn := _fn_by_name(str(d["function"]))
+	var names: Array = (fn.get("params", []) as Array) if not fn.is_empty() else []
+	for i in range(defs.size()):
+		var pname := str((names[i] as Dictionary).get("name", "p%d" % i)) if i < names.size() else "p%d" % i
+		var val: String = args[i] if i < args.size() else ""
+		if str((defs[i] as Dictionary).get("kind", "")) == "object":
+			aliases.append("%s: %s" % [_quote(pname), _quote(val)])
+		else:
+			values.append(val)
+	var sub := _tmp("_fs")
+	return "%s, {%s}, func(%s: GdePickContext) -> bool: return %s(%s)" % [
+			ctx, ", ".join(aliases), sub, GdeFunctions.method_name(str(d["function"])),
+			", ".join([sub] + values)]
+
+
+func _fn_by_name(name: String) -> Dictionary:
+	for f: Dictionary in _fns:
+		if str((f["e"] as Dictionary).get("name", "")) == name:
+			return f["e"]
+	return {}
+
+
+## Каждая функция — метод собранного скрипта. Параметры-числа и тексты —
+## её локальные переменные, параметры-объекты — имена объектов внутри тела.
+func _emit_functions() -> void:
+	var seen: Dictionary = {}
+	for f: Dictionary in _fns:
+		var e: Dictionary = f["e"]
+		var name := str(e.get("name", ""))
+		_path = (f["path"] as Array).duplicate()
+		_inst = []
+		var inc: Array = f["include"]
+		_include_at = inc.size() if not inc.is_empty() else -1
+		if not GdeFunctions.is_valid_name(name):
+			_err(GdeI18n.t("функция «%s»: имя — латинские буквы, цифры и _, не с цифры") % name)
+			continue
+		if seen.has(name):
+			_err(GdeI18n.t("функция «%s» объявлена дважды") % name)
+			continue
+		seen[name] = true
+		var obj_params: Array[String] = []
+		var val_params: Array[String] = []
+		for p: Variant in e.get("params", []):
+			var pd: Dictionary = p if p is Dictionary else {}
+			var pn := str(pd.get("name", ""))
+			if not pn.is_valid_ascii_identifier():
+				_err(GdeI18n.t("функция «%s»: имя параметра «%s» — латинские буквы, цифры и _") % [name, pn])
+				continue
+			if str(pd.get("kind", "number")) == "object":
+				obj_params.append(pn)
+			else:
+				val_params.append(pn)
+		_line(0, "")
+		_line(0, "")
+		_line(0, GdeI18n.t("# Функция «%s» (%s) — из событий листа.") % [name,
+				GdeI18n.t("условие") if str(e.get("kind", "action")) == "condition" else GdeI18n.t("действие")])
+		var sig: Array[String] = ["_fc: GdePickContext"]
+		for vp: String in val_params:
+			sig.append("p_%s: Variant" % vp)
+		_line(0, "func %s(%s) -> bool:" % [GdeFunctions.method_name(name), ", ".join(sig)])
+		_line(1, "var _gde_ret := false")
+		var added: Array[String] = []
+		for op: String in obj_params:
+			if not _objects.has(op):
+				_objects[op] = true
+				added.append(op)
+		GdeExpr.known_objects = _objects.duplicate()
+		var scoped := false
+		if not val_params.is_empty():
+			var init: Array[String] = []
+			for vp2: String in val_params:
+				init.append("%s: p_%s" % [_quote(vp2), vp2])
+			_lv_n += 1
+			var dict_var := "_lv%d" % _lv_n
+			_line(1, "var %s: Dictionary = {%s}" % [dict_var, ", ".join(init)])
+			var re := RegEx.new()
+			re.compile("Gde\\.(var_get|var_set|str_get)\\(\"(%s)(?=[\".])" % "|".join(val_params))
+			_scopes.append({"var": dict_var, "re": re})
+			scoped = true
+		_in_fn = e
+		_event_n += 1
+		_emit_event_comment(e, 1, GdeI18n.t("Функция %s") % name)
+		_gen_events(e.get("children", []), 1, "_fc")
+		_in_fn = {}
+		_close_locals(scoped)
+		_line(1, "return _gde_ret")
+		for op2: String in added:
+			_objects.erase(op2)
+		GdeExpr.known_objects = _objects.duplicate()
+	_include_at = -1
+	_path = []
+
+
 # ------------------------------------------------ локальные переменные ---
 
 ## Локальные переменные события: словарь объявляется в начале события, так
@@ -407,6 +517,8 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 	var p := _compile_params(d, raw, ctx, id)
 	var args: Array = p["args"]
 	var bare: Array = p["bare"]
+	if d.has("function"):
+		return "%s(%s)" % ["Gde.call_fn_not" if inverted else "Gde.call_fn", _fn_call_args(d, args, ctx)]
 	var kind := str(d.get("kind", "global"))
 
 	match kind:
@@ -466,6 +578,24 @@ func _gen_action(a: Dictionary, ctx: String, indent: int) -> bool:
 	var p := _compile_params(d, raw, ctx, id)
 	var args: Array = p["args"]
 	var bare: Array = p["bare"]
+	if d.has("function"):
+		_line(indent, "Gde.call_fn_action(%s)" % _fn_call_args(d, args, ctx))
+		return true
+	if id == GdeFunctions.RETURN_TRUE or id == GdeFunctions.RETURN_FALSE:
+		if _in_fn.is_empty() or str(_in_fn.get("kind", "")) != "condition":
+			_err(GdeI18n.t("«Вернуть» — только внутри функции-условия"))
+			return false
+		if id == GdeFunctions.RETURN_TRUE:
+			# Выборка внутри функции живёт в контексте этого события — наверх,
+			# вызывающему условию, её передаёт возврат.
+			var names: Array[String] = []
+			for p2: Variant in _in_fn.get("params", []):
+				if p2 is Dictionary and str((p2 as Dictionary).get("kind", "")) == "object":
+					names.append(_quote(str((p2 as Dictionary).get("name", ""))))
+			_line(indent, "_gde_ret = true")
+			if not names.is_empty():
+				_line(indent, "Gde.fn_return(_fc, %s, [%s])" % [ctx, ", ".join(names)])
+			return true
 	var template := str(d.get("code", ""))
 	# «=» у изменяющих действий — это присваивание, а не «x = x = v».
 	if d.has("code_assign") and _has_plain_assign(d, bare):

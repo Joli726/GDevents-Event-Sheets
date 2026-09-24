@@ -57,6 +57,8 @@ func _ready() -> void:
 	_test_include()
 	print("—— ошибка в игре называет событие ——")
 	_test_error_points_to_event()
+	print("—— функции из событий ——")
+	_test_functions()
 	_finish()
 
 
@@ -657,6 +659,56 @@ func _test_error_points_to_event() -> void:
 			"ошибка в игре названа событием листа: %s" % logger.last_message)
 	_free([runner])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+# ------------------------------------------------------- функции из событий ---
+
+func _fn(name: String, kind: String, params: Array, children: Array) -> Dictionary:
+	return {"type": "function", "name": name, "kind": kind, "params": params, "children": children}
+
+
+func _test_functions() -> void:
+	var near := _thing("Enemy", Vector2(10, 0), Vector2(8, 8))
+	var mid := _thing("Enemy", Vector2(200, 0), Vector2(8, 8))
+	var far := _thing("Enemy", Vector2(500, 0), Vector2(8, 8))
+	var hurt := _fn("Hurt", "action",
+			[{"name": "target", "kind": "object"}, {"name": "amount", "kind": "number"}],
+			[_event([], [_act("object.variable", ["target", "hp", "-", "Variable(amount)"])])])
+	var is_far := _fn("IsFar", "condition", [{"name": "who", "kind": "object"}],
+			[_event([_cond("object.x", ["who", ">", "300"])], [_act(GdeFunctions.RETURN_TRUE, [])])])
+	var add := _fn("Add", "action", [{"name": "amount", "kind": "number"}, {"name": "note", "kind": "string"}],
+			[_event([], [_act("var.modify", ["total", "+", "Variable(amount)"]), _act("var.set_string", ["last", "VariableString(note)"])])])
+	var r := _runner({"total": 0, "none": 0}, [
+		hurt, is_far, add,
+		_event([_cond("system.trigger_once", []), _cond("object.x", ["Enemy", "<", "100"])], [_act("fn.Hurt", ["Enemy", "5"])]),
+		_event([_cond("system.trigger_once", []), _cond("fn.IsFar", ["Enemy"])], [_act("object.variable", ["Enemy", "far", "=", "1"])]),
+		_event([_cond("system.trigger_once", [])], [_act("fn.Add", ["3", "\"раз\""]), _act("fn.Add", ["4", "\"два\""])]),
+		_any([_cond("fn.IsFar", ["Enemy"]), _cond("system.compare", ["1", "=", "2"])], [_act("object.variable", ["Enemy", "any", "=", "1"])]),
+	])
+	_tick(r, 1)
+	var hp := [Gde.ovar_get(near, "hp", 0.0), Gde.ovar_get(mid, "hp", 0.0), Gde.ovar_get(far, "hp", 0.0)]
+	_eq(str(hp), str([-5.0, 0.0, 0.0]), "функция-действие: объект-параметр — отобранные при вызове экземпляры")
+	var f := [Gde.ovar_get(near, "far", 0.0), Gde.ovar_get(mid, "far", 0.0), Gde.ovar_get(far, "far", 0.0)]
+	_eq(str(f), str([0.0, 0.0, 1.0]), "функция-условие сужает выборку, как встроенное условие")
+	_eq(Gde.var_get("total"), 7.0, "функция: числа — как Variable(amount), вызов дважды")
+	_eq(Gde.var_get("last"), "два", "функция: текстовый параметр")
+	_eq(Gde.ovar_get(far, "any", 0.0), 1.0, "функция-условие внутри «ИЛИ»")
+	_free([r, near, mid, far])
+
+	var bad := GdeGenerator.generate({"events": [_event([], [_act(GdeFunctions.RETURN_TRUE, [])]),
+			_fn("C", "condition", [], [])]}, _reg, "res://t.gdes.json")
+	_ok(str(bad["errors"]).contains("Вернуть"), "«Вернуть» вне функции-условия — ошибка")
+	bad = GdeGenerator.generate({"events": [_fn("Twice", "action", [], []), _fn("Twice", "action", [], [])]}, _reg, "res://t.gdes.json")
+	_ok(str(bad["errors"]).contains("дважды"), "две функции с одним именем — ошибка")
+	_ok(_reg.sheet_actions.is_empty(), "после сборки функции листа не остаются в реестре")
+
+	var lib := "user://gde_test_fnlib.gdes.json"
+	_write_sheet(lib, {"format": 2, "events": [_fn("Bump", "action", [], [_event([], [_act("var.modify", ["bumps", "+", "1"])])])]})
+	var r2 := _runner({"bumps": 0}, [{"type": "include", "sheet": lib}, _event([], [_act("fn.Bump", [])])])
+	_tick(r2, 2)
+	_eq(Gde.var_get("bumps"), 2.0, "функция из подключённого листа доступна")
+	_free([r2])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(lib))
 
 
 # ------------------------------------------------------------------ лист ---

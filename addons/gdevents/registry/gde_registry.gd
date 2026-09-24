@@ -25,6 +25,10 @@ var extensions: Dictionary = {}
 ## «Clock::Hour» -> описание выражения расширения.
 var ext_expressions: Dictionary = {}
 var errors: Array[String] = []
+## Функции из событий открытого или собираемого листа (GdeFunctions).
+## Меняются от листа к листу, поэтому хранятся отдельно от библиотеки.
+var sheet_conditions: Dictionary = {}
+var sheet_actions: Dictionary = {}
 
 
 static func load_default() -> GdeRegistry:
@@ -80,13 +84,25 @@ func _localize_builtin() -> void:
 func condition(id: String) -> Variant:
 	if conditions.has(id):
 		return conditions[id]
+	if sheet_conditions.has(id):
+		return sheet_conditions[id]
 	return _behavior_member(id, "conditions")
 
 
 func action(id: String) -> Variant:
 	if actions.has(id):
 		return actions[id]
+	if sheet_actions.has(id):
+		return sheet_actions[id]
 	return _behavior_member(id, "actions")
+
+
+## Поставить функции листа; возвращает прежние — чтобы вернуть их на место.
+func set_sheet_functions(d: Dictionary) -> Dictionary:
+	var old := {"conditions": sheet_conditions, "actions": sheet_actions}
+	sheet_conditions = d.get("conditions", {})
+	sheet_actions = d.get("actions", {})
+	return old
 
 
 func free_expr(name: String) -> Variant:

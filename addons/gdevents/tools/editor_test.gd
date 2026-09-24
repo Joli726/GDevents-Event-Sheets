@@ -205,6 +205,7 @@ func _test_panel() -> void:
 	_panel.doc.undo()
 
 	_test_search_and_fold()
+	_test_function_card()
 
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
@@ -664,6 +665,30 @@ func _test_search_and_fold() -> void:
 	_panel.toggle_search(false)
 	_panel.doc.data["events"] = saved
 	_panel.doc.changed.emit()
+
+
+## Функция: карточка с именем, видом и параметрами; её вызов виден реестру.
+func _test_function_card() -> void:
+	var parsed: Dictionary = GdeEventSheetPanel.text_to_params("target: object: Кого\namount: number")
+	_eq(parsed["error"], "", "параметры функции разбираются")
+	_eq(str(parsed["params"]), str([{"name": "target", "kind": "object", "label": "Кого"}, {"name": "amount", "kind": "number"}]),
+			"параметры функции: имя, вид, подпись")
+	_ok(str(GdeEventSheetPanel.text_to_params("x: color")["error"]) != "", "неизвестный вид параметра — ошибка")
+	_eq(GdeEventSheetPanel.params_to_text(parsed["params"]), "target: object: Кого\namount: number", "параметры обратно в строки")
+	_panel.doc.add_event([], 9999, "function")
+	var last: int = (_panel.doc.data["events"] as Array).size() - 1
+	_panel.doc.set_event_field([last], "name", "Heal")
+	_panel.doc.set_event_field([last], "params", parsed["params"])
+	_ok(_panel.registry.action("fn.Heal") != null, "функция листа видна реестру — и окну выбора")
+	_ok(_find_label_prefix(_panel, GdeI18n.t("Параметры: %s") % ""), "на карточке функции — её параметры")
+	_panel.doc.set_event_field([last], "children", [{"type": "standard", "conditions": [], "actions": []}])
+	_ok(_panel.doc.function_objects([last, 0]) == ["target"] and _panel.doc.function_objects([0]).is_empty(),
+			"внутри функции её объект-параметр предлагается как объект")
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_ok(_panel.registry.action("fn.Heal") == null, "функция удалена — из реестра тоже")
 
 
 func _find_label(n: Node, text: String) -> bool:

@@ -207,6 +207,12 @@ func add_event(parent: Array, index: int, type: String = "standard") -> Array:
 			e["children"] = []
 		"include":
 			e["sheet"] = ""
+		"function":
+			e["name"] = "MyAction"
+			e["kind"] = "action"
+			e["sentence"] = ""
+			e["params"] = []
+			e["children"] = []
 		_:
 			e["conditions"] = []
 			e["actions"] = []
@@ -484,12 +490,32 @@ func objects() -> Array:
 	return data.get("objects", [])
 
 
+## Имена, которые сейчас значат объект, хотя в листе их нет: параметры-
+## объекты функции, в теле которой правят строку. Ставит панель.
+var extra_objects: Array[String] = []
+
+
 func object_names() -> Array[String]:
 	var out: Array[String] = []
 	for o: Dictionary in objects():
 		out.append(str(o.get("name", "")))
 	for g: String in (data.get("groups", {}) as Dictionary):
 		out.append(g)
+	for x: String in extra_objects:
+		if not out.has(x):
+			out.append(x)
+	return out
+
+
+## Параметры-объекты функции, внутри которой лежит событие по пути p.
+func function_objects(p: Array) -> Array[String]:
+	var out: Array[String] = []
+	for n in range(1, p.size() + 1):
+		var e: Variant = event_at(p.slice(0, n))
+		if e is Dictionary and str((e as Dictionary).get("type", "")) == "function":
+			for pr: Variant in (e as Dictionary).get("params", []):
+				if pr is Dictionary and str((pr as Dictionary).get("kind", "")) == "object":
+					out.append(str((pr as Dictionary).get("name", "")))
 	return out
 
 
