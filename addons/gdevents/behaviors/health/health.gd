@@ -1,0 +1,239 @@
+## Поведение «Здоровье».
+##
+## @behavior Health
+## @title Здоровье
+## @description Здоровье с бронёй, неуязвимостью после удара, регенерацией, миганием и сценой на смерть.
+## @icon health
+@tool
+extends GdeBehavior
+
+## Получил урон. Передаётся фактически снятое количество.
+signal damaged(amount: float)
+## Вылечен.
+signal healed(amount: float)
+## Здоровье кончилось.
+signal died
+
+@export_group("Здоровье")
+## Запас здоровья — с него объект начинает и до него лечится.
+@export_range(1.0, 1000.0, 1.0) var max_health: float = 3.0
+## Текущее здоровье. При старте подтягивается к максимуму, если включено ниже.
+@export_range(0.0, 1000.0, 1.0) var current: float = 3.0
+## Полное здоровье при старте, не оглядываясь на поле выше.
+@export var start_full: bool = true
+
+@export_group("Защита")
+## Броня — сколько урона снимается с каждого удара.
+@export_range(0.0, 100.0, 0.5) var armor_flat: float = 0.0
+## Броня в долях — какая часть урона поглощается, от 0 до 1.
+@export_range(0.0, 0.95, 0.05) var armor_percent: float = 0.0
+## Минимум урона за удар — ниже броня опустить не может.
+@export_range(0.0, 10.0, 0.5) var min_damage: float = 1.0
+## Неуязвимость после удара, секунд.
+@export_range(0.0, 5.0, 0.05) var invulnerable_time: float = 0.0
+
+@export_group("Регенерация")
+## Регенерация — единиц здоровья в секунду. 0 — не лечится.
+@export_range(0.0, 50.0, 0.1) var regen_per_second: float = 0.0
+## Задержка регенерации — сколько секунд после урона она молчит.
+@export_range(0.0, 20.0, 0.1) var regen_delay: float = 3.0
+
+@export_group("Смерть")
+## Удалять объект при смерти.
+@export var destroy_on_death: bool = false
+## Задержка перед удалением — время доиграть анимацию смерти.
+@export_range(0.0, 10.0, 0.1) var death_delay: float = 0.0
+## Что создать на месте гибели: взрыв, дроп, что угодно.
+@export var death_scene: PackedScene
+
+@export_group("Вид")
+## Мигание при получении урона.
+@export var blink_on_hit: bool = true
+## Частота мигания, раз в секунду.
+@export_range(1.0, 30.0, 1.0) var blink_speed: float = 12.0
+## Анимация урона — имя анимации, которая играет при ударе.
+@export var hurt_animation: String = ""
+
+var _invuln: float = 0.0
+var _since_hit: float = 999.0
+var _dying: float = -1.0
+var _hurt_frame: int = -10
+var _death_frame: int = -10
+var _base_modulate: Color = Color.WHITE
+var _has_base: bool = false
+var _started: bool = false
+
+
+## Заполнить здоровье до максимума при первом обращении — чем бы оно ни было.
+## Раньше это делал первый _process, а урон приходит из _physics_process,
+## который в первом кадре успевает раньше: удар по объекту, появившемуся
+## прямо на шипах, тут же стирался заполнением.
+func _ensure_started() -> void:
+	if _started:
+		return
+	_started = true
+	if start_full:
+		current = max_health
+
+
+func _process(delta: float) -> void:
+	_ensure_started()
+
+	_invuln = maxf(0.0, _invuln - delta)
+	_since_hit += delta
+
+	if regen_per_second > 0.0 and current > 0.0 and _since_hit >= regen_delay:
+		current = minf(max_health, current + regen_per_second * delta)
+
+	_update_blink()
+
+	if _dying >= 0.0:
+		_dying -= delta
+		if _dying <= 0.0:
+			_dying = -1.0
+			Gde.delete_object(object)
+
+
+func _update_blink() -> void:
+	var ci := object as CanvasItem
+	if ci == null:
+		return
+	if not _has_base:
+		_base_modulate = ci.modulate
+		_has_base = true
+	if not blink_on_hit:
+		return
+	if _invuln > 0.0:
+		# Мигание через синус: плавнее, чем просто вкл/выкл.
+		var t := sin(Time.get_ticks_msec() * 0.001 * blink_speed * TAU)
+		var c := _base_modulate
+		c.a = _base_modulate.a * (0.35 if t > 0.0 else 1.0)
+		ci.modulate = c
+	elif ci.modulate != _base_modulate:
+		ci.modulate = _base_modulate
+
+
+## @action Нанести _PARAM1_ урона объекту _PARAM0_
+func damage(amount: float) -> void:
+	_ensure_started()
+	if _invuln > 0.0 or current <= 0.0:
+		return
+	var raw := absf(amount)
+	var dealt := maxf(min_damage, (raw - armor_flat) * (1.0 - armor_percent))
+	if dealt <= 0.0:
+		return
+	current = maxf(0.0, current - dealt)
+	_invuln = invulnerable_time
+	_since_hit = 0.0
+	_hurt_frame = Engine.get_process_frames()
+	damaged.emit(dealt)
+
+	if not hurt_animation.is_empty():
+		Gde.play_animation(object, hurt_animation)
+
+	if current <= 0.0:
+		_die()
+
+
+## @action Нанести _PARAM1_ урона объекту _PARAM0_ сквозь неуязвимость
+func damage_pierce(amount: float) -> void:
+	_invuln = 0.0
+	damage(amount)
+
+
+## @action Восстановить _PARAM1_ здоровья объекту _PARAM0_
+func heal(amount: float) -> void:
+	_ensure_started()
+	if current <= 0.0:
+		return
+	var before := current
+	current = minf(max_health, current + absf(amount))
+	healed.emit(current - before)
+
+
+## @action Полностью восстановить здоровье _PARAM0_
+func restore() -> void:
+	_ensure_started()
+	current = max_health
+	_invuln = 0.0
+	_dying = -1.0
+
+
+## @action Убить _PARAM0_ немедленно
+func kill() -> void:
+	_ensure_started()
+	if current <= 0.0:
+		return
+	current = 0.0
+	_die()
+
+
+## @action Сделать _PARAM0_ неуязвимым на _PARAM1_ секунд
+func make_invulnerable(seconds: float) -> void:
+	_invuln = maxf(_invuln, absf(seconds))
+
+
+func _die() -> void:
+	_death_frame = Engine.get_process_frames()
+	died.emit()
+	var o := object as Node2D
+	if death_scene != null and o != null:
+		var fx := death_scene.instantiate()
+		o.get_parent().add_child(fx)
+		if fx is Node2D:
+			(fx as Node2D).global_position = o.global_position
+	if destroy_on_death:
+		if death_delay > 0.0:
+			_dying = death_delay
+		else:
+			Gde.delete_object(object)
+
+
+## @condition У _PARAM0_ закончилось здоровье
+func is_dead() -> bool:
+	_ensure_started()
+	return current <= 0.0
+
+
+## @condition _PARAM0_ жив
+func is_alive() -> bool:
+	_ensure_started()
+	return current > 0.0
+
+
+## @condition _PARAM0_ только что погиб
+func just_died() -> bool:
+	return Engine.get_process_frames() - _death_frame <= RECENT_FRAMES
+
+
+## @condition _PARAM0_ только что получил урон
+func just_hurt() -> bool:
+	return Engine.get_process_frames() - _hurt_frame <= RECENT_FRAMES
+
+
+## @condition _PARAM0_ сейчас неуязвим
+func is_invulnerable() -> bool:
+	return _invuln > 0.0
+
+
+## @condition Здоровье _PARAM0_ ниже _PARAM1_ процентов
+func below_percent(percent: float) -> bool:
+	_ensure_started()
+	return max_health > 0.0 and (current / max_health) * 100.0 < percent
+
+
+## @expression Доля здоровья от 0 до 1
+func fraction() -> float:
+	_ensure_started()
+	return current / max_health if max_health > 0.0 else 0.0
+
+
+## @expression Сколько здоровья не хватает до максимума
+func missing() -> float:
+	_ensure_started()
+	return maxf(0.0, max_health - current)
+
+
+## @expression Секунд неуязвимости осталось
+func invulnerable_left() -> float:
+	return _invuln

@@ -1,0 +1,109 @@
+{
+  "format": 1,
+  "name": "selftest",
+  "extends": "Node2D",
+  "objects": [
+    {
+      "name": "Enemy",
+      "scene": "res://addons/gdevents/tests/enemy.tscn"
+    },
+    {
+      "name": "Bullet",
+      "scene": "res://addons/gdevents/tests/bullet.tscn"
+    }
+  ],
+  "variables": {},
+  "events": [
+    {
+      "type": "comment",
+      "text": "Выборка GDevelop: условие сужает список экземпляров, а не отвечает да/нет."
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        { "id": "system.at_start", "params": [] }
+      ],
+      "actions": [
+        { "id": "object.create", "params": ["Enemy", "100", "0"] },
+        { "id": "object.create", "params": ["Enemy", "300", "0"] },
+        { "id": "object.create", "params": ["Bullet", "0", "0"] },
+        { "id": "system.print", "params": ["\"расставлено\""] }
+      ],
+      "children": []
+    },
+    {
+      "type": "comment",
+      "text": "Уехать должен ТОЛЬКО ближайший враг. Сломается выборка — уедут оба."
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        { "id": "system.at_start", "params": [] },
+        { "id": "pick.nearest", "params": ["Enemy", "90", "0"] }
+      ],
+      "actions": [
+        { "id": "object.x", "params": ["Enemy", "=", "999"] }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        { "id": "system.every", "params": ["0.1"] }
+      ],
+      "actions": [
+        { "id": "var.modify", "params": ["ticks", "+", "1"] }
+      ],
+      "children": []
+    },
+    {
+      "type": "comment",
+      "text": "Через полсекунды считаем, кого куда занесло."
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        { "id": "timer.compare", "params": ["итог", ">", "0.5"] },
+        { "id": "system.trigger_once", "params": [] }
+      ],
+      "actions": [],
+      "children": [
+        {
+          "type": "standard",
+          "conditions": [
+            { "id": "object.x", "params": ["Enemy", ">", "900"] }
+          ],
+          "actions": [
+            { "id": "var.modify", "params": ["уехал", "+", "Enemy.Count()"] }
+          ],
+          "children": []
+        },
+        {
+          "type": "standard",
+          "conditions": [
+            { "id": "object.x", "params": ["Enemy", "<", "900"] }
+          ],
+          "actions": [
+            { "id": "var.modify", "params": ["остался", "+", "Enemy.Count()"] }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        { "id": "timer.compare", "params": ["итог", ">", "0.6"] },
+        { "id": "system.trigger_once", "params": [] },
+        { "id": "pick.all", "params": ["Enemy"] }
+      ],
+      "actions": [
+        {
+          "id": "system.print",
+          "params": ["\"ИТОГ врагов=\" + ToString(Enemy.Count()) + \" уехал=\" + ToString(Variable(уехал)) + \" остался=\" + ToString(Variable(остался)) + \" пуля=\" + ToString(Bullet.X()) + \" скорость=\" + ToString(Bullet.LinearMove::Speed()) + \" тиков=\" + ToString(Variable(ticks))"]
+        }
+      ],
+      "children": []
+    }
+  ]
+}

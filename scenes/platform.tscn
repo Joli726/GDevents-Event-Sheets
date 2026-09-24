@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://c13cmld6roock"]
+
+[ext_resource type="Texture2D" uid="uid://bksfp5glvlba6" path="res://res/Pixel Adventure 1/Free/Traps/Blocks/Idle.png" id="1_ba0x2"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_g4v7s"]
+size = Vector2(300, 50)
+
+[node name="platform" type="Node2D" unique_id=2020474179]
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=784728169]
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="Sprite2D5" type="Sprite2D" parent="." unique_id=167526123]
+position = Vector2(250.00002, 0)
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="Sprite2D6" type="Sprite2D" parent="." unique_id=1019223605]
+position = Vector2(200.00002, 0)
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="Sprite2D4" type="Sprite2D" parent="." unique_id=1609155863]
+position = Vector2(150.00002, 0)
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="Sprite2D3" type="Sprite2D" parent="." unique_id=1470470408]
+position = Vector2(100.00001, 0)
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="Sprite2D2" type="Sprite2D" parent="." unique_id=120444110]
+position = Vector2(50.000004, 0)
+scale = Vector2(3.090909, 3.090909)
+texture = ExtResource("1_ba0x2")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="." unique_id=135348187]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D" unique_id=1033855637]
+position = Vector2(125, 0)
+shape = SubResource("RectangleShape2D_g4v7s")

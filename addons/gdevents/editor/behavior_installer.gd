@@ -1,0 +1,465 @@
+## Поведения внутри сцены объекта: найти, поставить, убрать.
+##
+## Три вещи, которые тут важны и которых не было раньше.
+##
+## 1. Поиск идёт по всему поддереву. Живая сцена почти никогда не плоская:
+##    корень — Node2D, а CharacterBody2D с поведениями лежит внутри. Раньше
+##    смотрели только прямых детей корня, и такой объект выглядел как
+##    «поведений нет», хотя в сцене они были.
+## 2. Открытую сцену закрывать не нужно. Если она сейчас в редакторе —
+##    правим живое дерево и сохраняем через редактор, ничего не теряя.
+## 3. Поведение приносит с собой каркас: узлы, без которых оно не работает
+##    (тело, форма столкновения, спрайт), создаются сами.
+@tool
+class_name GdeBehaviorInstaller
+extends RefCounted
+
+## Метка на ноде поведения. Пишется в .tscn и переживает что угодно —
+## перезагрузку плагина, ошибку в скрипте, переименование ноды.
+const META_KEY := "gde_behavior"
+
+## Кэш разбора сцен: путь -> {"stamp": int, "list": Array}.
+static var _scan_cache: Dictionary = {}
+## Кэш «имя поведения по скрипту»: путь скрипта -> имя или "".
+static var _script_names: Dictionary = {}
+
+
+# -------------------------------------------------------------------- поиск ---
+
+## Поведения объекта: [{"name": String, "node": String, "script": String}].
+## node — путь ноды от корня сцены, для подсказок в интерфейсе.
+static func scan(scene_path: String) -> Array:
+	if scene_path.is_empty():
+		return []
+	var live := _live_root(scene_path)
+	if live != null:
+		return _collect(live, live)
+
+	var stamp := _stamp(scene_path)
+	var cached: Dictionary = _scan_cache.get(scene_path, {})
+	if int(cached.get("stamp", -1)) == stamp:
+		return cached["list"]
+
+	var root := _open(scene_path)
+	if root == null:
+		return []
+	var list := _collect(root, root)
+	root.free()
+	_scan_cache[scene_path] = {"stamp": stamp, "list": list}
+	return list
+
+
+## Только имена — этого хватает большинству вызовов.
+static func installed(scene_path: String) -> Array[String]:
+	var out: Array[String] = []
+	for e: Dictionary in scan(scene_path):
+		out.append(str(e["name"]))
+	return out
+
+
+static func invalidate(scene_path: String = "") -> void:
+	if scene_path.is_empty():
+		_scan_cache.clear()
+		_script_names.clear()
+	else:
+		_scan_cache.erase(scene_path)
+
+
+static func _collect(n: Node, root: Node) -> Array:
+	var out: Array = []
+	for c: Node in n.get_children():
+		var bname := behavior_name_of(c)
+		if not bname.is_empty():
+			var scr := c.get_script() as Script
+			out.append({
+				"name": bname,
+				"node": String(root.get_path_to(c)),
+				"script": scr.resource_path if scr != null else "",
+			})
+		out.append_array(_collect(c, root))
+	return out
+
+
+## Имя поведения ноды или пустая строка.
+##
+## Порядок проверок — от надёжного к запасному. Метка стоит в .tscn и не
+## зависит ни от того, загрузился ли скрипт, ни от того, компилируется ли
+## сейчас GdeBehavior. Именно из-за отсутствия такой метки поведения
+## «пропадали» из списка после перезагрузки плагина.
+static func behavior_name_of(n: Node) -> String:
+	if n.has_meta(META_KEY):
+		return str(n.get_meta(META_KEY))
+	var s := n.get_script() as Script
+	if s == null:
+		return ""
+	return name_of_script(s)
+
+
+## Имя поведения по его скрипту. Результат кэшируется: разбор исходника
+## стоит дорого, а вызывается это на каждый узел каждой сцены.
+static func name_of_script(s: Script) -> String:
+	var key := s.resource_path
+	if not key.is_empty() and _script_names.has(key):
+		return _script_names[key]
+	var src := s.get_source_code()
+	if src.is_empty() and not key.is_empty():
+		# Скрипт мог прийти из кэша без исходника — читаем файл сами.
+		var f := FileAccess.open(key, FileAccess.READ)
+		if f != null:
+			src = f.get_as_text()
+			f.close()
+	var out := ""
+	if src.contains("extends GdeBehavior"):
+		var re := RegEx.create_from_string("^\\s*##\\s*@behavior\\s+(.+)$")
+		for line: String in src.split("\n"):
+			var m := re.search(line)
+			if m != null:
+				out = m.get_string(1).strip_edges()
+				break
+		if out.is_empty() and not key.is_empty():
+			out = pascal(key.get_file().get_basename())
+	if not key.is_empty():
+		_script_names[key] = out
+	return out
+
+
+# ---------------------------------------------------------------- установка ---
+
+## Поставить поведение. Возвращает {"error": String, "created": Array[String]}.
+## spec — описание каркаса из реестра: {"target": "CharacterBody2D",
+## "needs": [{"type": "CollisionShape2D", "name": "Форма"}]}.
+static func add(scene_path: String, bname: String, script_path: String,
+		spec: Dictionary = {}) -> Dictionary:
+	var scr: Script = load(script_path)
+	if scr == null:
+		return {"error": "не загружается скрипт %s" % script_path, "created": []}
+
+	var session := await _begin(scene_path)
+	var root: Node = session.get("root")
+	if root == null:
+		return {"error": str(session.get("error", "не открывается сцена")), "created": []}
+
+	for e: Dictionary in _collect(root, root):
+		if str(e["name"]) == bname:
+			_abort(session)
+			return {"error": "поведение «%s» уже есть у этого объекта" % bname, "created": []}
+
+	var built := _scaffold(root, spec)
+	var host: Node = built["host"]
+
+	var node := Node.new()
+	node.name = _unique_name(host, bname)
+	node.set_script(scr)
+	node.set_meta(META_KEY, bname)
+	host.add_child(node)
+	node.owner = root
+
+	var err := await _commit(session)
+	invalidate(scene_path)
+	return {"error": err, "created": built["created"]}
+
+
+static func remove(scene_path: String, bname: String) -> String:
+	var session := await _begin(scene_path)
+	var root: Node = session.get("root")
+	if root == null:
+		return str(session.get("error", "не открывается сцена"))
+
+	var target: Node = _find_behavior(root, bname)
+	if target == null:
+		_abort(session)
+		return "поведения «%s» на объекте нет" % bname
+	target.get_parent().remove_child(target)
+	target.queue_free()
+
+	var err := await _commit(session)
+	invalidate(scene_path)
+	return err
+
+
+static func _find_behavior(n: Node, bname: String) -> Node:
+	for c: Node in n.get_children():
+		if behavior_name_of(c) == bname:
+			return c
+		var r := _find_behavior(c, bname)
+		if r != null:
+			return r
+	return null
+
+
+static func _unique_name(parent: Node, want: String) -> String:
+	if parent.get_node_or_null(NodePath(want)) == null:
+		return want
+	var i := 2
+	while parent.get_node_or_null(NodePath("%s%d" % [want, i])) != null:
+		i += 1
+	return "%s%d" % [want, i]
+
+
+# ------------------------------------------------------------------ каркас ---
+
+## Достроить сцену до того, что поведению нужно для работы.
+## Возвращает {"host": Node, "created": Array[String]}.
+static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
+	var created: Array[String] = []
+	var target := str(spec.get("target", ""))
+	var host := root
+
+	if not target.is_empty():
+		var found := root if root.is_class(target) else _find_class(root, target)
+		if found != null:
+			host = found
+		else:
+			# Самый частый сценарий — «создал пустую сцену, кинул поведение».
+			# Корень менять нельзя (редактор держит на него ссылку), поэтому
+			# нужное тело появляется внутри корня. Событиям это не мешает:
+			# Gde.main() сам находит тело и считает позицию по нему.
+			var made := _make(target)
+			if made != null:
+				host = made
+				host.name = _unique_name(root, target)
+				root.add_child(host)
+				host.owner = root
+				created.append("%s (%s)" % [host.name, target])
+
+	for need: Variant in spec.get("needs", []):
+		var nd: Dictionary = need
+		var cls := str(nd.get("type", ""))
+		if cls.is_empty():
+			continue
+		var alts: Array = nd.get("any", [cls])
+		var already := false
+		for a: Variant in alts:
+			if host.is_class(str(a)) or _find_class(host, str(a)) != null:
+				already = true
+				break
+		if already:
+			continue
+		var child := _make(cls)
+		if child == null:
+			continue
+		child.name = _unique_name(host, str(nd.get("name", cls)))
+		host.add_child(child)
+		child.owner = root
+		created.append("%s (%s)" % [child.name, cls])
+
+	return {"host": host, "created": created}
+
+
+static func _find_class(n: Node, cls: String) -> Node:
+	for c: Node in n.get_children():
+		if c.is_class(cls):
+			return c
+	for c: Node in n.get_children():
+		var r := _find_class(c, cls)
+		if r != null:
+			return r
+	return null
+
+
+## Новый узел с настройками, при которых он сразу работает, а не молчит.
+## Пустой CollisionShape2D бесполезен, пустой AnimatedSprite2D — тоже.
+static func _make(cls: String) -> Node:
+	if not ClassDB.class_exists(cls) or not ClassDB.can_instantiate(cls):
+		return null
+	var n: Node = ClassDB.instantiate(cls)
+	match cls:
+		"CollisionShape2D":
+			var rect := RectangleShape2D.new()
+			rect.size = Vector2(32, 32)
+			(n as CollisionShape2D).shape = rect
+		"AnimatedSprite2D":
+			(n as AnimatedSprite2D).sprite_frames = SpriteFrames.new()
+		"Label":
+			(n as Label).text = "Текст"
+		"Camera2D":
+			(n as Camera2D).enabled = true
+	return n
+
+
+# ------------------------------------------------------------------ сессия ---
+#
+# Правка сцены идёт либо по живому дереву в редакторе, либо по файлу на диске.
+# _begin/_commit прячут эту разницу от вызывающего кода.
+
+static func _begin(scene_path: String) -> Dictionary:
+	if not ResourceLoader.exists(scene_path):
+		return {"error": "сцена %s не найдена" % scene_path}
+
+	var ei := _editor()
+	if ei != null and _is_open(ei, scene_path):
+		var switched_from := ""
+		var cur: Node = ei.call("get_edited_scene_root")
+		if cur == null or cur.scene_file_path != scene_path:
+			if cur != null:
+				switched_from = cur.scene_file_path
+			ei.call("open_scene_from_path", scene_path)
+			await _idle()
+			await _idle()
+			cur = ei.call("get_edited_scene_root")
+		if cur != null and cur.scene_file_path == scene_path:
+			return {"root": cur, "live": true, "path": scene_path, "back": switched_from}
+
+	var root := _open(scene_path)
+	if root == null:
+		return {"error": "не открывается сцена %s" % scene_path}
+	return {"root": root, "live": false, "path": scene_path}
+
+
+static func _commit(session: Dictionary) -> String:
+	var root: Node = session["root"]
+	var path := str(session["path"])
+	if not bool(session.get("live", false)):
+		var packed := PackedScene.new()
+		var err := packed.pack(root)
+		if err != OK:
+			root.free()
+			return "не упаковывается сцена (код %d)" % err
+		err = ResourceSaver.save(packed, path)
+		root.free()
+		return "" if err == OK else "не сохраняется %s (код %d)" % [path, err]
+
+	var ei := _editor()
+	if ei == null:
+		return "редактор недоступен"
+	ei.call("mark_scene_as_unsaved")
+	var err: int = ei.call("save_scene")
+	if err != OK:
+		return "не сохраняется открытая сцена (код %d)" % err
+	var back := str(session.get("back", ""))
+	if not back.is_empty():
+		ei.call("open_scene_from_path", back)
+	return ""
+
+
+static func _abort(session: Dictionary) -> void:
+	if not bool(session.get("live", false)):
+		var root: Node = session.get("root")
+		if root != null:
+			root.free()
+
+
+static func _idle() -> void:
+	var loop := Engine.get_main_loop()
+	if loop is SceneTree:
+		await (loop as SceneTree).process_frame
+
+
+# --------------------------------------------------------- общий доступ ---
+
+## Прочитать сцену и что-то из неё извлечь. Если сцена открыта во вкладке —
+## читаем живое дерево (с несохранёнными правками), иначе копию с диска,
+## которую тут же освобождаем. fn получает корень и возвращает что угодно.
+static func read(scene_path: String, fn: Callable) -> Variant:
+	var live := _live_root(scene_path)
+	var root := live if live != null else _open(scene_path)
+	if root == null:
+		return null
+	var out: Variant = fn.call(root)
+	if live == null:
+		root.free()
+	return out
+
+
+## Изменить сцену. fn получает корень и возвращает текст ошибки или "".
+## Открытую вкладку правим вживую и сохраняем через редактор, закрытую —
+## на диске. Закрывать сцену ради правки не нужно.
+static func modify(scene_path: String, fn: Callable) -> String:
+	var session := await _begin(scene_path)
+	var root: Node = session.get("root")
+	if root == null:
+		return str(session.get("error", "не открывается сцена"))
+	var err := str(fn.call(root))
+	if not err.is_empty():
+		_abort(session)
+		return err
+	err = await _commit(session)
+	invalidate(scene_path)
+	return err
+
+
+# ---------------------------------------------------------------- свойства ---
+
+## Значения @export-свойств поведения на объекте.
+static func properties(scene_path: String, bname: String) -> Dictionary:
+	var out: Dictionary = {}
+	var live := _live_root(scene_path)
+	var root := live if live != null else _open(scene_path)
+	if root == null:
+		return out
+	var node := _find_behavior(root, bname)
+	if node != null:
+		for p: Dictionary in node.get_property_list():
+			var usage := int(p.get("usage", 0))
+			if (usage & PROPERTY_USAGE_SCRIPT_VARIABLE) != 0 \
+					and (usage & PROPERTY_USAGE_EDITOR) != 0:
+				out[str(p["name"])] = node.get(str(p["name"]))
+	if live == null:
+		root.free()
+	return out
+
+
+static func set_property(scene_path: String, bname: String, prop: String, value: Variant) -> String:
+	var session := await _begin(scene_path)
+	var root: Node = session.get("root")
+	if root == null:
+		return str(session.get("error", "не открывается сцена"))
+	var node := _find_behavior(root, bname)
+	if node == null:
+		_abort(session)
+		return "поведения «%s» на объекте нет" % bname
+	node.set(prop, value)
+	var err := await _commit(session)
+	invalidate(scene_path)
+	return err
+
+
+# ------------------------------------------------------------- вспомогательное ---
+
+static func _editor() -> Object:
+	if not Engine.is_editor_hint() or not Engine.has_singleton("EditorInterface"):
+		return null
+	return Engine.get_singleton("EditorInterface")
+
+
+static func _is_open(ei: Object, scene_path: String) -> bool:
+	var open: Variant = ei.call("get_open_scenes")
+	if open is PackedStringArray or open is Array:
+		for s: String in open:
+			if s == scene_path:
+				return true
+	return false
+
+
+## Корень сцены, если она прямо сейчас открыта во вкладке редактора.
+static func _live_root(scene_path: String) -> Node:
+	var ei := _editor()
+	if ei == null:
+		return null
+	var root: Node = ei.call("get_edited_scene_root")
+	if root != null and root.scene_file_path == scene_path:
+		return root
+	return null
+
+
+static func _open(scene_path: String) -> Node:
+	if not ResourceLoader.exists(scene_path):
+		return null
+	var ps: PackedScene = ResourceLoader.load(scene_path, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE)
+	if ps == null:
+		return null
+	var state := PackedScene.GEN_EDIT_STATE_MAIN if Engine.is_editor_hint() \
+			else PackedScene.GEN_EDIT_STATE_DISABLED
+	return ps.instantiate(state)
+
+
+static func _stamp(path: String) -> int:
+	return int(FileAccess.get_modified_time(path))
+
+
+static func pascal(s: String) -> String:
+	var out := ""
+	for part: String in s.split("_", false):
+		if not part.is_empty():
+			out += part.substr(0, 1).to_upper() + part.substr(1)
+	return out

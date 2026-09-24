@@ -1,0 +1,289 @@
+{
+  "format": 1,
+  "name": "player",
+  "extends": "Node2D",
+  "objects": [
+    {
+      "name": "Player",
+      "scene": "res://scenes/player.tscn"
+    },
+    {
+      "name": "Box",
+      "scene": "res://scenes/box.tscn"
+    },
+    {
+      "name": "Bullet",
+      "scene": "res://scenes/bullet.tscn"
+    },
+    {
+      "name": "Platform",
+      "scene": "res://scenes/platform.tscn"
+    }
+  ],
+  "variables": {},
+  "events": [
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "key.pressed",
+          "params": [
+            "z"
+          ]
+        },
+        {
+          "id": "Shoot::is_empty",
+          "params": [
+            "Player"
+          ],
+          "inverted": true
+        },
+        {
+          "id": "Shoot::is_reloading",
+          "params": [
+            "Player"
+          ],
+          "inverted": true
+        }
+      ],
+      "actions": [
+        {
+          "id": "camera.shake",
+          "params": [
+            "10",
+            "0.2"
+          ]
+        },
+        {
+          "id": "camera.shake",
+          "params": [
+            "10",
+            "0.2"
+          ]
+        }
+      ],
+      "children": [
+        {
+          "type": "standard",
+          "conditions": [
+            {
+              "id": "object.flipped_h",
+              "params": [
+                "Player"
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "id": "Shoot::fire_at_angle",
+              "params": [
+                "Player",
+                "180"
+              ]
+            }
+          ],
+          "children": []
+        },
+        {
+          "type": "standard",
+          "conditions": [
+            {
+              "id": "object.flipped_h",
+              "params": [
+                "Player"
+              ],
+              "inverted": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "Shoot::fire_at_angle",
+              "params": [
+                "Player",
+                "0"
+              ]
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "object.collision",
+          "params": [
+            "Box",
+            "Bullet"
+          ]
+        },
+        {
+          "id": "object.on_screen",
+          "params": [
+            "Box"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "object.delete",
+          "params": [
+            "Box"
+          ]
+        },
+        {
+          "id": "Shoot::fire_at_angle",
+          "params": [
+            "Player",
+            "0"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "object.collision",
+          "params": [
+            "Bullet",
+            "Platform"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "object.delete",
+          "params": [
+            "Bullet"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "Health::is_alive",
+          "params": [
+            "Player"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "Health::damage",
+          "params": [
+            "Player",
+            "1"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "system.at_start",
+          "params": []
+        }
+      ],
+      "actions": [
+        {
+          "id": "camera.zoom",
+          "params": [
+            "1.5"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [],
+      "actions": [
+        {
+          "id": "camera.follow",
+          "params": [
+            "Player",
+            "1"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "Platformer::just_jumped",
+          "params": [
+            "Player"
+          ]
+        },
+        {
+          "id": "Platformer::on_floor",
+          "params": [
+            "Player"
+          ],
+          "inverted": true
+        }
+      ],
+      "actions": [
+        {
+          "id": "object.play_animation",
+          "params": [
+            "Player",
+            "Duble Jump"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "Platformer::is_wall_sliding",
+          "params": [
+            "Player"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "object.play_animation",
+          "params": [
+            "Player",
+            "Wall Jump"
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "type": "standard",
+      "conditions": [
+        {
+          "id": "key.pressed",
+          "params": [
+            "R"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "Shoot::start_reload",
+          "params": [
+            "Player"
+          ]
+        }
+      ],
+      "children": []
+    }
+  ]
+}

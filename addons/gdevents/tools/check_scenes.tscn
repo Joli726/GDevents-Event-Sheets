@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/gdevents/tools/check_scenes.gd" id="1"]
+
+[node name="CheckScenes" type="Node"]
+script = ExtResource("1")

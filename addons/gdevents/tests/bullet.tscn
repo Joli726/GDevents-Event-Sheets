@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://cgde0test0bullet"]
+
+[ext_resource type="Script" path="res://addons/gdevents/behaviors/linear_move/linear_move.gd" id="1_move"]
+
+; Поведение нарочно лежит НЕ на корне, а на вложенном теле — так выглядит
+; настоящая сцена. Именно на такой раскладке раньше ломалось всё: список
+; поведений был пуст, действия поведения молчали, а X объекта не менялся.
+
+[node name="bullet" type="Node2D"]
+
+[node name="Body" type="CharacterBody2D" parent="."]
+
+[node name="LinearMove" type="Node" parent="Body"]
+script = ExtResource("1_move")
+metadata/gde_behavior = "LinearMove"
+angle = 0.0
+speed = 100.0

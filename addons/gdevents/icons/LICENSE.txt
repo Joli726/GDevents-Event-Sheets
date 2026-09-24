@@ -1,0 +1,4 @@
+Иконки: Tabler Icons (https://tabler.io/icons), лицензия MIT.
+Скачаны через Iconify API (https://icones.js.org/).
+
+MIT License — Copyright (c) 2020-2024 Paweł Kuna

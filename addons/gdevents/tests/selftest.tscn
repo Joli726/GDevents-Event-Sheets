@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cgde0test0scene"]
+
+[ext_resource type="Script" path="res://addons/gdevents/tests/selftest.gd" id="1_sheet"]
+
+[node name="selftest" type="Node2D"]
+script = ExtResource("1_sheet")

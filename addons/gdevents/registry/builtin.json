@@ -1,0 +1,2507 @@
+{
+  "_comment": "Встроенная библиотека GDevents. Шаблоны — это GDScript. Подстановки: {ctx} контекст выборки, {self} нода-раннер, {o} текущий экземпляр, {a}/{b} пара, {N} параметр по номеру, {once} номер триггера. Виды параметров: object objname number string raw cmpop modop varname behavior.",
+  "conditions": {
+    "key.pressed": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ нажата",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        }
+      ],
+      "code": "Gde.key_pressed(\"{0}\")",
+      "description": "Истинно, пока клавиша удерживается. Для непрерывных действий — бега, полёта, прицеливания."
+    },
+    "key.just_pressed": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ нажата (один раз)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        }
+      ],
+      "code": "Gde.key_just_pressed(\"{0}\")",
+      "description": "Срабатывает один раз в момент нажатия. Для прыжка, выстрела, открытия меню."
+    },
+    "input.action_pressed": {
+      "group": "Клавиатура",
+      "sentence": "Действие ввода _PARAM0_ активно",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Действие"
+        }
+      ],
+      "code": "Gde.action_pressed(\"{0}\")",
+      "description": "Проверяет действие ввода из настроек проекта (Проект → Настройки → Ввод). В отличие от клавиши, работает и с геймпадом, и с переназначением."
+    },
+    "input.action_just_pressed": {
+      "group": "Клавиатура",
+      "sentence": "Действие ввода _PARAM0_ активно (один раз)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Действие"
+        }
+      ],
+      "code": "Gde.action_just_pressed(\"{0}\")",
+      "description": "То же действие ввода, но только в кадр нажатия."
+    },
+    "mouse.button": {
+      "group": "Мышь",
+      "sentence": "Кнопка мыши _PARAM0_ зажата",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "1 ЛКМ, 2 ПКМ"
+        }
+      ],
+      "code": "Gde.mouse_button(int({0}))",
+      "description": "Истинно, пока кнопка мыши зажата: 1 — левая, 2 — правая, 3 — средняя."
+    },
+    "system.trigger_once": {
+      "group": "Система",
+      "sentence": "Триггер один раз, пока истинно",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.once({self}, {once})",
+      "description": "Пропускает событие один раз, пока остальные условия истинны. Без него действие повторялось бы каждый кадр."
+    },
+    "system.always": {
+      "group": "Система",
+      "sentence": "Всегда",
+      "kind": "global",
+      "params": [],
+      "code": "true",
+      "description": "Всегда истинно. Ставится, когда действия нужно выполнять каждый кадр без всяких проверок."
+    },
+    "object.collision": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ сталкивается с _PARAM1_",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.overlaps({a}, {b})",
+      "description": "Объекты соприкасаются. В выборке остаются только столкнувшиеся пары — дальше действия работают именно с ними."
+    },
+    "object.distance": {
+      "group": "Столкновения",
+      "sentence": "Расстояние между _PARAM0_ и _PARAM1_ _PARAM2_ _PARAM3_",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Расстояние"
+        }
+      ],
+      "pred": "Gde.distance({a}, {b}) {2} {3}",
+      "description": "Сравнивает расстояние между объектами в пикселях. Оставляет в выборке подходящие пары."
+    },
+    "object.x": {
+      "group": "Движение",
+      "sentence": "X у _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "pred": "Gde.pos_of({o}).x {1} {2}",
+      "description": "Сравнивает координату X объекта. Оставляет в выборке только те экземпляры, у которых сравнение верно."
+    },
+    "object.y": {
+      "group": "Движение",
+      "sentence": "Y у _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "pred": "Gde.pos_of({o}).y {1} {2}",
+      "description": "Сравнивает координату Y объекта. Например, «Y больше 600» — объект упал за нижний край."
+    },
+    "object.angle": {
+      "group": "Движение",
+      "sentence": "Угол у _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Градусы"
+        }
+      ],
+      "pred": "Gde.get_angle({o}) {1} {2}",
+      "description": "Сравнивает поворот объекта в градусах: 0 — вправо, 90 — вниз, 180 — влево."
+    },
+    "object.visible": {
+      "group": "Вид",
+      "sentence": "_PARAM0_ видим",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.is_visible({o})",
+      "description": "Объект виден (и сам не скрыт, и все его родители)."
+    },
+    "object.animation_is": {
+      "group": "Анимация",
+      "sentence": "У _PARAM0_ проигрывается анимация _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Анимация"
+        }
+      ],
+      "pred": "Gde.current_animation({o}) == \"{1}\"",
+      "description": "У объекта сейчас проигрывается названная анимация."
+    },
+    "object.variable": {
+      "group": "Переменные",
+      "sentence": "Переменная _PARAM1_ у _PARAM0_ _PARAM2_ _PARAM3_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "pred": "Gde.ovar_get({o}, \"{1}\") {2} {3}",
+      "description": "Сравнивает переменную, принадлежащую конкретному экземпляру. У каждого врага своё здоровье — это оно."
+    },
+    "object.count": {
+      "group": "Объекты",
+      "sentence": "Число объектов _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "objname",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Количество"
+        }
+      ],
+      "code": "Gde.count({ctx}, \"{0}\") {1} {2}",
+      "description": "Сравнивает число отобранных экземпляров. Важно: считаются именно отобранные, а не все живые."
+    },
+    "var.compare": {
+      "group": "Переменные",
+      "sentence": "Переменная сцены _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.var_get(\"{0}\") {1} {2}",
+      "description": "Сравнивает переменную сцены. Такие переменные живут до перезапуска сцены."
+    },
+    "gvar.compare": {
+      "group": "Переменные",
+      "sentence": "Глобальная переменная _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.gvar_get(\"{0}\") {1} {2}",
+      "description": "Сравнивает глобальную переменную. Такие переменные переживают смену сцен — рекорды, деньги, прогресс."
+    },
+    "timer.compare": {
+      "group": "Таймеры",
+      "sentence": "Таймер _PARAM0_ _PARAM1_ _PARAM2_ сек",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Таймер"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.timer_value({self}, \"{0}\") {1} {2}",
+      "description": "Сравнивает время таймера в секундах. Таймер идёт сам, сбрасывается действием «Сбросить таймер»."
+    },
+    "system.chance": {
+      "group": "Система",
+      "sentence": "Шанс _PARAM0_ % за кадр",
+      "description": "Случайное срабатывание с заданной вероятностью в каждом кадре. Для редких событий и разброса.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Проценты"
+        }
+      ],
+      "code": "randf() * 100.0 < {0}"
+    },
+    "mouse.over": {
+      "group": "Мышь",
+      "sentence": "Курсор над _PARAM0_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.aabb({o}).has_point(Gde.mouse_world())",
+      "description": "Курсор находится внутри объекта. Оставляет в выборке только те экземпляры, над которыми курсор."
+    },
+    "mouse.click_object": {
+      "group": "Мышь",
+      "sentence": "По _PARAM0_ кликнули мышью",
+      "description": "Клик левой кнопкой именно по объекту. Основа для кнопок и выбора юнитов.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.mouse_button(1) and Gde.aabb({o}).has_point(Gde.mouse_world())"
+    },
+    "object.on_screen": {
+      "group": "Вид",
+      "sentence": "_PARAM0_ виден на экране",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.on_screen({o})",
+      "description": "Объект попадает в видимую область камеры. Удобно, чтобы не считать то, чего игрок не видит."
+    },
+    "object.opacity": {
+      "group": "Вид",
+      "sentence": "Прозрачность _PARAM0_ _PARAM1_ _PARAM2_",
+      "description": "Сравнивает прозрачность: 1 — непрозрачный, 0 — полностью прозрачный.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "0…1"
+        }
+      ],
+      "pred": "Gde.get_opacity({o}) {1} {2}"
+    },
+    "object.text": {
+      "group": "Текст",
+      "sentence": "Текст _PARAM0_ равен _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "pred": "Gde.get_text({o}) == {1}",
+      "description": "Текст внутри объекта совпадает с заданным. Ищет Label или RichTextLabel в любом месте объекта."
+    },
+    "system.at_start": {
+      "group": "Система",
+      "sentence": "В начале сцены",
+      "description": "Истинно только в первом кадре сцены. Место для начальной расстановки и обнуления счёта.",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.at_start({self})"
+    },
+    "system.every": {
+      "group": "Система",
+      "sentence": "Каждые _PARAM0_ секунд",
+      "description": "Срабатывает через равные промежутки времени. Заменяет связку «таймер + сброс таймера».",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.every({self}, {every}, {0})"
+    },
+    "pick.nearest": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять ближайший _PARAM0_ к точке _PARAM1_ ; _PARAM2_",
+      "description": "Оставляет в выборке один экземпляр — ближайший к точке. Дальше действия работают только с ним.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.pick_nearest({ctx}, \"{0}\", {1}, {2})"
+    },
+    "pick.nearest_to": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять ближайший _PARAM0_ к объекту _PARAM1_",
+      "description": "Сужает оба списка до одной пары: объект и ближайший к нему другой объект. «Враг стреляет в ближайшего игрока» — это оно.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "К кому"
+        }
+      ],
+      "code": "Gde.pick_nearest_to({ctx}, \"{0}\", \"{1}\")"
+    },
+    "pick.farthest": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять самый далёкий _PARAM0_ от точки _PARAM1_ ; _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.pick_farthest({ctx}, \"{0}\", {1}, {2})",
+      "description": "Оставляет в выборке самый далёкий от точки экземпляр."
+    },
+    "pick.random": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять случайный _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.pick_random({ctx}, \"{0}\")",
+      "description": "Оставляет в выборке один случайный экземпляр. Для случайного появления бонусов и реплик."
+    },
+    "pick.all": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять все _PARAM0_",
+      "description": "Сбрасывает сужение и возвращает в выборку все экземпляры объекта. Нужно, когда выше по событию выборку уже сузили.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.pick_all({ctx}, \"{0}\")"
+    },
+    "object.sees": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ видит _PARAM1_",
+      "description": "Между объектами нет препятствия: пускается настоящий луч и проверяется, во что он упёрся. Основа для врагов с обзором.",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Кто смотрит"
+        },
+        {
+          "kind": "object",
+          "label": "На кого"
+        }
+      ],
+      "pred": "Gde.has_line_of_sight({a}, {b})"
+    },
+    "object.in_rect": {
+      "group": "Движение",
+      "sentence": "_PARAM0_ внутри области _PARAM1_ ; _PARAM2_ размером _PARAM3_ × _PARAM4_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X угла"
+        },
+        {
+          "kind": "number",
+          "label": "Y угла"
+        },
+        {
+          "kind": "number",
+          "label": "Ширина"
+        },
+        {
+          "kind": "number",
+          "label": "Высота"
+        }
+      ],
+      "pred": "Gde.in_rect({o}, {1}, {2}, {3}, {4})",
+      "description": "Объект внутри прямоугольной области. Для зон, триггеров и границ уровня."
+    },
+    "object.scale": {
+      "group": "Вид",
+      "sentence": "Масштаб _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Масштаб"
+        }
+      ],
+      "pred": "Gde.main({o}).scale.x {1} {2}",
+      "description": "Сравнивает масштаб объекта по горизонтали. 1 — исходный размер."
+    },
+    "object.animation_finished": {
+      "group": "Анимация",
+      "sentence": "Анимация _PARAM0_ доиграла",
+      "description": "Непрерывная анимация доиграла до последнего кадра. Работает только с незацикленными анимациями — иначе конца не бывает.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.animation_finished({o})"
+    },
+    "key.released": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ отпущена (один раз)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        }
+      ],
+      "code": "Gde.key_just_released(\"{0}\")",
+      "description": "Срабатывает один раз в момент отпускания. Пригодно для заряжаемого удара: чем дольше держали, тем сильнее."
+    },
+    "key.any": {
+      "group": "Клавиатура",
+      "sentence": "Нажата любая клавиша",
+      "description": "Истинно, если нажата хоть какая-нибудь клавиша. Удобно для заставок «нажмите любую кнопку».",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.any_key_pressed()"
+    },
+    "mouse.wheel": {
+      "group": "Мышь",
+      "sentence": "Колесо мыши _PARAM0_ _PARAM1_",
+      "description": "Сравнивает поворот колеса за кадр: вверх — плюс, вниз — минус. Для зума и листания.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Щелчков"
+        }
+      ],
+      "code": "Gde.wheel() {0} {1}"
+    },
+    "var.string_equals": {
+      "group": "Переменные",
+      "sentence": "Текстовая переменная _PARAM0_ равна _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.str_get(\"{0}\") == {1}",
+      "description": "Сравнивает текстовую переменную сцены со строкой. Для состояний вида «меню», «игра», «пауза»."
+    },
+    "scene.paused": {
+      "group": "Сцена",
+      "sentence": "Игра на паузе",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.is_paused()",
+      "description": "Игра стоит на паузе. Проверяйте, чтобы меню паузы не реагировало дважды."
+    },
+    "audio.music_playing": {
+      "group": "Звук",
+      "sentence": "Музыка играет",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.music_playing()",
+      "description": "Фоновая музыка сейчас звучит."
+    },
+    "save.exists": {
+      "group": "Сохранение",
+      "icon": "save",
+      "sentence": "Сохранение _PARAM0_ существует",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя слота"
+        }
+      ],
+      "code": "Gde.has_save(\"{0}\")",
+      "description": "В слоте есть сохранение. Для кнопки «Продолжить», которую нечего показывать в пустой игре."
+    },
+    "object.flipped_h": {
+      "group": "Вид",
+      "sentence": "_PARAM0_ отражён по горизонтали (смотрит влево)",
+      "description": "Объект отражён по горизонтали, то есть смотрит влево. Инвертируйте условие (правая кнопка → «Инвертировать»), чтобы поймать взгляд вправо.",
+      "icon": "view",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.is_flipped_h({o})"
+    },
+    "object.flipped_v": {
+      "group": "Вид",
+      "sentence": "_PARAM0_ отражён по вертикали",
+      "description": "Объект отражён по вертикали — перевёрнут вверх ногами.",
+      "icon": "view",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.is_flipped_v({o})"
+    },
+    "tween.running": {
+      "group": "Плавность",
+      "sentence": "У _PARAM0_ идёт плавное изменение",
+      "description": "Истинно, пока объект едет, крутится или растворяется. Позволяет дождаться конца, а не гадать по времени.",
+      "icon": "move",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.tween_running({o})"
+    },
+    "object.exists": {
+      "group": "Объекты",
+      "sentence": "_PARAM0_ есть в сцене",
+      "description": "Хотя бы один живой экземпляр. В отличие от «числа объектов», смотрит на всех живых, а не на отобранных, и выборку не сужает — удобно для проверки «врагов не осталось».",
+      "icon": "object",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "objname",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.object_exists({0})"
+    },
+    "object.ray": {
+      "group": "Столкновения",
+      "sentence": "Луч из _PARAM0_ длиной _PARAM3_ под углом _PARAM2_ достаёт до _PARAM1_",
+      "description": "Пускает настоящий луч и смотрит, во что он упёрся ПЕРВЫМ: стена между объектами загораживает, как и должна. В выборке остаются только те пары, между которыми луч прошёл. Основа для лазеров, прицела и проверки «есть ли пол впереди».",
+      "icon": "collision",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Угол в градусах"
+        },
+        {
+          "kind": "number",
+          "label": "Длина"
+        }
+      ],
+      "pred": "Gde.ray_hits({a}, {b}, {2}, {3})"
+    },
+    "mouse.released": {
+      "group": "Мышь",
+      "sentence": "Кнопка мыши _PARAM0_ отпущена (один раз)",
+      "description": "Срабатывает в момент отпускания: 1 — левая, 2 — правая, 3 — средняя. Для заряжаемого броска и для перетаскивания.",
+      "icon": "mouse",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "1 лев, 2 прав"
+        }
+      ],
+      "pred": "Gde.mouse_released({0})"
+    },
+    "mouse.moved": {
+      "group": "Мышь",
+      "sentence": "Мышь двигается",
+      "description": "Истинно в кадрах, когда курсор смещался. Позволяет показывать прицел только при движении мыши.",
+      "icon": "mouse",
+      "kind": "global",
+      "params": [],
+      "pred": "Gde.mouse_moved()"
+    },
+    "mouse.right_object": {
+      "group": "Мышь",
+      "sentence": "По _PARAM0_ кликнули правой кнопкой",
+      "description": "Правый клик именно по объекту. Для контекстных команд и отмены приказа.",
+      "icon": "mouse",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.mouse_button(2) and Gde.aabb({o}).has_point(Gde.mouse_world())"
+    },
+    "timer.paused": {
+      "group": "Таймеры",
+      "sentence": "Таймер _PARAM0_ на паузе",
+      "description": "Истинно, пока таймер остановлен действием «поставить на паузу».",
+      "icon": "timer",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя таймера"
+        }
+      ],
+      "pred": "Gde.timer_paused(self, \"{0}\")"
+    },
+    "object.text_contains": {
+      "group": "Текст",
+      "sentence": "Текст _PARAM0_ содержит _PARAM1_",
+      "description": "Проверяет вхождение подстроки, а не полное совпадение.",
+      "icon": "text",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "string",
+          "label": "Что ищем"
+        }
+      ],
+      "pred": "Gde.str_contains(Gde.get_text({o}), {1})"
+    },
+    "key.last_is": {
+      "group": "Клавиатура",
+      "sentence": "Последняя нажатая клавиша — _PARAM0_",
+      "description": "Помнит последнюю нажатую клавишу и после отпускания. Для экрана «нажмите клавишу, чтобы назначить действие».",
+      "icon": "keyboard",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        }
+      ],
+      "pred": "Gde.last_key() == \"{0}\""
+    }
+  },
+  "actions": {
+    "object.create": {
+      "group": "Объекты",
+      "sentence": "Создать объект _PARAM0_ в позиции _PARAM1_ ; _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "objname",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.create_object({ctx}, \"{0}\", {1}, {2}, {self})",
+      "description": "Создаёт новый экземпляр объекта в точке. Созданное сразу попадает в выборку, и следующие действия работают с ним."
+    },
+    "object.delete": {
+      "group": "Объекты",
+      "sentence": "Удалить объект _PARAM0_",
+      "kind": "picked",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.delete_picked({ctx}, \"{0}\")",
+      "description": "Убирает объект из игры. Удалённое тут же покидает выборку, так что следующие действия его не тронут."
+    },
+    "object.x": {
+      "group": "Движение",
+      "sentence": "Изменить X у _PARAM0_: _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.main({o}).global_position.x {1} {2}",
+      "description": "Меняет координату X. Знак «=» ставит значение, «+» сдвигает вправо, «−» влево."
+    },
+    "object.y": {
+      "group": "Движение",
+      "sentence": "Изменить Y у _PARAM0_: _PARAM1_ _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.main({o}).global_position.y {1} {2}",
+      "description": "Меняет координату Y. Ось направлена вниз: «+» опускает объект."
+    },
+    "object.set_position": {
+      "group": "Движение",
+      "sentence": "Поместить _PARAM0_ в позицию _PARAM1_ ; _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.main({o}).global_position = Vector2({1}, {2})",
+      "description": "Переносит объект в точку мгновенно, без анимации."
+    },
+    "object.move_by": {
+      "group": "Движение",
+      "sentence": "Сдвинуть _PARAM0_ на _PARAM1_ ; _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "по X"
+        },
+        {
+          "kind": "number",
+          "label": "по Y"
+        }
+      ],
+      "code": "Gde.main({o}).global_position += Vector2({1}, {2})",
+      "description": "Сдвигает объект на заданное смещение от текущего места."
+    },
+    "object.angle": {
+      "group": "Движение",
+      "sentence": "Изменить угол у _PARAM0_: _PARAM1_ _PARAM2_ градусов",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Градусы"
+        }
+      ],
+      "code": "Gde.main({o}).global_rotation_degrees {1} {2}",
+      "description": "Поворачивает объект. Градусы: 0 — вправо, 90 — вниз."
+    },
+    "object.set_scale": {
+      "group": "Вид",
+      "sentence": "Изменить масштаб _PARAM0_ на _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Масштаб"
+        }
+      ],
+      "code": "Gde.main({o}).scale = Vector2({1}, {1})",
+      "description": "Меняет размер объекта сразу по обеим осям. 1 — исходный размер."
+    },
+    "object.set_visible": {
+      "group": "Вид",
+      "sentence": "Показать/скрыть _PARAM0_: _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "1 показать, 0 скрыть"
+        }
+      ],
+      "code": "{o}.visible = bool({1})",
+      "description": "Показывает или прячет объект вместе со всем его содержимым. 1 — показать, 0 — скрыть."
+    },
+    "object.play_animation": {
+      "group": "Анимация",
+      "sentence": "Запустить анимацию _PARAM1_ у _PARAM0_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Анимация"
+        }
+      ],
+      "code": "Gde.play_animation({o}, \"{1}\")",
+      "description": "Запускает анимацию по имени. Имя должно совпадать с именем в SpriteFrames объекта."
+    },
+    "object.variable": {
+      "group": "Переменные",
+      "sentence": "Изменить переменную _PARAM1_ у _PARAM0_: _PARAM2_ _PARAM3_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.ovar_set({o}, \"{1}\", Gde.ovar_get({o}, \"{1}\") {2~} {3})",
+      "code_assign": "Gde.ovar_set({o}, \"{1}\", {3})",
+      "description": "Меняет переменную конкретного экземпляра — у каждого врага свой запас здоровья."
+    },
+    "var.modify": {
+      "group": "Переменные",
+      "sentence": "Изменить переменную сцены _PARAM0_: _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.var_set(\"{0}\", Gde.var_get(\"{0}\") {1~} {2})",
+      "code_assign": "Gde.var_set(\"{0}\", {2})",
+      "description": "Меняет переменную сцены. Живёт до перезапуска сцены."
+    },
+    "gvar.modify": {
+      "group": "Переменные",
+      "sentence": "Изменить глобальную переменную _PARAM0_: _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "modop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.gvar_set(\"{0}\", Gde.gvar_get(\"{0}\") {1~} {2})",
+      "code_assign": "Gde.gvar_set(\"{0}\", {2})",
+      "description": "Меняет глобальную переменную — она переживает смену сцен."
+    },
+    "timer.reset": {
+      "group": "Таймеры",
+      "sentence": "Сбросить таймер _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Таймер"
+        }
+      ],
+      "code": "Gde.timer_reset({self}, \"{0}\")",
+      "description": "Обнуляет таймер и запускает отсчёт заново."
+    },
+    "scene.change": {
+      "group": "Сцена",
+      "sentence": "Перейти на сцену _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Путь к сцене"
+        }
+      ],
+      "code": "Gde.change_scene(\"{0}\")",
+      "description": "Переходит на другую сцену. Переменные сцены при этом теряются, глобальные остаются."
+    },
+    "system.print": {
+      "group": "Система",
+      "sentence": "Записать в консоль _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "print({0})",
+      "description": "Пишет строку в консоль редактора. Главный инструмент, когда событие ведёт себя не так, как ожидалось."
+    },
+    "system.quit": {
+      "group": "Система",
+      "sentence": "Выйти из игры",
+      "kind": "global",
+      "params": [],
+      "code": "{self}.get_tree().quit()",
+      "description": "Закрывает игру."
+    },
+    "object.set_opacity": {
+      "group": "Вид",
+      "sentence": "Прозрачность _PARAM0_: _PARAM1_ (0…1)",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "0…1"
+        }
+      ],
+      "code": "Gde.set_opacity({o}, {1})",
+      "description": "Задаёт прозрачность от 0 до 1. Плавно уменьшайте её каждый кадр — получится затухание."
+    },
+    "object.flip_h": {
+      "group": "Вид",
+      "sentence": "Отразить _PARAM0_ по горизонтали: _PARAM1_",
+      "description": "Отражает объект по горизонтали. 1 — смотрит влево, 0 — вправо. Читается условием «отражён по горизонтали».",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "1 да, 0 нет"
+        }
+      ],
+      "code": "Gde.set_flip_h({o}, {1} > 0.5)"
+    },
+    "object.set_z": {
+      "group": "Вид",
+      "sentence": "Порядок отрисовки _PARAM0_: _PARAM1_",
+      "description": "Задаёт порядок отрисовки. Больше — рисуется поверх остальных.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Слой"
+        }
+      ],
+      "code": "{o}.z_index = int({1})"
+    },
+    "object.look_at": {
+      "group": "Движение",
+      "sentence": "Повернуть _PARAM0_ к точке _PARAM1_ ; _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.look_at_point({o}, {1}, {2})",
+      "description": "Разворачивает объект носом к точке. Для башен и прицеливания по мыши."
+    },
+    "object.move_angle": {
+      "group": "Движение",
+      "sentence": "Сдвинуть _PARAM0_ под углом _PARAM1_ на _PARAM2_",
+      "description": "Сдвигает объект под углом: 0 — вправо, 90 — вниз. Умножайте расстояние на TimeDelta(), чтобы скорость не зависела от частоты кадров.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Градусы"
+        },
+        {
+          "kind": "number",
+          "label": "Расстояние"
+        }
+      ],
+      "code": "Gde.move_at_angle({o}, {1}, {2})"
+    },
+    "object.set_text": {
+      "group": "Текст",
+      "sentence": "Задать текст _PARAM0_: _PARAM1_",
+      "description": "Пишет текст в Label или RichTextLabel внутри объекта. Числа оборачивайте в ToString().",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.set_text({o}, {1})"
+    },
+    "audio.play": {
+      "group": "Звук",
+      "sentence": "Проиграть звук _PARAM0_ (громкость _PARAM1_ дБ)",
+      "description": "Проигрывает звук один раз. Громкость в децибелах: 0 — как есть, −10 — тише.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Файл звука"
+        },
+        {
+          "kind": "number",
+          "label": "ДБ"
+        }
+      ],
+      "code": "Gde.play_sound(\"{0}\", {1})"
+    },
+    "audio.stop": {
+      "group": "Звук",
+      "sentence": "Остановить все звуки",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.stop_sounds()",
+      "description": "Глушит все звуковые эффекты сразу. Музыки не касается."
+    },
+    "camera.center": {
+      "group": "Камера",
+      "sentence": "Центрировать камеру на _PARAM0_",
+      "description": "Ставит камеру ровно на объект — без плавности, мгновенно.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.camera_center({o})"
+    },
+    "camera.move": {
+      "group": "Камера",
+      "sentence": "Поместить камеру в _PARAM0_ ; _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        }
+      ],
+      "code": "Gde.camera_move({0}, {1})",
+      "description": "Переносит камеру в точку."
+    },
+    "camera.zoom": {
+      "group": "Камера",
+      "sentence": "Масштаб камеры: _PARAM0_",
+      "description": "Приближает или отдаляет камеру. Больше 1 — ближе.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Масштаб"
+        }
+      ],
+      "code": "Gde.camera_zoom({0})"
+    },
+    "scene.restart": {
+      "group": "Сцена",
+      "sentence": "Перезапустить текущую сцену",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.restart_scene()",
+      "description": "Перезапускает текущую сцену с нуля."
+    },
+    "object.move_to": {
+      "group": "Движение",
+      "sentence": "Двигать _PARAM0_ к точке _PARAM1_ ; _PARAM2_ на _PARAM3_",
+      "description": "Подвигает объект к точке на заданное число пикселей за кадр. Повторяйте каждый кадр — получится плавное движение.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        },
+        {
+          "kind": "number",
+          "label": "Пикселей"
+        }
+      ],
+      "code": "Gde.move_to({o}, {1}, {2}, {3})"
+    },
+    "object.move_to_object": {
+      "group": "Движение",
+      "sentence": "Двигать _PARAM0_ к объекту _PARAM1_ на _PARAM2_",
+      "description": "То же, но цель — другой объект. Простейшее преследование без отдельного поведения.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Кто"
+        },
+        {
+          "kind": "object",
+          "label": "К кому"
+        },
+        {
+          "kind": "number",
+          "label": "Пикселей"
+        }
+      ],
+      "code": "Gde.move_to_node({o}, {ctx}.first(\"{1}\"), {2})"
+    },
+    "object.look_at_object": {
+      "group": "Движение",
+      "sentence": "Повернуть _PARAM0_ к объекту _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Кто"
+        },
+        {
+          "kind": "object",
+          "label": "К кому"
+        }
+      ],
+      "code": "Gde.look_at_node({o}, {ctx}.first(\"{1}\"))",
+      "description": "Разворачивает объект к другому объекту."
+    },
+    "object.place_at": {
+      "group": "Движение",
+      "sentence": "Поставить _PARAM0_ к _PARAM1_ со сдвигом _PARAM2_ ; _PARAM3_",
+      "description": "Ставит объект вплотную к другому со смещением. Для полоски здоровья над врагом или огонька у ствола.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Кто"
+        },
+        {
+          "kind": "object",
+          "label": "К кому"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг X"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг Y"
+        }
+      ],
+      "code": "Gde.place_at({o}, {ctx}.first(\"{1}\"), {2}, {3})"
+    },
+    "object.clamp_rect": {
+      "group": "Движение",
+      "sentence": "Не выпускать _PARAM0_ из области _PARAM1_ ; _PARAM2_ размером _PARAM3_ × _PARAM4_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X угла"
+        },
+        {
+          "kind": "number",
+          "label": "Y угла"
+        },
+        {
+          "kind": "number",
+          "label": "Ширина"
+        },
+        {
+          "kind": "number",
+          "label": "Высота"
+        }
+      ],
+      "code": "Gde.clamp_to_rect({o}, {1}, {2}, {3}, {4})",
+      "description": "Не даёт объекту выйти за прямоугольник. Удерживает игрока в границах уровня."
+    },
+    "object.set_scale_xy": {
+      "group": "Вид",
+      "sentence": "Масштаб _PARAM0_: по X _PARAM1_, по Y _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "По X"
+        },
+        {
+          "kind": "number",
+          "label": "По Y"
+        }
+      ],
+      "code": "Gde.set_scale_xy({o}, {1}, {2})",
+      "description": "Меняет размер по осям раздельно. Отрицательное значение по X отражает объект."
+    },
+    "object.set_color": {
+      "group": "Вид",
+      "sentence": "Оттенок _PARAM0_: R _PARAM1_, G _PARAM2_, B _PARAM3_",
+      "description": "Красит объект множителем цвета. Все три по 1 — обычный вид, R 1 G 0 B 0 — красная вспышка от урона.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Красный"
+        },
+        {
+          "kind": "number",
+          "label": "Зелёный"
+        },
+        {
+          "kind": "number",
+          "label": "Синий"
+        }
+      ],
+      "code": "Gde.set_color({o}, {1}, {2}, {3})"
+    },
+    "object.animation_speed": {
+      "group": "Анимация",
+      "sentence": "Скорость анимации _PARAM0_: _PARAM1_",
+      "description": "Множитель скорости анимации. 2 — вдвое быстрее, 0.5 — вдвое медленнее.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Скорость"
+        }
+      ],
+      "code": "Gde.set_animation_speed({o}, {1})"
+    },
+    "object.pause_animation": {
+      "group": "Анимация",
+      "sentence": "Пауза анимации _PARAM0_: _PARAM1_ (1 да, 0 нет)",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "1 да, 0 нет"
+        }
+      ],
+      "code": "Gde.pause_animation({o}, {1} > 0.5)",
+      "description": "Останавливает анимацию на текущем кадре, не сбрасывая её."
+    },
+    "object.append_text": {
+      "group": "Текст",
+      "sentence": "Добавить к тексту _PARAM0_: _PARAM1_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.set_text({o}, Gde.get_text({o}) + {1})",
+      "description": "Дописывает текст в конец. Для бегущей строки и журналов."
+    },
+    "object.create_at": {
+      "group": "Объекты",
+      "sentence": "Создать _PARAM0_ у объекта _PARAM1_ со сдвигом _PARAM2_ ; _PARAM3_",
+      "description": "Создаёт объект рядом с другим объектом. Для взрыва на месте гибели, выпадения награды, вспышки у ствола.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "objname",
+          "label": "Что создать"
+        },
+        {
+          "kind": "object",
+          "label": "Где"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг X"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг Y"
+        }
+      ],
+      "code": "Gde.create_at({ctx}, \"{0}\", {ctx}.first(\"{1}\"), {2}, {3}, {self})"
+    },
+    "var.set_string": {
+      "group": "Переменные",
+      "sentence": "Текстовая переменная _PARAM0_ = _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.var_set(\"{0}\", {1})",
+      "description": "Кладёт строку в переменную сцены. Для состояний и имён."
+    },
+    "var.toggle": {
+      "group": "Переменные",
+      "sentence": "Переключить переменную _PARAM0_ (0 ↔ 1)",
+      "description": "Переключает переменную между 0 и 1. Одно действие вместо события с двумя ветками.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        }
+      ],
+      "code": "Gde.var_set(\"{0}\", 0.0 if float(Gde.var_get(\"{0}\")) > 0.5 else 1.0)"
+    },
+    "save.save": {
+      "group": "Сохранение",
+      "icon": "save",
+      "sentence": "Сохранить переменные в слот _PARAM0_",
+      "description": "Пишет все переменные в слот на диск. Слот — просто номер или имя.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя слота"
+        }
+      ],
+      "code": "Gde.save_vars(\"{0}\")"
+    },
+    "save.load": {
+      "group": "Сохранение",
+      "icon": "save",
+      "sentence": "Загрузить переменные из слота _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя слота"
+        }
+      ],
+      "code": "Gde.load_vars(\"{0}\")",
+      "description": "Читает переменные из слота обратно в игру."
+    },
+    "save.delete": {
+      "group": "Сохранение",
+      "icon": "trash",
+      "sentence": "Удалить сохранение _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя слота"
+        }
+      ],
+      "code": "Gde.delete_save(\"{0}\")",
+      "description": "Стирает сохранение в слоте."
+    },
+    "scene.pause": {
+      "group": "Сцена",
+      "sentence": "Поставить игру на паузу: _PARAM0_ (1 да, 0 нет)",
+      "description": "Ставит игру на паузу или снимает с неё. 1 — пауза, 0 — играем.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "1 да, 0 нет"
+        }
+      ],
+      "code": "Gde.set_paused({0} > 0.5)"
+    },
+    "scene.time_scale": {
+      "group": "Сцена",
+      "sentence": "Скорость времени: _PARAM0_",
+      "description": "Скорость времени: 1 — обычная, 0.3 — замедленная съёмка, 2 — ускорение.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Множитель"
+        }
+      ],
+      "code": "Gde.set_time_scale({0})"
+    },
+    "audio.play_music": {
+      "group": "Звук",
+      "sentence": "Играть музыку _PARAM0_ (громкость _PARAM1_ дБ)",
+      "description": "Запускает фоновую музыку зациклено. Отдельно от эффектов, поэтому громкость настраивается своя.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Файл музыки"
+        },
+        {
+          "kind": "number",
+          "label": "ДБ"
+        }
+      ],
+      "code": "Gde.play_music(\"{0}\", {1})"
+    },
+    "audio.stop_music": {
+      "group": "Звук",
+      "sentence": "Остановить музыку",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.stop_music()",
+      "description": "Останавливает фоновую музыку."
+    },
+    "audio.music_volume": {
+      "group": "Звук",
+      "sentence": "Громкость музыки: _PARAM0_ дБ",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "ДБ"
+        }
+      ],
+      "code": "Gde.set_music_volume({0})",
+      "description": "Меняет громкость музыки в децибелах, не прерывая её."
+    },
+    "camera.shake": {
+      "group": "Камера",
+      "sentence": "Трясти камеру: сила _PARAM0_, _PARAM1_ секунд",
+      "description": "Трясёт камеру с затуханием. Для взрывов и ударов.",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Сила"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.shake_camera({0}, {1})"
+    },
+    "camera.follow": {
+      "group": "Камера",
+      "sentence": "Камера следует за _PARAM0_ с плавностью _PARAM1_",
+      "description": "Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "За кем"
+        },
+        {
+          "kind": "number",
+          "label": "Плавность"
+        }
+      ],
+      "code": "Gde.camera_follow({o}, {1})"
+    },
+    "camera.stop_follow": {
+      "group": "Камера",
+      "sentence": "Камера перестаёт за кем-либо следовать",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.camera_stop_follow()",
+      "description": "Отвязывает камеру от объекта."
+    },
+    "physics.impulse": {
+      "group": "Физика",
+      "sentence": "Толкнуть _PARAM0_ под углом _PARAM1_ с силой _PARAM2_",
+      "description": "Толкает физическое тело разом. Работает только с RigidBody2D.",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Градусы"
+        },
+        {
+          "kind": "number",
+          "label": "Сила"
+        }
+      ],
+      "code": "Gde.apply_impulse({o}, {1}, {2})"
+    },
+    "object.flip_v": {
+      "group": "Вид",
+      "sentence": "Отразить _PARAM0_ по вертикали: _PARAM1_",
+      "description": "Переворачивает объект вверх ногами. 1 — перевернуть, 0 — вернуть.",
+      "icon": "view",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "1 да, 0 нет"
+        }
+      ],
+      "code": "Gde.set_flip_v({o}, bool({1}))"
+    },
+    "tween.move": {
+      "group": "Плавность",
+      "sentence": "Плавно переместить _PARAM0_ в _PARAM1_ ; _PARAM2_ за _PARAM3_ сек",
+      "description": "Объект сам доедет до точки за заданное время. Заменяет событие «двигать каждый кадр» со своим счётчиком. Новое плавное движение отменяет предыдущее.",
+      "icon": "move",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        }
+      ],
+      "code": "Gde.tween_move({o}, {1}, {2}, {3})"
+    },
+    "tween.move_by": {
+      "group": "Плавность",
+      "sentence": "Плавно сдвинуть _PARAM0_ на _PARAM1_ ; _PARAM2_ за _PARAM3_ сек",
+      "description": "То же, но смещение считается от текущего места. Для подпрыгиваний, отскоков и выездов панелей.",
+      "icon": "move",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "На сколько по X"
+        },
+        {
+          "kind": "number",
+          "label": "На сколько по Y"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        }
+      ],
+      "code": "Gde.tween_move_by({o}, {1}, {2}, {3})"
+    },
+    "tween.scale": {
+      "group": "Плавность",
+      "sentence": "Плавно изменить масштаб _PARAM0_ до _PARAM1_ за _PARAM2_ сек",
+      "description": "Плавное увеличение или сжатие. 1 — исходный размер.",
+      "icon": "scale",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Масштаб"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        }
+      ],
+      "code": "Gde.tween_scale({o}, {1}, {2})"
+    },
+    "tween.rotate": {
+      "group": "Плавность",
+      "sentence": "Плавно повернуть _PARAM0_ до _PARAM1_ градусов за _PARAM2_ сек",
+      "description": "Плавный доворот до угла. 0 — вправо, 90 — вниз.",
+      "icon": "rotate",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Градусов"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        }
+      ],
+      "code": "Gde.tween_rotate({o}, {1}, {2})"
+    },
+    "tween.opacity": {
+      "group": "Плавность",
+      "sentence": "Плавно изменить прозрачность _PARAM0_ до _PARAM1_ за _PARAM2_ сек",
+      "description": "Появление и растворение. 1 — непрозрачный, 0 — невидимый.",
+      "icon": "view",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Прозрачность 0…1"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        }
+      ],
+      "code": "Gde.tween_opacity({o}, {1}, {2})"
+    },
+    "tween.stop": {
+      "group": "Плавность",
+      "sentence": "Остановить плавные изменения _PARAM0_",
+      "description": "Обрывает начатое плавное движение на месте. Нужно, когда объект перехватывает управление — например, игрок толкнул то, что ехало само.",
+      "icon": "close",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.tween_stop({o})"
+    },
+    "object.blink": {
+      "group": "Вид",
+      "sentence": "Мигать _PARAM0_: _PARAM1_ секунд, _PARAM2_ раз",
+      "description": "Объект N раз пропадает и появляется. Обычная реакция на урон и на подбор.",
+      "icon": "view",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Секунд"
+        },
+        {
+          "kind": "number",
+          "label": "Сколько раз"
+        }
+      ],
+      "code": "Gde.blink({o}, {1}, {2})"
+    },
+    "object.delete_all": {
+      "group": "Объекты",
+      "sentence": "Удалить все _PARAM0_",
+      "description": "Убирает из сцены все экземпляры разом, не глядя на выборку. Для зачистки уровня между волнами.",
+      "icon": "trash",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "objname",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.delete_all({0})"
+    },
+    "object.knockback": {
+      "group": "Движение",
+      "sentence": "Оттолкнуть _PARAM0_ от _PARAM1_ на _PARAM2_",
+      "description": "Сдвигает объект по прямой прочь от другого. Спутник урона: удар должен отбрасывать.",
+      "icon": "move",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Пикселей"
+        }
+      ],
+      "code": "Gde.knockback({o}, {ctx}.first(\"{1}\"), {2})"
+    },
+    "timer.pause": {
+      "group": "Таймеры",
+      "sentence": "Поставить таймер _PARAM0_ на паузу: _PARAM1_",
+      "description": "1 — таймер замирает, 0 — идёт дальше с того же места. Отдельно от сброса: пауза не теряет накопленное время.",
+      "icon": "timer",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя таймера"
+        },
+        {
+          "kind": "number",
+          "label": "1 да, 0 нет"
+        }
+      ],
+      "code": "Gde.timer_pause(self, \"{0}\", bool({1}))"
+    },
+    "timer.delete": {
+      "group": "Таймеры",
+      "sentence": "Удалить таймер _PARAM0_",
+      "description": "Убирает таймер совсем. Следующее обращение начнёт отсчёт с нуля.",
+      "icon": "timer",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Имя таймера"
+        }
+      ],
+      "code": "Gde.timer_delete(self, \"{0}\")"
+    },
+    "audio.play_pitch": {
+      "group": "Звук",
+      "sentence": "Проиграть звук _PARAM0_ (громкость _PARAM1_ дБ, высота _PARAM2_)",
+      "description": "Высота 1 — как в файле, 1.2 — выше и быстрее. Случайная высота в пределах 0.9…1.1 избавляет от «пулемётного» повтора одного и того же звука.",
+      "icon": "audio",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Файл звука"
+        },
+        {
+          "kind": "number",
+          "label": "Громкость, дБ"
+        },
+        {
+          "kind": "number",
+          "label": "Высота"
+        }
+      ],
+      "code": "Gde.play_sound(\"{0}\", {1}, {2})"
+    }
+  },
+  "expressions": {
+    "RandomInRange": {
+      "type": "number",
+      "params": [
+        "number",
+        "number"
+      ],
+      "template": "randf_range({0}, {1})"
+    },
+    "Random": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "float(randi() % max(1, int({0}) + 1))"
+    },
+    "TimeDelta": {
+      "type": "number",
+      "params": [],
+      "template": "_delta"
+    },
+    "MouseX": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.mouse_world().x"
+    },
+    "MouseY": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.mouse_world().y"
+    },
+    "ToString": {
+      "type": "string",
+      "params": [
+        "number"
+      ],
+      "template": "Gde.num_str({0})"
+    },
+    "ToNumber": {
+      "type": "number",
+      "params": [
+        "string"
+      ],
+      "template": "float({0})"
+    },
+    "abs": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "absf({0})"
+    },
+    "min": {
+      "type": "number",
+      "params": [
+        "number",
+        "number"
+      ],
+      "template": "minf({0}, {1})"
+    },
+    "max": {
+      "type": "number",
+      "params": [
+        "number",
+        "number"
+      ],
+      "template": "maxf({0}, {1})"
+    },
+    "floor": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "floorf({0})"
+    },
+    "ceil": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "ceilf({0})"
+    },
+    "round": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "roundf({0})"
+    },
+    "sqrt": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "sqrt({0})"
+    },
+    "pow": {
+      "type": "number",
+      "params": [
+        "number",
+        "number"
+      ],
+      "template": "pow({0}, {1})"
+    },
+    "clamp": {
+      "type": "number",
+      "params": [
+        "number",
+        "number",
+        "number"
+      ],
+      "template": "clampf({0}, {1}, {2})"
+    },
+    "cos": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "cos({0})"
+    },
+    "sin": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "sin({0})"
+    },
+    "ToRad": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "deg_to_rad({0})"
+    },
+    "ToDeg": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "rad_to_deg({0})"
+    },
+    "Variable": {
+      "type": "number",
+      "params": [
+        "varname"
+      ],
+      "template": "float(Gde.var_get({0}))"
+    },
+    "VariableString": {
+      "type": "string",
+      "params": [
+        "varname"
+      ],
+      "template": "str(Gde.var_get({0}, \"\"))"
+    },
+    "GlobalVariable": {
+      "type": "number",
+      "params": [
+        "varname"
+      ],
+      "template": "float(Gde.gvar_get({0}))"
+    },
+    "Count": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.count({ctx}, {0})"
+    },
+    "Timer": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.timer_value({self}, {0})"
+    },
+    "ScreenWidth": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.screen_size().x"
+    },
+    "ScreenHeight": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.screen_size().y"
+    },
+    "lerp": {
+      "type": "number",
+      "params": [
+        "number",
+        "number",
+        "number"
+      ],
+      "template": "lerpf({0}, {1}, {2})"
+    },
+    "sign": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "signf({0})"
+    },
+    "atan2": {
+      "type": "number",
+      "params": [
+        "number",
+        "number"
+      ],
+      "template": "atan2({0}, {1})"
+    },
+    "tan": {
+      "type": "number",
+      "params": [
+        "number"
+      ],
+      "template": "tan({0})"
+    },
+    "SceneTime": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.scene_time()"
+    },
+    "TimeScale": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_time_scale()"
+    },
+    "MouseWheel": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.wheel()"
+    },
+    "Distance": {
+      "type": "number",
+      "params": [
+        "number",
+        "number",
+        "number",
+        "number"
+      ],
+      "template": "Vector2({0}, {1}).distance_to(Vector2({2}, {3}))"
+    },
+    "AngleBetween": {
+      "type": "number",
+      "params": [
+        "number",
+        "number",
+        "number",
+        "number"
+      ],
+      "template": "rad_to_deg((Vector2({2}, {3}) - Vector2({0}, {1})).angle())"
+    },
+    "VariableText": {
+      "type": "string",
+      "params": [
+        "varname"
+      ],
+      "template": "Gde.str_get({0})"
+    },
+    "Length": {
+      "type": "number",
+      "params": [
+        "string"
+      ],
+      "description": "Сколько символов в строке.",
+      "template": "Gde.str_len({0})"
+    },
+    "Substring": {
+      "type": "string",
+      "params": [
+        "string",
+        "number",
+        "number"
+      ],
+      "description": "Кусок строки: откуда (первый символ — нулевой) и сколько символов.",
+      "template": "Gde.substring({0}, {1}, {2})"
+    },
+    "Uppercase": {
+      "type": "string",
+      "params": [
+        "string"
+      ],
+      "description": "Строка заглавными буквами.",
+      "template": "({0}).to_upper()"
+    },
+    "Lowercase": {
+      "type": "string",
+      "params": [
+        "string"
+      ],
+      "description": "Строка строчными буквами.",
+      "template": "({0}).to_lower()"
+    },
+    "Pad": {
+      "type": "string",
+      "params": [
+        "number",
+        "number"
+      ],
+      "description": "Число с ведущими нулями: Pad(7, 3) даёт «007». Для счёта и таймеров на экране.",
+      "template": "Gde.pad_number({0}, {1})"
+    },
+    "TimeText": {
+      "type": "string",
+      "params": [
+        "number"
+      ],
+      "description": "Секунды в виде 1:05 — привычный вид таймера на экране.",
+      "template": "Gde.time_text({0})"
+    },
+    "SceneName": {
+      "type": "string",
+      "params": [],
+      "description": "Имя текущей сцены.",
+      "template": "Gde.scene_name()"
+    },
+    "LastKey": {
+      "type": "string",
+      "params": [],
+      "description": "Имя последней нажатой клавиши.",
+      "template": "Gde.last_key()"
+    },
+    "InstanceCount": {
+      "type": "number",
+      "params": [
+        "string"
+      ],
+      "description": "Сколько экземпляров объекта живо в сцене — всех, а не отобранных.",
+      "template": "Gde.instance_count({0})"
+    }
+  },
+  "object_expressions": {
+    "X": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).x"
+    },
+    "Y": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).y"
+    },
+    "Angle": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_angle({ctx}.first(\"{obj}\"))"
+    },
+    "Width": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.x"
+    },
+    "Height": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.y"
+    },
+    "Count": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.count({ctx}, \"{obj}\")"
+    },
+    "Variable": {
+      "type": "number",
+      "params": [
+        "varname"
+      ],
+      "template": "float(Gde.ovar_get({ctx}.first(\"{obj}\"), {0}))"
+    },
+    "Animation": {
+      "type": "string",
+      "params": [],
+      "template": "Gde.current_animation({ctx}.first(\"{obj}\"))"
+    },
+    "DistanceTo": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.distance({ctx}.first(\"{obj}\"), {ctx}.first({0}))"
+    },
+    "AngleTo": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.angle_to({ctx}.first(\"{obj}\"), {ctx}.first({0}))"
+    },
+    "Opacity": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_opacity({ctx}.first(\"{obj}\"))"
+    },
+    "Text": {
+      "type": "string",
+      "params": [],
+      "template": "Gde.get_text({ctx}.first(\"{obj}\"))"
+    },
+    "ZIndex": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_z({ctx}.first(\"{obj}\"))"
+    },
+    "ScaleX": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_scale_x({ctx}.first(\"{obj}\"))"
+    },
+    "ScaleY": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.get_scale_y({ctx}.first(\"{obj}\"))"
+    },
+    "Frame": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.animation_frame({ctx}.first(\"{obj}\"))"
+    },
+    "Facing": {
+      "type": "number",
+      "params": [],
+      "description": "Куда смотрит объект: 1 — вправо, −1 — влево. Умножьте на скорость, и снаряд полетит в ту же сторону.",
+      "template": "Gde.facing({ctx}.first(\"{obj}\"))"
+    },
+    "Flipped": {
+      "type": "number",
+      "params": [],
+      "description": "1, если объект отражён по горизонтали, иначе 0.",
+      "template": "float(Gde.is_flipped_h({ctx}.first(\"{obj}\")))"
+    }
+  },
+  "operators": {
+    "cmpop": {
+      "=": "==",
+      "≠": "!=",
+      "!=": "!=",
+      "<": "<",
+      ">": ">",
+      "≤": "<=",
+      "<=": "<=",
+      "≥": ">=",
+      ">=": ">="
+    },
+    "modop": {
+      "=": "=",
+      "+": "+=",
+      "-": "-=",
+      "*": "*=",
+      "/": "/="
+    }
+  }
+}
