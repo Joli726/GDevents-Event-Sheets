@@ -132,6 +132,21 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 		any.tooltip_text = GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события")
 		any.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(any)
+	var locals: Variant = e.get("locals", {})
+	if locals is Dictionary and not (locals as Dictionary).is_empty():
+		var parts: Array[String] = []
+		for k: Variant in (locals as Dictionary):
+			var v: Variant = (locals as Dictionary)[k]
+			parts.append("%s = %s" % [k, JSON.stringify(v) if v is String else str(GdeSheetDocument._normalize(v))])
+		var lb := Button.new()
+		lb.flat = true
+		lb.focus_mode = Control.FOCUS_NONE
+		lb.icon = GdeIcons.get_icon("variable")
+		lb.text = GdeI18n.t("Локальные: %s") % ", ".join(parts)
+		lb.tooltip_text = GdeI18n.t("Локальные переменные события: живут в нём и его подсобытиях, обнуляются при каждом запуске. Нажмите, чтобы изменить")
+		lb.add_theme_font_size_override("font_size", 11)
+		lb.pressed.connect(func(): panel.edit_event_locals(path))
+		row.add_child(lb)
 
 
 func _fill_type_header(row: HBoxContainer, e: Dictionary) -> void:

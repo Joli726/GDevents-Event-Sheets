@@ -9,6 +9,8 @@ extends VBoxContainer
 const DEFAULT_ACCENT := Color(1, 0.78, 0.42)
 ## События, у которых условия можно соединить через «или».
 const ANY_TYPES := ["standard", "foreach", "while"]
+## События, у которых бывают локальные переменные.
+const LOCALS_TYPES := ["standard", "foreach", "repeat", "while"]
 
 ## Выбран другой язык — плагин перестроит панель на нём.
 signal language_changed(code: String)
@@ -872,6 +874,87 @@ func toggle_event_any(p: Array) -> void:
 		doc.erase_event_field(p, "any")
 
 
+## Локальные переменные события — строками «имя = значение».
+func edit_event_locals(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	var e: Dictionary = doc.event_at(p)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = GdeI18n.t("Локальные переменные события")
+	var box := VBoxContainer.new()
+	var hint := Label.new()
+	hint.text = GdeI18n.t("По одной на строке: имя = значение. Текст — в кавычках.\nЖивут только в этом событии и его подсобытиях и обнуляются при каждом его запуске.")
+	hint.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(hint)
+	var te := TextEdit.new()
+	te.custom_minimum_size = Vector2(420, 160)
+	te.text = locals_to_text(e.get("locals", {}))
+	te.placeholder_text = "count = 0\nname = \"Bob\""
+	box.add_child(te)
+	var err := Label.new()
+	err.add_theme_color_override("font_color", Color(0.85, 0.55, 0.55))
+	box.add_child(err)
+	dlg.add_child(box)
+	dlg.get_ok_button().text = GdeI18n.t("Сохранить")
+	# Окно не закрывается при ошибке: иначе набранное пропало бы.
+	dlg.get_ok_button().pressed.connect(func():
+		var parsed := text_to_locals(te.text)
+		if str(parsed["error"]) != "":
+			err.text = parsed["error"]
+			dlg.show.call_deferred()
+			return
+		set_event_locals(p, parsed["locals"])
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func set_event_locals(p: Array, locals: Dictionary) -> void:
+	if doc == null:
+		return
+	if locals.is_empty():
+		doc.erase_event_field(p, "locals")
+	else:
+		doc.set_event_field(p, "locals", locals)
+
+
+static func locals_to_text(locals: Variant) -> String:
+	var lines: Array[String] = []
+	if locals is Dictionary:
+		for k: Variant in (locals as Dictionary):
+			var v: Variant = (locals as Dictionary)[k]
+			lines.append("%s = %s" % [k, JSON.stringify(v) if v is String else str(GdeSheetDocument._normalize(v))])
+	return "\n".join(lines)
+
+
+## {"locals": Dictionary, "error": ""}
+static func text_to_locals(text: String) -> Dictionary:
+	var out: Dictionary = {}
+	var n := 0
+	for raw: String in text.split("\n"):
+		n += 1
+		var line := raw.strip_edges()
+		if line.is_empty():
+			continue
+		var eq := line.find("=")
+		if eq < 0:
+			return {"locals": {}, "error": GdeI18n.t("строка %d: нужно «имя = значение»") % n}
+		var name := line.substr(0, eq).strip_edges()
+		var val := line.substr(eq + 1).strip_edges()
+		if not name.is_valid_ascii_identifier():
+			return {"locals": {}, "error": GdeI18n.t("строка %d: имя «%s» — латинские буквы, цифры и _, не с цифры") % [n, name]}
+		if val.length() >= 2 and val.begins_with("\"") and val.ends_with("\""):
+			out[name] = val.substr(1, val.length() - 2)
+		elif val.is_valid_float():
+			out[name] = GdeSheetDocument._normalize(val.to_float())
+		elif val.is_empty():
+			out[name] = 0
+		else:
+			return {"locals": {}, "error": GdeI18n.t("строка %d: «%s» — не число; текст пишите в кавычках") % [n, val]}
+	return {"locals": out, "error": ""}
+
+
 func toggle_event_disabled(p: Array) -> void:
 	if doc != null:
 		doc.toggle_disabled(p)
@@ -1204,6 +1287,9 @@ func event_menu(p: Array, at: Vector2) -> void:
 		_event_menu.set_item_tooltip(_event_menu.item_count - 1,
 				GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие, а не все сразу"))
 		_event_menu.add_separator()
+	if e != null and str((e as Dictionary).get("type", "standard")) in LOCALS_TYPES:
+		_event_menu.add_icon_item(GdeIcons.get_icon("variable"), GdeI18n.t("Локальные переменные…"), 13)
+		_event_menu.add_separator()
 	_event_menu.add_icon_item(GdeIcons.get_icon("up"), GdeI18n.t("Выше	Alt+↑"), 3)
 	_event_menu.add_icon_item(GdeIcons.get_icon("down"), GdeI18n.t("Ниже	Alt+↓"), 4)
 	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Вложить в предыдущее"), 5)
@@ -1248,6 +1334,7 @@ func _on_event_menu(id: int) -> void:
 		10: copy_event(p)
 		11: paste()
 		12: toggle_event_any(p)
+		13: edit_event_locals(p)
 
 
 func _on_add_root_event(id: int) -> void:

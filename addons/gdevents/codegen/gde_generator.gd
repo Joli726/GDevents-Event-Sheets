@@ -26,6 +26,10 @@ var _inst: Array = []
 var _cond_i: int = -1
 var _act_i: int = -1
 var _error_items: Array = []
+## Локальные переменные событий, от внешнего к внутреннему:
+## [{"var": имя словаря в коде, "re": RegEx обращений к ним}].
+var _scopes: Array = []
+var _lv_n: int = 0
 
 
 static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
@@ -170,6 +174,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var ctx := _new_ctx()
 	_emit_event_comment(e, indent)
 	_line(indent, _ctx_decl(ctx, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 
 	var conds := _gen_conditions(e, ctx)
 
@@ -181,6 +186,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var emitted := _gen_body(e.get("actions", []), e.get("children", []), ctx, body)
 	if not emitted and body > indent:
 		_line(body, "pass")
+	_close_locals(scoped)
 
 
 func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -192,6 +198,7 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, GdeI18n.t("Для каждого объекта %s") % obj)
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	var it := _tmp("_each")
 	_line(indent, "for %s in %s.pick(%s):" % [it, outer, _quote(obj)])
 	_line(indent + 1, "if not is_instance_valid(%s): continue" % it)
@@ -206,6 +213,7 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 
 	if not _gen_body(e.get("actions", []), e.get("children", []), inner, body):
 		_line(body, "pass")
+	_close_locals(scoped)
 
 
 func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -213,6 +221,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, GdeI18n.t("Повторить %s раз") % str(e.get("count", "1")))
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	var n := GdeExpr.compile_as(str(e.get("count", "1")), "number", outer, _reg)
 	_collect(n, GdeI18n.t("«Повторить»: количество"))
 	var it := _tmp("_rep")
@@ -221,6 +230,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
 	if not _gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1):
 		_line(indent + 1, "pass")
+	_close_locals(scoped)
 
 
 func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -230,6 +240,7 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "var %s := 0" % guard)
 	var outer := _new_ctx()
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	# Контекст условия пересоздаётся каждой итерацией — иначе выборка,
 	# суженная на первом проходе, заморозила бы цикл.
 	_line(indent, "while true:")
@@ -245,6 +256,7 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent + 2, "push_error(%s)" % _quote(GdeI18n.t("GDevents: событие «Пока» превысило %d итераций") % MAX_WHILE_ITERATIONS))
 	_line(indent + 2, "break")
 	_gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1)
+	_close_locals(scoped)
 
 
 ## Действия и подсобытия события. «Подождать N секунд» уносит всё, что
@@ -277,6 +289,49 @@ func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> boo
 		cur -= 1
 		_line(cur, ")")
 	return emitted
+
+
+# ------------------------------------------------ локальные переменные ---
+
+## Локальные переменные события: словарь объявляется в начале события, так
+## что они обнуляются при каждом его запуске, видны в условиях, действиях и
+## подсобытиях, а «Подождать» уносит их с собой — функция захватывает словарь.
+## Обращения к ним в собранном коде переписываются в _line: Variable(n) и
+## «Изменить переменную n» те же, что для переменных сцены, и локальная
+## переменная просто перекрывает одноимённую переменную сцены.
+func _open_locals(e: Dictionary, indent: int) -> bool:
+	var locals: Variant = e.get("locals", {})
+	if not (locals is Dictionary) or (locals as Dictionary).is_empty():
+		return false
+	var names: Array[String] = []
+	for k: Variant in (locals as Dictionary):
+		var name := str(k)
+		if not name.is_valid_ascii_identifier():
+			_err(GdeI18n.t("локальная переменная «%s»: имя — латинские буквы, цифры и _, не с цифры") % name)
+			continue
+		names.append(name)
+	if names.is_empty():
+		return false
+	_lv_n += 1
+	var dict_var := "_lv%d" % _lv_n
+	_line(indent, "var %s: Dictionary = %s" % [dict_var, _literal(locals)])
+	var re := RegEx.new()
+	re.compile("Gde\\.(var_get|var_set|str_get)\\(\"(%s)(?=[\".])" % "|".join(names))
+	_scopes.append({"var": dict_var, "re": re})
+	return true
+
+
+func _close_locals(opened: bool) -> void:
+	if opened:
+		_scopes.pop_back()
+
+
+func _scoped(text: String) -> String:
+	var out := text
+	for i in range(_scopes.size() - 1, -1, -1):
+		var sc: Dictionary = _scopes[i]
+		out = (sc["re"] as RegEx).sub(out, "Gde.l$1(%s, \"$2" % sc["var"], true)
+	return out
 
 
 # -------------------------------------------------------- условия/действия ---
@@ -562,6 +617,8 @@ func _tmp(prefix: String) -> String:
 
 
 func _line(indent: int, text: String) -> void:
+	if not _scopes.is_empty():
+		text = _scoped(text)
 	_out.append("" if text.is_empty() else "\t".repeat(indent) + text)
 
 

@@ -244,10 +244,10 @@ func _check_sheet(path: String) -> void:
 ## и подсобытия просто исчезают из игры.
 const SHEET_KEYS := ["format", "name", "extends", "objects", "groups", "variables", "events"]
 const EVENT_KEYS := {
-	"standard": ["type", "disabled", "any", "conditions", "actions", "children"],
-	"foreach": ["type", "disabled", "any", "object", "conditions", "actions", "children"],
-	"repeat": ["type", "disabled", "count", "actions", "children"],
-	"while": ["type", "disabled", "any", "conditions", "actions", "children"],
+	"standard": ["type", "disabled", "any", "locals", "conditions", "actions", "children"],
+	"foreach": ["type", "disabled", "any", "locals", "object", "conditions", "actions", "children"],
+	"repeat": ["type", "disabled", "locals", "count", "actions", "children"],
+	"while": ["type", "disabled", "any", "locals", "conditions", "actions", "children"],
 	"group": ["type", "disabled", "name", "children"],
 	"comment": ["type", "disabled", "text"],
 }

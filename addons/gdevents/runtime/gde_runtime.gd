@@ -945,6 +945,24 @@ func var_set(path: String, value: Variant) -> void:
 	(loc[0] as Dictionary)[loc[1]] = value
 
 
+## Локальные переменные события: словарь живёт в собранном коде события.
+func lvar_get(d: Dictionary, path: String, fallback: Variant = 0.0) -> Variant:
+	var loc := _dig(d, path, false)
+	if loc[0] == null:
+		return fallback
+	return (loc[0] as Dictionary).get(loc[1], fallback)
+
+
+func lvar_set(d: Dictionary, path: String, value: Variant) -> void:
+	var loc := _dig(d, path, true)
+	if loc[0] != null:
+		(loc[0] as Dictionary)[loc[1]] = value
+
+
+func lstr_get(d: Dictionary, path: String) -> String:
+	return str(lvar_get(d, path, ""))
+
+
 func gvar_get(path: String, fallback: Variant = 0.0) -> Variant:
 	var loc := _dig(_global_vars, path, false)
 	if loc[0] == null:

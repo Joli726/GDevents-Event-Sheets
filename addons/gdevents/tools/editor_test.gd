@@ -181,6 +181,20 @@ func _test_panel() -> void:
 	_panel.doc.undo()
 	_panel.doc.undo()
 
+	# Локальные переменные: разбор строк, запись в событие, подпись на карточке.
+	var parsed: Dictionary = GdeEventSheetPanel.text_to_locals("count = 0\nname = \"Bob\"\n\nspeed = 2.5")
+	_eq(parsed["error"], "", "локальные: строки разбираются")
+	_eq(str(parsed["locals"]), str({"count": 0, "name": "Bob", "speed": 2.5}), "локальные: числа и текст")
+	_ok(str(GdeEventSheetPanel.text_to_locals("2x = 1")["error"]) != "", "локальные: плохое имя — ошибка")
+	_ok(str(GdeEventSheetPanel.text_to_locals("a = bob")["error"]) != "", "локальные: текст без кавычек — ошибка")
+	_eq(GdeEventSheetPanel.locals_to_text(parsed["locals"]), "count = 0\nname = \"Bob\"\nspeed = 2.5", "локальные: обратно в строки")
+	_panel.set_event_locals([0], parsed["locals"])
+	_ok(_find_label_prefix(_panel, GdeI18n.t("Локальные: %s") % ""), "локальные: подпись на событии")
+	_panel.set_event_locals([0], {})
+	_ok(not (_panel.doc.event_at([0]) as Dictionary).has("locals"), "локальные: пустой список убирает ключ")
+	_panel.doc.undo()
+	_panel.doc.undo()
+
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
 	_ok(GdeText.with_labels(def).contains("‹"), "фраза с подписями параметров")
@@ -593,6 +607,15 @@ func _find_label(n: Node, text: String) -> bool:
 		return true
 	for c: Node in n.get_children():
 		if _find_label(c, text):
+			return true
+	return false
+
+
+func _find_label_prefix(n: Node, prefix: String) -> bool:
+	if n is Button and (n as Button).text.begins_with(prefix):
+		return true
+	for c: Node in n.get_children():
+		if _find_label_prefix(c, prefix):
 			return true
 	return false
 

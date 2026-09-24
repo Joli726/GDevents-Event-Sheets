@@ -964,5 +964,15 @@
 	"  ИЛИ: ": "  OR:  ",
 	"Любое из условий (ИЛИ)": "Any of the conditions (OR)",
 	"Событие сработает, если выполнено хотя бы одно условие, а не все сразу": "The event runs when at least one condition is true, not all of them",
-	"Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события": "The event runs when at least one condition is true. Turn it off in the event menu"
+	"Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события": "The event runs when at least one condition is true. Turn it off in the event menu",
+	"Локальные переменные…": "Local variables…",
+	"Локальные переменные события": "Event local variables",
+	"По одной на строке: имя = значение. Текст — в кавычках.\nЖивут только в этом событии и его подсобытиях и обнуляются при каждом его запуске.": "One per line: name = value. Text goes in quotes.\nThey live only in this event and its sub-events and reset every time it runs.",
+	"строка %d: нужно «имя = значение»": "line %d: expected «name = value»",
+	"строка %d: имя «%s» — латинские буквы, цифры и _, не с цифры": "line %d: the name «%s» must be Latin letters, digits and _, not starting with a digit",
+	"строка %d: «%s» — не число; текст пишите в кавычках": "line %d: «%s» is not a number; put text in quotes",
+	"Локальные: %s": "Local: %s",
+	"Локальные переменные события: живут в нём и его подсобытиях, обнуляются при каждом запуске. Нажмите, чтобы изменить": "Event local variables: they live in the event and its sub-events and reset on every run. Click to edit",
+	"Локальная переменная события": "Event local variable",
+	"локальная переменная «%s»: имя — латинские буквы, цифры и _, не с цифры": "local variable «%s»: the name must be Latin letters, digits and _, not starting with a digit"
 }

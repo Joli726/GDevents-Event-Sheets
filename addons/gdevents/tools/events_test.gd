@@ -51,6 +51,8 @@ func _ready() -> void:
 	await _test_screen_values()
 	print("—— любое из условий (ИЛИ) ——")
 	_test_any_of()
+	print("—— локальные переменные ——")
+	_test_locals()
 	_finish()
 
 
@@ -518,6 +520,37 @@ func _test_any_of() -> void:
 	_eq(str(all), str([1.0, 1.0, 1.0]), "ИЛИ: ложное условие не сужает выборку, когда сработало другое")
 	_eq(Gde.var_get("dis"), 0.0, "ИЛИ: выключенное условие не делает событие верным")
 	_free([r, e1, e2, e3])
+
+
+# ------------------------------------------------------ локальные переменные ---
+
+func _test_locals() -> void:
+	var counter := _event([], [
+		_act("var.modify", ["n", "+", "1"]),
+		_act("var.modify", ["out", "=", "Variable(n)"]),
+	], [_event([], [_act("var.modify", ["out2", "=", "Variable(n) + 10"])])])
+	counter["locals"] = {"n": 0}
+	var later := _event([_cond("system.trigger_once", [])], [
+		_act("system.wait", ["0.1"]),
+		_act("var.modify", ["out3", "=", "Variable(k)"]),
+	])
+	later["locals"] = {"k": 5}
+	var text := _event([_cond("system.compare_text", ["VariableString(who)", "=", "\"bob\""])],
+			[_act("var.modify", ["out4", "=", "1"])])
+	text["locals"] = {"who": "bob"}
+	var r := _runner({"n": 100, "out": 0, "out2": 0, "out3": 0, "out4": 0}, [counter, later, text])
+	_tick(r, 3)
+	_eq(Gde.var_get("out"), 1.0, "локальная: обнуляется при каждом запуске события (3 кадра — всё равно 1)")
+	_eq(Gde.var_get("out2"), 11.0, "локальная: видна в подсобытии")
+	_eq(Gde.var_get("n"), 100.0, "локальная: одноимённая переменная сцены не тронута")
+	_eq(Gde.var_get("out4"), 1.0, "локальная: текстовая, в условии")
+	_tick(r, 10)
+	_eq(Gde.var_get("out3"), 5.0, "локальная: «Подождать» уносит её с собой")
+	var bad := _event([], [])
+	bad["locals"] = {"2x": 0}
+	var res := GdeGenerator.generate({"objects": [], "events": [bad]}, _reg, "res://t.gdes.json")
+	_ok(not (res["errors"] as Array).is_empty(), "локальная: плохое имя — ошибка сборки")
+	_free([r])
 
 
 # ------------------------------------------------------------------ лист ---
