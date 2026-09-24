@@ -19,6 +19,8 @@ var _panel: GdeEventSheetPanel
 
 
 func _initialize() -> void:
+	# Тест сверяет русские надписи — язык плагина здесь русский.
+	GdeI18n.set_language("ru", false)
 	print("—— модель документа ——")
 	_test_document()
 	print("—— буфер и вставка ——")

@@ -30,12 +30,12 @@ static func load_default() -> GdeRegistry:
 func load_builtin(path: String) -> void:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		errors.append("не открывается %s" % path)
+		errors.append(GdeI18n.t("не открывается %s") % path)
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
 	if not (parsed is Dictionary):
-		errors.append("%s — некорректный JSON" % path)
+		errors.append(GdeI18n.t("%s — некорректный JSON") % path)
 		return
 	var d: Dictionary = parsed
 	conditions = d.get("conditions", {})
@@ -274,7 +274,7 @@ func _scan_behavior_file(path: String) -> void:
 		if prev.begins_with(BEHAVIOR_DIRS[0] + "/") and path.begins_with(BEHAVIOR_DIRS[1] + "/"):
 			entry["builtin_path"] = prev
 		else:
-			errors.append("поведение «%s» объявлено дважды: %s и %s" % [bname, prev, path])
+			errors.append(GdeI18n.t("поведение «%s» объявлено дважды: %s и %s") % [bname, prev, path])
 	behaviors[bname] = entry
 
 
@@ -362,14 +362,14 @@ func _kind_of(gdtype: String) -> String:
 
 func _add_member(entry: Dictionary, bname: String, kind: String, sentence: String,
 		method: String, arglist: String, doc: String = "") -> void:
-	var params: Array = [{"kind": "object", "label": "Объект"}]
+	var params: Array = [{"kind": "object", "label": GdeI18n.t("Объект")}]
 	params.append_array(_parse_params(arglist))
 	var call_args: Array[String] = []
 	for i in range(1, params.size()):
 		call_args.append("{%d}" % i)
 	var argstr := ", ".join(call_args)
 	var about := doc if not doc.is_empty() \
-			else "Из поведения «%s»." % TITLE_MARK
+			else GdeI18n.t("Из поведения «%s».") % TITLE_MARK
 
 	match kind:
 		"action":
@@ -434,28 +434,28 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 
 	entry["actions"]["set_" + pname] = {
 		"group": bname,
-		"sentence": "Изменить «%s» у _PARAM0_ (%s): _PARAM1_ _PARAM2_" % [label, TITLE_MARK],
+		"sentence": GdeI18n.t("Изменить «%s» у _PARAM0_ (%s): _PARAM1_ _PARAM2_") % [label, TITLE_MARK],
 		"description": about,
 		"weight": 1,
 		"kind": "object",
 		"params": [
-			{"kind": "object", "label": "Объект"},
-			{"kind": "modop", "label": "Знак"},
-			{"kind": kind, "label": "Значение"},
+			{"kind": "object", "label": GdeI18n.t("Объект")},
+			{"kind": "modop", "label": GdeI18n.t("Знак")},
+			{"kind": kind, "label": GdeI18n.t("Значение")},
 		],
 		"code": "Gde.beh_set({o}, \"%s\", \"%s\", %s {1~} {2})" % [bname, pname, read],
 		"code_assign": "Gde.beh_set({o}, \"%s\", \"%s\", {2})" % [bname, pname],
 	}
 	entry["conditions"]["is_" + pname] = {
 		"group": bname,
-		"sentence": "«%s» у _PARAM0_ (%s) _PARAM1_ _PARAM2_" % [label, TITLE_MARK],
+		"sentence": GdeI18n.t("«%s» у _PARAM0_ (%s) _PARAM1_ _PARAM2_") % [label, TITLE_MARK],
 		"description": about,
 		"weight": 1,
 		"kind": "object",
 		"params": [
-			{"kind": "object", "label": "Объект"},
-			{"kind": "cmpop", "label": "Знак"},
-			{"kind": kind, "label": "Значение"},
+			{"kind": "object", "label": GdeI18n.t("Объект")},
+			{"kind": "cmpop", "label": GdeI18n.t("Знак")},
+			{"kind": kind, "label": GdeI18n.t("Значение")},
 		],
 		"pred": "%s {1} {2}" % read,
 	}
@@ -464,7 +464,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 	entry["expressions"][_pascal(pname)] = {
 		"type": kind,
 		"params": [],
-		"description": "%s — настройка поведения." % label if doc.is_empty() else doc,
+		"description": GdeI18n.t("%s — настройка поведения.") % label if doc.is_empty() else doc,
 		"template": ("str(%s)" if kind == "string" else "float(%s)") % getter,
 	}
 
@@ -490,9 +490,9 @@ static func _label_from_doc(doc: String, fallback: String) -> String:
 
 
 static func _property_about(doc: String, group: String) -> String:
-	var head := "Настройка поведения «%s»" % TITLE_MARK
+	var head := GdeI18n.t("Настройка поведения «%s»") % TITLE_MARK
 	if not group.is_empty():
-		head += ", раздел «%s»" % group
+		head += GdeI18n.t(", раздел «%s»") % group
 	if doc.is_empty():
 		return head + "."
 	return "%s. %s" % [head, doc]

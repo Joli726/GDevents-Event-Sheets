@@ -49,7 +49,7 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 				else GdeText.with_labels(def as Dictionary)
 	var err: String = panel.instruction_error(path, k, i)
 	if not err.is_empty():
-		tooltip_text = "Ошибка: %s\n\n%s" % [err, tooltip_text]
+		tooltip_text = GdeI18n.t("Ошибка: %s\n\n%s") % [err, tooltip_text]
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
@@ -74,7 +74,7 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 
 	if inst.get("disabled", false):
 		var off := Label.new()
-		off.text = "ВЫКЛ"
+		off.text = GdeI18n.t("ВЫКЛ")
 		off.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		off.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 		off.add_theme_font_size_override("font_size", 10)
@@ -82,7 +82,7 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 
 	if inst.get("inverted", false):
 		var marker := Label.new()
-		marker.text = "НЕ"
+		marker.text = GdeI18n.t("НЕ")
 		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		marker.add_theme_color_override("font_color", Color(0.95, 0.45, 0.45))
 		marker.add_theme_font_size_override("font_size", 10)
@@ -104,11 +104,11 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 	_tools.add_theme_constant_override("separation", 0)
 	row.add_child(_tools)
 	if kind == "conditions":
-		_tools.add_child(_tool_button("invert", "Инвертировать (НЕ)", func():
+		_tools.add_child(_tool_button("invert", GdeI18n.t("Инвертировать (НЕ)"), func():
 			panel.invert_instruction(path, kind, index)))
-	_tools.add_child(_tool_button("copy", "Копировать (Ctrl+C)", func():
+	_tools.add_child(_tool_button("copy", GdeI18n.t("Копировать (Ctrl+C)"), func():
 		panel.copy_instruction(path, kind, index)))
-	_tools.add_child(_tool_button("trash", "Удалить (Delete)", func():
+	_tools.add_child(_tool_button("trash", GdeI18n.t("Удалить (Delete)"), func():
 		panel.remove_instruction(path, kind, index)))
 
 	if inst.get("disabled", false):

@@ -132,17 +132,17 @@ static func add(scene_path: String, bname: String, script_path: String,
 		spec: Dictionary = {}) -> Dictionary:
 	var scr: Script = load(script_path)
 	if scr == null:
-		return {"error": "не загружается скрипт %s" % script_path, "created": []}
+		return {"error": GdeI18n.t("не загружается скрипт %s") % script_path, "created": []}
 
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
-		return {"error": str(session.get("error", "не открывается сцена")), "created": []}
+		return {"error": str(session.get("error", GdeI18n.t("не открывается сцена"))), "created": []}
 
 	for e: Dictionary in _collect(root, root):
 		if str(e["name"]) == bname:
 			_abort(session)
-			return {"error": "поведение «%s» уже есть у этого объекта" % bname, "created": []}
+			return {"error": GdeI18n.t("поведение «%s» уже есть у этого объекта") % bname, "created": []}
 
 	var built := _scaffold(root, spec)
 	var host: Node = built["host"]
@@ -163,12 +163,12 @@ static func remove(scene_path: String, bname: String) -> String:
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
-		return str(session.get("error", "не открывается сцена"))
+		return str(session.get("error", GdeI18n.t("не открывается сцена")))
 
 	var target: Node = _find_behavior(root, bname)
 	if target == null:
 		_abort(session)
-		return "поведения «%s» на объекте нет" % bname
+		return GdeI18n.t("поведения «%s» на объекте нет") % bname
 	target.get_parent().remove_child(target)
 	target.queue_free()
 
@@ -271,7 +271,7 @@ static func _make(cls: String) -> Node:
 		"AnimatedSprite2D":
 			(n as AnimatedSprite2D).sprite_frames = SpriteFrames.new()
 		"Label":
-			(n as Label).text = "Текст"
+			(n as Label).text = GdeI18n.t("Текст")
 		"Camera2D":
 			(n as Camera2D).enabled = true
 	return n
@@ -284,7 +284,7 @@ static func _make(cls: String) -> Node:
 
 static func _begin(scene_path: String) -> Dictionary:
 	if not ResourceLoader.exists(scene_path):
-		return {"error": "сцена %s не найдена" % scene_path}
+		return {"error": GdeI18n.t("сцена %s не найдена") % scene_path}
 
 	var ei := _editor()
 	if ei != null and _is_open(ei, scene_path):
@@ -302,7 +302,7 @@ static func _begin(scene_path: String) -> Dictionary:
 
 	var root := _open(scene_path)
 	if root == null:
-		return {"error": "не открывается сцена %s" % scene_path}
+		return {"error": GdeI18n.t("не открывается сцена %s") % scene_path}
 	return {"root": root, "live": false, "path": scene_path}
 
 
@@ -314,18 +314,18 @@ static func _commit(session: Dictionary) -> String:
 		var err := packed.pack(root)
 		if err != OK:
 			root.free()
-			return "не упаковывается сцена (код %d)" % err
+			return GdeI18n.t("не упаковывается сцена (код %d)") % err
 		err = ResourceSaver.save(packed, path)
 		root.free()
-		return "" if err == OK else "не сохраняется %s (код %d)" % [path, err]
+		return "" if err == OK else GdeI18n.t("не сохраняется %s (код %d)") % [path, err]
 
 	var ei := _editor()
 	if ei == null:
-		return "редактор недоступен"
+		return GdeI18n.t("редактор недоступен")
 	ei.call("mark_scene_as_unsaved")
 	var err: int = ei.call("save_scene")
 	if err != OK:
-		return "не сохраняется открытая сцена (код %d)" % err
+		return GdeI18n.t("не сохраняется открытая сцена (код %d)") % err
 	var back := str(session.get("back", ""))
 	if not back.is_empty():
 		ei.call("open_scene_from_path", back)
@@ -368,7 +368,7 @@ static func modify(scene_path: String, fn: Callable) -> String:
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
-		return str(session.get("error", "не открывается сцена"))
+		return str(session.get("error", GdeI18n.t("не открывается сцена")))
 	var err := str(fn.call(root))
 	if not err.is_empty():
 		_abort(session)
@@ -454,11 +454,11 @@ static func edit_behavior(scene_path: String, bname: String, fn: Callable) -> St
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
-		return str(session.get("error", "не открывается сцена"))
+		return str(session.get("error", GdeI18n.t("не открывается сцена")))
 	var node := _find_behavior(root, bname)
 	if node == null:
 		_abort(session)
-		return "поведения «%s» на объекте нет" % bname
+		return GdeI18n.t("поведения «%s» на объекте нет") % bname
 	var live := bool(session.get("live", false))
 	var before := _script_values(node)
 	var err := str(fn.call(node))
@@ -498,7 +498,7 @@ static func _record_undo(node: Node, bname: String, before: Dictionary, after: D
 			changed.append(k)
 	if changed.is_empty():
 		return
-	ur.call("create_action", "Настройки поведения «%s»" % bname, UndoRedo.MERGE_DISABLE, node)
+	ur.call("create_action", GdeI18n.t("Настройки поведения «%s»") % bname, UndoRedo.MERGE_DISABLE, node)
 	for k: String in changed:
 		ur.call("add_do_property", node, k, after[k])
 		ur.call("add_undo_property", node, k, before.get(k))

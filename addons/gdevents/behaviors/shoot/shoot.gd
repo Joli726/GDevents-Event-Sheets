@@ -179,7 +179,7 @@ func fire_at_angle(angle_deg: float) -> void:
 	if not can_fire():
 		return
 	if bullet_scene == null:
-		push_warning("Shoot: у «%s» не задана сцена снаряда" % name)
+		push_warning(GdeI18n.t("Shoot: у «%s» не задана сцена снаряда") % name)
 		return
 
 	_cooldown = fire_rate
@@ -283,7 +283,7 @@ func _spawn_one(o: Node2D, angle_deg: float) -> void:
 		if created:
 			mv.set("lifetime", bullet_lifetime)
 	else:
-		push_warning("Shoot: у снаряда «%s» нет LinearMove, а auto_move выключен — он не полетит" % b.name)
+		push_warning(GdeI18n.t("Shoot: у снаряда «%s» нет LinearMove, а auto_move выключен — он не полетит") % b.name)
 
 	fired.emit(b)
 

@@ -37,12 +37,12 @@ static func create_empty(name: String) -> GdeSheetDocument:
 func load_from(p: String) -> String:
 	var f := FileAccess.open(p, FileAccess.READ)
 	if f == null:
-		return "не открывается %s" % p
+		return GdeI18n.t("не открывается %s") % p
 	var text := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
-		return "некорректный JSON в %s" % p
+		return GdeI18n.t("некорректный JSON в %s") % p
 	path = p
 	data = parsed
 	_undo.clear()
@@ -54,10 +54,10 @@ func load_from(p: String) -> String:
 
 func save() -> String:
 	if path.is_empty():
-		return "у листа нет пути"
+		return GdeI18n.t("у листа нет пути")
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		return "не записывается %s" % path
+		return GdeI18n.t("не записывается %s") % path
 	f.store_string(JSON.stringify(_normalize(data), "  ", false) + "\n")
 	f.close()
 	_set_dirty(false)
@@ -187,9 +187,9 @@ func add_event(parent: Array, index: int, type: String = "standard") -> Array:
 	var e: Dictionary = {"type": type}
 	match type:
 		"comment":
-			e["text"] = "Комментарий"
+			e["text"] = GdeI18n.t("Комментарий")
 		"group":
-			e["name"] = "Группа"
+			e["name"] = GdeI18n.t("Группа")
 			e["children"] = []
 		"foreach":
 			e["object"] = ""

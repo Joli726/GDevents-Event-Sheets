@@ -22,6 +22,8 @@ var _reg: GdeRegistry
 
 
 func _ready() -> void:
+	# Тест сверяет русские надписи — язык плагина здесь русский.
+	GdeI18n.set_language("ru", false)
 	_reg = GdeRegistry.load_default()
 	await _make_scene()
 	print("—— реестр: названия и описания настроек ——")

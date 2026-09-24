@@ -7,30 +7,30 @@ const DIR := "res://addons/gdevents/icons/"
 
 ## Группа инструкций -> имя файла иконки.
 const GROUP_ICONS := {
-	"Движение": "move",
-	"Столкновения": "collision",
-	"Переменные": "variable",
-	"Анимация": "animation",
-	"Клавиатура": "keyboard",
-	"Мышь": "mouse",
-	"Таймеры": "timer",
-	"Объекты": "object",
-	"Сцена": "scene",
-	"Звук": "audio",
-	"Система": "system",
-	"Вид": "view",
-	"Текст": "text",
-	"Камера": "camera",
-	"Физика": "physics",
-	"Математика": "math",
-	"Выборка": "object",
-	"Сохранение": "save",
-	"Плавность": "move",
-	"Появление": "spawn",
-	"Путь": "path",
-	"Урон": "damage",
-	"Подбор": "pickup",
-	"Сетка": "layer",
+	"Движение": "move",  # i18n: ключ
+	"Столкновения": "collision",  # i18n: ключ
+	"Переменные": "variable",  # i18n: ключ
+	"Анимация": "animation",  # i18n: ключ
+	"Клавиатура": "keyboard",  # i18n: ключ
+	"Мышь": "mouse",  # i18n: ключ
+	"Таймеры": "timer",  # i18n: ключ
+	"Объекты": "object",  # i18n: ключ
+	"Сцена": "scene",  # i18n: ключ
+	"Звук": "audio",  # i18n: ключ
+	"Система": "system",  # i18n: ключ
+	"Вид": "view",  # i18n: ключ
+	"Текст": "text",  # i18n: ключ
+	"Камера": "camera",  # i18n: ключ
+	"Физика": "physics",  # i18n: ключ
+	"Математика": "math",  # i18n: ключ
+	"Выборка": "object",  # i18n: ключ
+	"Сохранение": "save",  # i18n: ключ
+	"Плавность": "move",  # i18n: ключ
+	"Появление": "spawn",  # i18n: ключ
+	"Путь": "path",  # i18n: ключ
+	"Урон": "damage",  # i18n: ключ
+	"Подбор": "pickup",  # i18n: ключ
+	"Сетка": "layer",  # i18n: ключ
 }
 
 static var _cache: Dictionary = {}
@@ -68,9 +68,14 @@ static func for_instruction(def: Variant, kind: String) -> Texture2D:
 	return get_icon("condition" if kind == "conditions" else "action")
 
 
+## Группа приходит уже переведённой («Movement»), а в таблице — русские
+## названия: сверяем и так, и в переводе.
 static func for_group(group: String) -> Texture2D:
 	if GROUP_ICONS.has(group):
 		return get_icon(GROUP_ICONS[group])
+	for k: String in GROUP_ICONS:
+		if GdeI18n.t(k) == group:
+			return get_icon(GROUP_ICONS[k])
 	return get_icon("behavior")
 
 

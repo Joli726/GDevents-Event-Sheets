@@ -38,7 +38,7 @@ func register_objects(defs: Array) -> void:
 		var n: String = d.get("name", "")
 		var s: String = d.get("scene", "")
 		if n.is_empty() or s.is_empty():
-			push_warning("GDevents: пропущен объект без имени или сцены: %s" % [d])
+			push_warning(GdeI18n.t("GDevents: пропущен объект без имени или сцены: %s") % [d])
 			continue
 		_objects[n] = s
 		_scene_to_obj[s] = n
@@ -93,7 +93,7 @@ func all_instances(obj: String) -> Array:
 			out.append_array(get_tree().get_nodes_in_group(GROUP_PREFIX + member))
 		return out
 	if not _objects.has(obj):
-		push_warning("GDevents: объект «%s» не зарегистрирован" % obj)
+		push_warning(GdeI18n.t("GDevents: объект «%s» не зарегистрирован") % obj)
 		return []
 	return get_tree().get_nodes_in_group(GROUP_PREFIX + obj)
 
@@ -107,11 +107,11 @@ func new_context() -> GdePickContext:
 func create_object(ctx: GdePickContext, obj: String, x: float, y: float, parent: Node) -> Node:
 	var path: String = _objects.get(obj, "")
 	if path.is_empty():
-		push_error("GDevents: нельзя создать «%s» — объект не зарегистрирован" % obj)
+		push_error(GdeI18n.t("GDevents: нельзя создать «%s» — объект не зарегистрирован") % obj)
 		return null
 	var ps: PackedScene = load(path)
 	if ps == null:
-		push_error("GDevents: не загружается сцена %s" % path)
+		push_error(GdeI18n.t("GDevents: не загружается сцена %s") % path)
 		return null
 	var n := ps.instantiate()
 	parent.add_child(n)
@@ -339,7 +339,7 @@ func var_get(path: String, fallback: Variant = 0.0) -> Variant:
 func var_set(path: String, value: Variant) -> void:
 	var loc := _dig(_scene_vars, path, true)
 	if loc[0] == null:
-		push_warning("GDevents: пустое имя переменной сцены")
+		push_warning(GdeI18n.t("GDevents: пустое имя переменной сцены"))
 		return
 	(loc[0] as Dictionary)[loc[1]] = value
 
@@ -354,7 +354,7 @@ func gvar_get(path: String, fallback: Variant = 0.0) -> Variant:
 func gvar_set(path: String, value: Variant) -> void:
 	var loc := _dig(_global_vars, path, true)
 	if loc[0] == null:
-		push_warning("GDevents: пустое имя глобальной переменной")
+		push_warning(GdeI18n.t("GDevents: пустое имя глобальной переменной"))
 		return
 	(loc[0] as Dictionary)[loc[1]] = value
 
@@ -376,7 +376,7 @@ func ovar_set(n: Node, path: String, value: Variant) -> void:
 	var store: Dictionary = n.get_meta("__gde_vars", {})
 	var loc := _dig(store, path, true)
 	if loc[0] == null:
-		push_warning("GDevents: пустое имя переменной объекта")
+		push_warning(GdeI18n.t("GDevents: пустое имя переменной объекта"))
 		return
 	(loc[0] as Dictionary)[loc[1]] = value
 	n.set_meta("__gde_vars", store)
@@ -404,7 +404,7 @@ func behavior(n: Node, bname: String, quiet: bool = false) -> Node:
 		n.set_meta("__gde_beh", cached)
 		return found
 	if not quiet:
-		push_warning("GDevents: у «%s» нет поведения «%s»" % [n.name, bname])
+		push_warning(GdeI18n.t("GDevents: у «%s» нет поведения «%s»") % [n.name, bname])
 	return null
 
 
@@ -549,7 +549,7 @@ func _keycode(name: String) -> int:
 		return _keycodes[name]
 	var k := OS.find_keycode_from_string(name)
 	if k == KEY_NONE:
-		push_warning("GDevents: неизвестная клавиша «%s»" % name)
+		push_warning(GdeI18n.t("GDevents: неизвестная клавиша «%s»") % name)
 	_keycodes[name] = k
 	return k
 
@@ -779,10 +779,10 @@ func _play(n: Node, anim: String, from_event: bool) -> void:
 		if ap != null:
 			ap.play(anim)
 		else:
-			_warn_once(n, "нет ноды с анимацией", "GDevents: у «%s» нет ноды с анимацией" % n.name)
+			_warn_once(n, GdeI18n.t("нет ноды с анимацией"), GdeI18n.t("GDevents: у «%s» нет ноды с анимацией") % n.name)
 		return
 	if a.sprite_frames == null or not a.sprite_frames.has_animation(anim):
-		_warn_once(a, "anim:" + anim, "GDevents: у «%s» нет анимации «%s». Есть: %s"
+		_warn_once(a, "anim:" + anim, GdeI18n.t("GDevents: у «%s» нет анимации «%s». Есть: %s")
 				% [n.name, anim, ", ".join(Array(a.sprite_frames.get_animation_names()) if a.sprite_frames != null else [])])
 		return
 
@@ -962,7 +962,7 @@ var _sounds: Array[AudioStreamPlayer] = []
 ## этого достаточно, а возиться с нодами в сцене не приходится.
 func play_sound(path: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not ResourceLoader.exists(path):
-		push_warning("GDevents: звук не найден — %s" % path)
+		push_warning(GdeI18n.t("GDevents: звук не найден — %s") % path)
 		return
 	var stream: AudioStream = load(path)
 	if stream == null:
@@ -1117,7 +1117,7 @@ func set_text(n: Node, text: String) -> void:
 	if t != null:
 		t.set("text", text)
 	else:
-		push_warning("GDevents: у «%s» нет ноды с текстом" % n.name)
+		push_warning(GdeI18n.t("GDevents: у «%s» нет ноды с текстом") % n.name)
 
 
 func get_text(n: Node) -> String:
@@ -1435,7 +1435,7 @@ func save_vars(slot: String) -> void:
 	var path := "user://%s.json" % slot.validate_filename()
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		push_error("GDevents: не сохраняется %s" % path)
+		push_error(GdeI18n.t("GDevents: не сохраняется %s") % path)
 		return
 	f.store_string(JSON.stringify({"scene": _scene_vars, "global": _global_vars}, "  ", false))
 	f.close()
@@ -1475,7 +1475,7 @@ var _music: AudioStreamPlayer
 ## Фоновая музыка — один игрок на всю игру, зациклен.
 func play_music(path: String, volume_db: float = 0.0) -> void:
 	if not ResourceLoader.exists(path):
-		push_warning("GDevents: музыка не найдена — %s" % path)
+		push_warning(GdeI18n.t("GDevents: музыка не найдена — %s") % path)
 		return
 	var stream: AudioStream = load(path)
 	if stream == null:
@@ -1568,7 +1568,7 @@ func apply_impulse(n: Node, angle_deg: float, force: float) -> void:
 		# толчок добавляется к ней и гаснет так же, как гасится разбег.
 		(body as CharacterBody2D).velocity += push * CHARACTER_IMPULSE
 	else:
-		_warn_once(n, "impulse", "GDevents: толкнуть можно только тело — внутри «%s» нет ни RigidBody2D, ни CharacterBody2D" % n.name)
+		_warn_once(n, "impulse", GdeI18n.t("GDevents: толкнуть можно только тело — внутри «%s» нет ни RigidBody2D, ни CharacterBody2D") % n.name)
 
 
 # ------------------------------------------------------------------ строки ---

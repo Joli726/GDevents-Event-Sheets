@@ -28,16 +28,16 @@ static func build(id: String, param_index: int, param_def: Dictionary,
 	var kind := str(param_def.get("kind", "number"))
 	var label := str(param_def.get("label", "")).to_lower()
 
-	if kind == "raw" and (label.contains("клавиш") or id.begins_with("key.")):
-		return _plain(KEYS, "клавиша")
+	if kind == "raw" and (label.contains(GdeI18n.t("клавиш")) or id.begins_with("key.")):
+		return _plain(KEYS, GdeI18n.t("клавиша"))
 	if id.begins_with("input.") :
-		return _plain(_input_actions(), "действие ввода из настроек проекта")
+		return _plain(_input_actions(), GdeI18n.t("действие ввода из настроек проекта"))
 	if id == "scene.change":
-		return _plain(_files(["tscn"]), "сцена")
+		return _plain(_files(["tscn"]), GdeI18n.t("сцена"))
 	if id.begins_with("audio."):
-		return _plain(_files(SOUND_EXT), "звуковой файл")
+		return _plain(_files(SOUND_EXT), GdeI18n.t("звуковой файл"))
 	if id.contains("animation") and kind != "number":
-		return _plain(_animations(doc, params), "анимация объекта")
+		return _plain(_animations(doc, params), GdeI18n.t("анимация объекта"))
 
 	if kind == "number" or kind == "string":
 		return _expressions(reg, doc, _objects_in(params))
@@ -79,7 +79,7 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 			out.append({
 				"text": "%s.%s(%s)" % [o, name, _args(d)],
 				"insert": "%s.%s(" % [o, name],
-				"hint": str(d.get("description", "Выражение объекта")),
+				"hint": str(d.get("description", GdeI18n.t("Выражение объекта"))),
 			})
 		for beh: String in _behaviors_of(doc, o):
 			var b: Variant = reg.behaviors.get(beh)
@@ -91,7 +91,7 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 				out.append({
 					"text": "%s.%s::%s(%s)" % [o, beh, name, _args(d2)],
 					"insert": "%s.%s::%s(" % [o, beh, name],
-					"hint": str(d2.get("description", "Выражение поведения «%s»" % beh)),
+					"hint": str(d2.get("description", GdeI18n.t("Выражение поведения «%s»") % beh)),
 				})
 
 	if doc != null:
@@ -99,7 +99,7 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 			out.append({
 				"text": "Variable(%s)" % v,
 				"insert": "Variable(%s)" % v,
-				"hint": "Переменная сцены",
+				"hint": GdeI18n.t("Переменная сцены"),
 			})
 
 	for name: String in reg.expressions:
@@ -107,7 +107,7 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 		out.append({
 			"text": "%s(%s)" % [name, _args(d)],
 			"insert": "%s(" % name,
-			"hint": str(d.get("description", "Общее выражение")),
+			"hint": str(d.get("description", GdeI18n.t("Общее выражение"))),
 		})
 	return out
 

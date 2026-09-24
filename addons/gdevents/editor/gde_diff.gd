@@ -93,11 +93,11 @@ static func hunks(ops: Array, context: int = 3) -> Array:
 	for i in range(ops.size()):
 		if keep[i] == 1:
 			if skipped > 0:
-				out.append(["…", "%d строк без изменений" % skipped])
+				out.append(["…", GdeI18n.t("%d строк без изменений") % skipped])
 				skipped = 0
 			out.append(ops[i])
 		else:
 			skipped += 1
 	if skipped > 0:
-		out.append(["…", "%d строк без изменений" % skipped])
+		out.append(["…", GdeI18n.t("%d строк без изменений") % skipped])
 	return out

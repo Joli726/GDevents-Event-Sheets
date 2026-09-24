@@ -57,8 +57,8 @@ var _selected: int = -1
 
 
 func _init() -> void:
-	title = "Объекты листа"
-	ok_button_text = "Закрыть"
+	title = GdeI18n.t("Объекты листа")
+	ok_button_text = GdeI18n.t("Закрыть")
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
@@ -66,7 +66,7 @@ func _init() -> void:
 
 	# Без автопереноса и с clip_text: автоперенос в контейнере раздувает
 	# минимальную высоту и выталкивает низ диалога за край.
-	var hint := _note("Тип объекта — сцена .tscn. Перетащите сцену из файловой системы в список слева.")
+	var hint := _note(GdeI18n.t("Тип объекта — сцена .tscn. Перетащите сцену из файловой системы в список слева."))
 	box.add_child(hint)
 
 	var split := HSplitContainer.new()
@@ -79,7 +79,7 @@ func _init() -> void:
 	left.add_theme_constant_override("separation", 4)
 	left.custom_minimum_size = Vector2(200, 0)
 	split.add_child(left)
-	left.add_child(_caption("ОБЪЕКТЫ"))
+	left.add_child(_caption(GdeI18n.t("ОБЪЕКТЫ")))
 
 	var drop := GdeSceneDrop.new()
 	drop.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -102,7 +102,7 @@ func _init() -> void:
 	right.add_child(_detail)
 
 	_empty_hint = Label.new()
-	_empty_hint.text = "Выберите объект слева или добавьте новый внизу."
+	_empty_hint.text = GdeI18n.t("Выберите объект слева или добавьте новый внизу.")
 	_empty_hint.modulate = Color(1, 1, 1, 0.45)
 	_empty_hint.clip_text = true
 	_detail.add_child(_empty_hint)
@@ -119,7 +119,7 @@ func _init() -> void:
 	_scene_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scene_row.add_child(_scene_label)
 	var open_btn := Button.new()
-	open_btn.text = "Открыть сцену"
+	open_btn.text = GdeI18n.t("Открыть сцену")
 	open_btn.pressed.connect(_open_scene)
 	scene_row.add_child(open_btn)
 
@@ -130,7 +130,7 @@ func _init() -> void:
 	_detail.add_child(_tabs)
 
 	var beh_split := HSplitContainer.new()
-	beh_split.name = "Поведения"
+	beh_split.name = GdeI18n.t("Поведения")
 	_tabs.add_child(beh_split)
 
 	var beh_col := VBoxContainer.new()
@@ -148,7 +148,7 @@ func _init() -> void:
 	beh_scroll.add_child(_behaviors)
 
 	var add_beh := Button.new()
-	add_beh.text = "  Добавить поведение"
+	add_beh.text = GdeI18n.t("  Добавить поведение")
 	add_beh.icon = GdeIcons.get_icon("plus")
 	add_beh.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_beh.pressed.connect(_open_behavior_picker)
@@ -175,10 +175,10 @@ func _init() -> void:
 	beh_right.add_child(_beh_panel)
 
 	var checks_tab := VBoxContainer.new()
-	checks_tab.name = "Проверка сцены"
+	checks_tab.name = GdeI18n.t("Проверка сцены")
 	checks_tab.add_theme_constant_override("separation", 6)
 	_tabs.add_child(checks_tab)
-	_checks_caption = _caption("ПРОВЕРКА СЦЕНЫ")
+	_checks_caption = _caption(GdeI18n.t("ПРОВЕРКА СЦЕНЫ"))
 	checks_tab.add_child(_checks_caption)
 
 	# Прокрутка обязательна: длинные пояснения с переносом иначе раздули бы
@@ -194,7 +194,7 @@ func _init() -> void:
 	scroll.add_child(_checks)
 
 	var del_obj := Button.new()
-	del_obj.text = "  Удалить объект из листа"
+	del_obj.text = GdeI18n.t("  Удалить объект из листа")
 	del_obj.icon = GdeIcons.get_icon("trash")
 	del_obj.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	del_obj.pressed.connect(_remove_object)
@@ -202,14 +202,14 @@ func _init() -> void:
 
 	# ---- внизу: добавление объекта
 	box.add_child(HSeparator.new())
-	box.add_child(_caption("НОВЫЙ ОБЪЕКТ"))
+	box.add_child(_caption(GdeI18n.t("НОВЫЙ ОБЪЕКТ")))
 
 	var form := HBoxContainer.new()
 	form.add_theme_constant_override("separation", 6)
 	box.add_child(form)
 
 	_name_edit = LineEdit.new()
-	_name_edit.placeholder_text = "Имя, например Enemy"
+	_name_edit.placeholder_text = GdeI18n.t("Имя, например Enemy")
 	_name_edit.custom_minimum_size = Vector2(170, 0)
 	_name_edit.text_changed.connect(func(_t): _clear_error())
 	_name_edit.text_submitted.connect(func(_t): _add_object())
@@ -222,12 +222,12 @@ func _init() -> void:
 	form.add_child(_scene_edit)
 
 	var browse := Button.new()
-	browse.text = "Выбрать…"
+	browse.text = GdeI18n.t("Выбрать…")
 	browse.pressed.connect(func(): GdeUi.popup_fit(_file, Vector2i(900, 620)))
 	form.add_child(browse)
 
 	var add := Button.new()
-	add.text = "Добавить"
+	add.text = GdeI18n.t("Добавить")
 	add.icon = GdeIcons.get_icon("plus")
 	add.pressed.connect(_add_object)
 	form.add_child(add)
@@ -239,10 +239,10 @@ func _init() -> void:
 	box.add_child(_error)
 
 	_file = FileDialog.new()
-	_file.title = "Сцена объекта"
+	_file.title = GdeI18n.t("Сцена объекта")
 	_file.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	_file.access = FileDialog.ACCESS_RESOURCES
-	_file.filters = PackedStringArray(["*.tscn ; Сцены"])
+	_file.filters = PackedStringArray([GdeI18n.t("*.tscn ; Сцены")])
 	_file.file_selected.connect(func(p: String):
 		_scene_edit.text = p
 		_clear_error()
@@ -257,14 +257,14 @@ func _init() -> void:
 	# Удаление объекта ломает все события, которые на него ссылаются —
 	# одного клика для такого мало.
 	_confirm_delete = ConfirmationDialog.new()
-	_confirm_delete.title = "Удалить объект"
-	_confirm_delete.ok_button_text = "Удалить"
-	_confirm_delete.cancel_button_text = "Отмена"
+	_confirm_delete.title = GdeI18n.t("Удалить объект")
+	_confirm_delete.ok_button_text = GdeI18n.t("Удалить")
+	_confirm_delete.cancel_button_text = GdeI18n.t("Отмена")
 	_confirm_delete.confirmed.connect(_do_remove_object)
 	add_child(_confirm_delete)
 
 	_confirm_lib = ConfirmationDialog.new()
-	_confirm_lib.cancel_button_text = "Отмена"
+	_confirm_lib.cancel_button_text = GdeI18n.t("Отмена")
 	_confirm_lib.confirmed.connect(func() -> void:
 		if _lib_action.is_valid():
 			_lib_action.call())
@@ -323,17 +323,17 @@ func _refresh_list() -> void:
 		_list.set_item_tooltip(idx, scene)
 		if not ResourceLoader.exists(scene):
 			_list.set_item_custom_fg_color(idx, Color(0.92, 0.45, 0.45))
-			_list.set_item_tooltip(idx, "%s — файл не найден" % scene)
+			_list.set_item_tooltip(idx, GdeI18n.t("%s — файл не найден") % scene)
 			continue
 		var found := GdeSceneCheck.check(scene, _reg, _doc.object_names())
 		var errs := GdeSceneCheck.count(found, "error")
 		var warns := GdeSceneCheck.count(found, "warn")
 		if errs > 0:
 			_list.set_item_custom_fg_color(idx, Color(0.95, 0.5, 0.5))
-			_list.set_item_tooltip(idx, "%s — ошибок в сцене: %d" % [scene, errs])
+			_list.set_item_tooltip(idx, GdeI18n.t("%s — ошибок в сцене: %d") % [scene, errs])
 		elif warns > 0:
 			_list.set_item_custom_fg_color(idx, Color(0.95, 0.75, 0.4))
-			_list.set_item_tooltip(idx, "%s — есть что поправить: %d" % [scene, warns])
+			_list.set_item_tooltip(idx, GdeI18n.t("%s — есть что поправить: %d") % [scene, warns])
 	if _list.item_count > 0:
 		var pick: int = clampi(_selected, 0, _list.item_count - 1)
 		_list.select(pick)
@@ -384,7 +384,7 @@ func _refresh_behaviors() -> void:
 	var scene := _current_scene()
 	if scene.is_empty() or not ResourceLoader.exists(scene):
 		var miss := Label.new()
-		miss.text = "Сцена объекта не найдена — поведения недоступны."
+		miss.text = GdeI18n.t("Сцена объекта не найдена — поведения недоступны.")
 		miss.modulate = Color(0.92, 0.45, 0.45)
 		miss.clip_text = true
 		_behaviors.add_child(miss)
@@ -394,11 +394,10 @@ func _refresh_behaviors() -> void:
 	var found := GdeBehaviorInstaller.scan(scene)
 	if found.is_empty():
 		var none := Label.new()
-		none.text = "Поведений нет."
+		none.text = GdeI18n.t("Поведений нет.")
 		none.modulate = Color(1, 1, 1, 0.45)
 		_behaviors.add_child(none)
-		_beh_panel.show_empty("У объекта пока нет поведений. Поведение — это готовая способность: " +
-				"бегать и прыгать, стрелять, получать урон. Добавьте первое кнопкой слева внизу.")
+		_beh_panel.show_empty(GdeI18n.t("У объекта пока нет поведений. Поведение — это готовая способность: бегать и прыгать, стрелять, получать урон. Добавьте первое кнопкой слева внизу."))
 		return
 
 	var names: Array[String] = []
@@ -422,12 +421,12 @@ func _refresh_behaviors() -> void:
 		pick.set_meta("gde_behavior", bname)
 		if b != null:
 			pick.text = str((b as Dictionary).get("title", bname))
-			pick.tooltip_text = "%s\n\nУзел в сцене: %s" \
+			pick.tooltip_text = GdeI18n.t("%s\n\nУзел в сцене: %s") \
 					% [str((b as Dictionary).get("description", "")), str(e["node"])]
 		else:
 			pick.text = bname
 			pick.modulate = Color(0.92, 0.65, 0.35)
-			pick.tooltip_text = "Скрипт поведения не найден в проекте"
+			pick.tooltip_text = GdeI18n.t("Скрипт поведения не найден в проекте")
 		pick.pressed.connect(_select_behavior.bind(bname))
 		row.add_child(pick)
 
@@ -435,27 +434,25 @@ func _refresh_behaviors() -> void:
 		var kind := GdeBehaviorLibrary.kind_of(b) if b != null else ""
 		var badge := ""
 		if GdeBehaviorLibrary.is_broken(str(e.get("script", ""))):
-			badge = "ошибка"
-		elif kind == "copy":
-			badge = "копия"
-		elif kind == "own":
-			badge = "своё"
+			badge = "broken"
+		elif kind == "copy" or kind == "own":
+			badge = kind
 		if not badge.is_empty():
 			var tag := Label.new()
-			tag.text = badge
+			tag.text = {"broken": GdeI18n.t("ошибка"), "copy": GdeI18n.t("копия"), "own": GdeI18n.t("своё")}[badge]
 			tag.add_theme_font_size_override("font_size", 10)
-			tag.modulate = Color(0.95, 0.5, 0.5) if badge == "ошибка" else Color(0.55, 0.85, 0.6)
+			tag.modulate = Color(0.95, 0.5, 0.5) if badge == "broken" else Color(0.55, 0.85, 0.6)
 			tag.tooltip_text = {
-				"ошибка": "Скрипт поведения не собирается — в игре оно не работает",
-				"копия": "Своя копия встроенного поведения",
-				"своё": "Своё поведение из res://behaviors",
+				"broken": GdeI18n.t("Скрипт поведения не собирается — в игре оно не работает"),
+				"copy": GdeI18n.t("Своя копия встроенного поведения"),
+				"own": GdeI18n.t("Своё поведение из res://behaviors"),
 			}[badge]
 			tag.mouse_filter = Control.MOUSE_FILTER_PASS
 			row.add_child(tag)
 
 		var del := Button.new()
 		del.icon = GdeIcons.get_icon("trash")
-		del.tooltip_text = "Убрать поведение из сцены объекта"
+		del.tooltip_text = GdeI18n.t("Убрать поведение из сцены объекта")
 		del.flat = true
 		del.pressed.connect(_uninstall_behavior.bind(bname))
 		row.add_child(del)
@@ -510,20 +507,20 @@ func _refresh_checks() -> void:
 		c.queue_free()
 	var scene := _current_scene()
 	if scene.is_empty() or not ResourceLoader.exists(scene):
-		_checks_caption.text = "ПРОВЕРКА СЦЕНЫ"
+		_checks_caption.text = GdeI18n.t("ПРОВЕРКА СЦЕНЫ")
 		_set_checks_tab(0)
 		return
 	var found := GdeSceneCheck.check(scene, _reg, _doc.object_names())
 	_set_checks_tab(found.size())
 	if found.is_empty():
-		_checks_caption.text = "ПРОВЕРКА СЦЕНЫ — ВСЁ В ПОРЯДКЕ"
+		_checks_caption.text = GdeI18n.t("ПРОВЕРКА СЦЕНЫ — ВСЁ В ПОРЯДКЕ")
 		var ok := Label.new()
-		ok.text = "Тела с формами, спрайты с картинками, анимации на месте."
+		ok.text = GdeI18n.t("Тела с формами, спрайты с картинками, анимации на месте.")
 		ok.modulate = Color(0.6, 0.85, 0.6)
 		ok.clip_text = true
 		_checks.add_child(ok)
 		return
-	_checks_caption.text = "ПРОВЕРКА СЦЕНЫ — НАХОДОК: %d" % found.size()
+	_checks_caption.text = GdeI18n.t("ПРОВЕРКА СЦЕНЫ — НАХОДОК: %d") % found.size()
 	for it: Dictionary in found:
 		_checks.add_child(_check_row(scene, it))
 
@@ -533,7 +530,7 @@ func _refresh_checks() -> void:
 func _set_checks_tab(n: int) -> void:
 	if _tabs == null or _tabs.get_tab_count() < 2:
 		return
-	_tabs.set_tab_title(1, "Проверка сцены" if n == 0 else "Проверка сцены · %d" % n)
+	_tabs.set_tab_title(1, GdeI18n.t("Проверка сцены") if n == 0 else GdeI18n.t("Проверка сцены · %d") % n)
 	_tabs.set_tab_icon(1, GdeIcons.get_icon("warning") if n > 0 else null)
 
 
@@ -591,7 +588,7 @@ func _apply_fix(scene: String, one_fix: Dictionary) -> void:
 	if not err.is_empty():
 		_set_error(err)
 		return
-	_set_note("Исправлено: %s" % str(one_fix.get("label", "")))
+	_set_note(GdeI18n.t("Исправлено: %s") % str(one_fix.get("label", "")))
 	_rescan_filesystem()
 	var keep := _selected
 	_refresh_list()
@@ -615,10 +612,10 @@ func open_on_problem(doc: GdeSheetDocument, reg: GdeRegistry, object_name: Strin
 func _open_behavior_picker() -> void:
 	var scene := _current_scene()
 	if scene.is_empty():
-		_set_error("Сначала выберите объект")
+		_set_error(GdeI18n.t("Сначала выберите объект"))
 		return
 	if _reg == null or _reg.behaviors.is_empty():
-		_set_error("В проекте нет ни одного поведения")
+		_set_error(GdeI18n.t("В проекте нет ни одного поведения"))
 		return
 	_beh_picker.open_for(_reg, GdeBehaviorInstaller.installed(scene))
 
@@ -646,9 +643,9 @@ func _install_behavior(bname: String, script_path: String) -> void:
 	_rescan_filesystem()
 	var created: Array = res.get("created", [])
 	if not created.is_empty():
-		_set_note("Поведение добавлено, настройки — справа. Для него в сцену добавлено: %s" % ", ".join(created))
+		_set_note(GdeI18n.t("Поведение добавлено, настройки — справа. Для него в сцену добавлено: %s") % ", ".join(created))
 	else:
-		_set_note("Поведение добавлено, его настройки — справа")
+		_set_note(GdeI18n.t("Поведение добавлено, его настройки — справа"))
 
 
 func _uninstall_behavior(bname: String) -> void:
@@ -674,19 +671,19 @@ func _add_object() -> void:
 	var n := _name_edit.text.strip_edges()
 	var s := _scene_edit.text.strip_edges()
 	if n.is_empty():
-		_set_error("Укажите имя объекта")
+		_set_error(GdeI18n.t("Укажите имя объекта"))
 		return
 	if not _is_valid_name(n):
-		_set_error("Имя: латинские буквы, цифры и _, не начиная с цифры")
+		_set_error(GdeI18n.t("Имя: латинские буквы, цифры и _, не начиная с цифры"))
 		return
 	if _doc.object_names().has(n):
-		_set_error("Объект «%s» уже есть в листе" % n)
+		_set_error(GdeI18n.t("Объект «%s» уже есть в листе") % n)
 		return
 	if not s.begins_with("res://") or not s.ends_with(".tscn"):
-		_set_error("Выберите сцену .tscn внутри проекта")
+		_set_error(GdeI18n.t("Выберите сцену .tscn внутри проекта"))
 		return
 	if not ResourceLoader.exists(s):
-		_set_error("Файл %s не найден" % s)
+		_set_error(GdeI18n.t("Файл %s не найден") % s)
 		return
 	_doc.add_object(n, s)
 	_name_edit.text = ""
@@ -699,12 +696,12 @@ func _add_object() -> void:
 
 func _remove_object() -> void:
 	if _doc == null or _selected < 0:
-		_set_error("Сначала выберите объект")
+		_set_error(GdeI18n.t("Сначала выберите объект"))
 		return
 	var list: Array = _doc.objects()
 	var nm := str((list[_selected] as Dictionary).get("name", "")) if _selected < list.size() else ""
 	_confirm_delete.dialog_text = \
-			"Убрать объект «%s» из листа?\nСобытия, ссылающиеся на него, перестанут собираться.\nСама сцена не удаляется." % nm
+			GdeI18n.t("Убрать объект «%s» из листа?\nСобытия, ссылающиеся на него, перестанут собираться.\nСама сцена не удаляется.") % nm
 	GdeUi.popup_fit(_confirm_delete, Vector2i(460, 320))
 
 
@@ -735,13 +732,9 @@ func _ask_make_copy(bname: String) -> void:
 		return
 	var dst := GdeBehaviorLibrary.copy_path_for(str(entry["path"]))
 	var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
-	_confirm_lib.title = "Своя копия поведения"
-	_confirm_lib.ok_button_text = "Сделать копию"
-	_confirm_lib.dialog_text = ("Сделать свою копию поведения «%s»?\n\n" +
-			"Копия ляжет в %s и заменит встроенное поведение у всех объектов проекта " +
-			"(сцен с ним: %d). Настройки объектов сохранятся.\n\n" +
-			"Встроенная версия останется нетронутой — вернуть её можно в любой момент " +
-			"кнопкой «Вернуть встроенную».") % [str(entry.get("title", bname)), dst, n]
+	_confirm_lib.title = GdeI18n.t("Своя копия поведения")
+	_confirm_lib.ok_button_text = GdeI18n.t("Сделать копию")
+	_confirm_lib.dialog_text = GdeI18n.t("Сделать свою копию поведения «%s»?\n\nКопия ляжет в %s и заменит встроенное поведение у всех объектов проекта (сцен с ним: %d). Настройки объектов сохранятся.\n\nВстроенная версия останется нетронутой — вернуть её можно в любой момент кнопкой «Вернуть встроенную».") % [str(entry.get("title", bname)), dst, n]
 	_lib_action = _make_copy.bind(bname)
 	GdeUi.popup_fit(_confirm_lib, Vector2i(560, 300))
 
@@ -754,7 +747,7 @@ func _make_copy(bname: String) -> void:
 	if not err.is_empty():
 		_set_error(err)
 		return
-	_set_note("Своя копия создана: %s. Сцен переключено: %d." % [res["path"], (res["scenes"] as Array).size()])
+	_set_note(GdeI18n.t("Своя копия создана: %s. Сцен переключено: %d.") % [res["path"], (res["scenes"] as Array).size()])
 	# Копию делают, чтобы править, — сразу туда.
 	if _in_editor():
 		_beh_panel.code.open_in_script_editor()
@@ -765,11 +758,9 @@ func _ask_reset(bname: String) -> void:
 	if entry.is_empty():
 		return
 	var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
-	_confirm_lib.title = "Вернуть встроенное поведение"
-	_confirm_lib.ok_button_text = "Вернуть встроенную"
-	_confirm_lib.dialog_text = ("Вернуть встроенное поведение «%s»?\n\n" +
-			"Все объекты (сцен: %d) снова будут работать на встроенной версии, настройки сохранятся.\n\n" +
-			"Ваша копия не пропадёт — она уйдёт в историю версий.") % [str(entry.get("title", bname)), n]
+	_confirm_lib.title = GdeI18n.t("Вернуть встроенное поведение")
+	_confirm_lib.ok_button_text = GdeI18n.t("Вернуть встроенную")
+	_confirm_lib.dialog_text = GdeI18n.t("Вернуть встроенное поведение «%s»?\n\nВсе объекты (сцен: %d) снова будут работать на встроенной версии, настройки сохранятся.\n\nВаша копия не пропадёт — она уйдёт в историю версий.") % [str(entry.get("title", bname)), n]
 	_lib_action = _reset_copy.bind(bname)
 	GdeUi.popup_fit(_confirm_lib, Vector2i(560, 280))
 
@@ -782,15 +773,15 @@ func _reset_copy(bname: String) -> void:
 	if not err.is_empty():
 		_set_error(err)
 		return
-	_set_note("Встроенное поведение вернулось. Сцен переключено: %d. Копия — в истории версий." \
+	_set_note(GdeI18n.t("Встроенное поведение вернулось. Сцен переключено: %d. Копия — в истории версий.") \
 			% (res["scenes"] as Array).size())
 
 
 func _build_derive_dialog() -> void:
 	_derive = ConfirmationDialog.new()
-	_derive.title = "Новое поведение"
-	_derive.ok_button_text = "Создать"
-	_derive.cancel_button_text = "Отмена"
+	_derive.title = GdeI18n.t("Новое поведение")
+	_derive.ok_button_text = GdeI18n.t("Создать")
+	_derive.cancel_button_text = GdeI18n.t("Отмена")
 	# Закрывать окно по «Создать» будем сами — только если имя подошло.
 	_derive.dialog_hide_on_ok = false
 	_derive.confirmed.connect(_do_derive)
@@ -798,14 +789,14 @@ func _build_derive_dialog() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	_derive.add_child(box)
-	box.add_child(_note("Имя — для кода и листа событий, латиницей: EnemyShoot."))
+	box.add_child(_note(GdeI18n.t("Имя — для кода и листа событий, латиницей: EnemyShoot.")))
 	_derive_name = LineEdit.new()
 	_derive_name.placeholder_text = "EnemyShoot"
 	_derive_name.text_changed.connect(func(_t: String) -> void: _derive_error.text = "")
 	box.add_child(_derive_name)
-	box.add_child(_note("Название — как его увидит человек: «Выстрел врага»."))
+	box.add_child(_note(GdeI18n.t("Название — как его увидит человек: «Выстрел врага».")))
 	_derive_title = LineEdit.new()
-	_derive_title.placeholder_text = "Выстрел врага"
+	_derive_title.placeholder_text = GdeI18n.t("Выстрел врага")
 	_derive_title.text_submitted.connect(func(_t: String) -> void: _do_derive())
 	box.add_child(_derive_title)
 	_derive_error = Label.new()
@@ -818,7 +809,7 @@ func _build_derive_dialog() -> void:
 func _ask_derive(bname: String) -> void:
 	_derive_from = bname
 	var entry: Dictionary = _reg.behaviors.get(bname, {})
-	_derive.title = "Новое поведение на основе «%s»" % str(entry.get("title", bname))
+	_derive.title = GdeI18n.t("Новое поведение на основе «%s»") % str(entry.get("title", bname))
 	_derive_name.text = ""
 	_derive_title.text = ""
 	_derive_error.text = ""
@@ -839,21 +830,21 @@ func _do_derive() -> void:
 		return
 	_derive.hide()
 	_reload_library()
-	_set_note("Поведение «%s» создано: %s. Добавьте его объектам кнопкой «Добавить поведение»." \
+	_set_note(GdeI18n.t("Поведение «%s» создано: %s. Добавьте его объектам кнопкой «Добавить поведение».") \
 			% [nm, res["path"]])
 
 
 func _build_remember_dialog() -> void:
 	_remember = ConfirmationDialog.new()
-	_remember.title = "Запомнить версию"
-	_remember.ok_button_text = "Запомнить"
-	_remember.cancel_button_text = "Отмена"
+	_remember.title = GdeI18n.t("Запомнить версию")
+	_remember.ok_button_text = GdeI18n.t("Запомнить")
+	_remember.cancel_button_text = GdeI18n.t("Отмена")
 	_remember.confirmed.connect(_do_remember)
 	add_child(_remember)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	_remember.add_child(box)
-	box.add_child(_note("Название версии — чтобы потом узнать её в списке: «стабильная», «до рывка»."))
+	box.add_child(_note(GdeI18n.t("Название версии — чтобы потом узнать её в списке: «стабильная», «до рывка».")))
 	_remember_title = LineEdit.new()
 	_remember_title.custom_minimum_size = Vector2(420, 0)
 	_remember_title.text_submitted.connect(func(_t: String) -> void:
@@ -864,7 +855,7 @@ func _build_remember_dialog() -> void:
 
 func _ask_remember(bname: String) -> void:
 	_remember_for = bname
-	_remember_title.text = "Версия от %s" % GdeBehaviorCode.nice_time(Time.get_datetime_string_from_system(false, true))
+	_remember_title.text = GdeI18n.t("Версия от %s") % GdeBehaviorCode.nice_time(Time.get_datetime_string_from_system(false, true))
 	GdeUi.popup_fit(_remember, Vector2i(480, 180))
 	_remember_title.grab_focus()
 	_remember_title.select_all()
@@ -873,11 +864,11 @@ func _ask_remember(bname: String) -> void:
 func _do_remember() -> void:
 	var entry: Dictionary = _reg.behaviors.get(_remember_for, {})
 	var title := _remember_title.text.strip_edges()
-	var err := GdeBehaviorLibrary.remember(entry, title if not title.is_empty() else "Без названия")
+	var err := GdeBehaviorLibrary.remember(entry, title if not title.is_empty() else GdeI18n.t("Без названия"))
 	if not err.is_empty():
 		_set_error(err)
 		return
-	_set_note("Версия «%s» запомнена" % title)
+	_set_note(GdeI18n.t("Версия «%s» запомнена") % title)
 	_select_behavior(_selected_behavior)
 	_tabs.current_tab = 0
 	_beh_panel.show_code_tab()
@@ -886,17 +877,13 @@ func _do_remember() -> void:
 func _ask_restore(bname: String, version_path: String, version_title: String) -> void:
 	var entry: Dictionary = _reg.behaviors.get(bname, {})
 	var builtin := GdeBehaviorLibrary.kind_of(entry) == "builtin"
-	_confirm_lib.title = "Восстановить версию"
-	_confirm_lib.ok_button_text = "Восстановить"
+	_confirm_lib.title = GdeI18n.t("Восстановить версию")
+	_confirm_lib.ok_button_text = GdeI18n.t("Восстановить")
 	if builtin:
 		var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
-		_confirm_lib.dialog_text = ("Восстановить версию «%s»?\n\n" +
-				"Из неё снова появится своя копия поведения, и все объекты (сцен: %d) " +
-				"переключатся на неё. Настройки объектов сохранятся.") % [version_title, n]
+		_confirm_lib.dialog_text = GdeI18n.t("Восстановить версию «%s»?\n\nИз неё снова появится своя копия поведения, и все объекты (сцен: %d) переключатся на неё. Настройки объектов сохранятся.") % [version_title, n]
 	else:
-		_confirm_lib.dialog_text = ("Восстановить версию «%s»?\n\n" +
-				"Текущий код поведения заменится этой версией. Он не пропадёт — " +
-				"сначала сам уйдёт в историю.") % version_title
+		_confirm_lib.dialog_text = GdeI18n.t("Восстановить версию «%s»?\n\nТекущий код поведения заменится этой версией. Он не пропадёт — сначала сам уйдёт в историю.") % version_title
 	_lib_action = _restore.bind(bname, version_path, version_title)
 	GdeUi.popup_fit(_confirm_lib, Vector2i(520, 240))
 
@@ -909,13 +896,13 @@ func _restore(bname: String, version_path: String, version_title: String) -> voi
 	if not err.is_empty():
 		_set_error(err)
 		return
-	_set_note("Версия «%s» восстановлена: %s" % [version_title, res.get("path", "")])
+	_set_note(GdeI18n.t("Версия «%s» восстановлена: %s") % [version_title, res.get("path", "")])
 	_beh_panel.show_code_tab()
 
 
 func _accept_builtin(bname: String) -> void:
 	GdeBehaviorLibrary.accept_builtin(_reg.behaviors.get(bname, {}))
-	_set_note("Новая встроенная версия — теперь точка отсчёта для вашей копии")
+	_set_note(GdeI18n.t("Новая встроенная версия — теперь точка отсчёта для вашей копии"))
 	_select_behavior(_selected_behavior)
 	_beh_panel.show_code_tab()
 
@@ -972,7 +959,7 @@ func _add_scenes(paths: Array) -> void:
 	_selected = _doc.objects().size() - 1
 	_refresh_list()
 	objects_changed.emit()
-	_set_note("Добавлено: %s" % ", ".join(added))
+	_set_note(GdeI18n.t("Добавлено: %s") % ", ".join(added))
 
 
 func _set_error(text: String) -> void:

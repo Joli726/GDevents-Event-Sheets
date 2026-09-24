@@ -42,7 +42,7 @@ func _init() -> void:
 	add_theme_constant_override("separation", 0)
 
 	_empty = Label.new()
-	_empty.text = "Выберите условие или действие —\nего настройки появятся здесь."
+	_empty.text = GdeI18n.t("Выберите условие или действие —\nего настройки появятся здесь.")
 	_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -90,7 +90,7 @@ func _init() -> void:
 	_content.add_child(_problem)
 
 	_expr_note = Label.new()
-	_expr_note.text = "В полях работают выражения: Player.X(), RandomInRange(0, 5), Variable(score)"
+	_expr_note.text = GdeI18n.t("В полях работают выражения: Player.X(), RandomInRange(0, 5), Variable(score)")
 	_expr_note.add_theme_font_size_override("font_size", 11)
 	_expr_note.modulate = Color(1, 1, 1, 0.45)
 	_expr_note.clip_text = true
@@ -103,7 +103,7 @@ func _init() -> void:
 	_content.add_child(_hint_box)
 
 	var cap := Label.new()
-	cap.text = "ПОДСКАЗКИ — дважды щёлкните, чтобы подставить"
+	cap.text = GdeI18n.t("ПОДСКАЗКИ — дважды щёлкните, чтобы подставить")
 	cap.add_theme_font_size_override("font_size", 10)
 	cap.modulate = Color(1, 1, 1, 0.45)
 	_hint_box.add_child(cap)
@@ -135,17 +135,17 @@ func _init() -> void:
 	_content.add_child(toggles)
 
 	_invert = CheckButton.new()
-	_invert.text = "Инвертировать (НЕ)"
-	_invert.tooltip_text = "Условие срабатывает, когда оно ЛОЖНО: «НЕ стоит на земле» — в прыжке.\n" \
-			+ "Выборка переворачивается вместе с ним: остаются экземпляры,\n" \
-			+ "для которых условие не выполнено."
+	_invert.text = GdeI18n.t("Инвертировать (НЕ)")
+	_invert.tooltip_text = GdeI18n.t("Условие срабатывает, когда оно ЛОЖНО: «НЕ стоит на земле» — в прыжке.\n") \
+			+ GdeI18n.t("Выборка переворачивается вместе с ним: остаются экземпляры,\n") \
+			+ GdeI18n.t("для которых условие не выполнено.")
 	_invert.toggled.connect(func(_on): _refresh_preview())
 	toggles.add_child(_invert)
 
 	_disable = CheckButton.new()
-	_disable.text = "Выключено"
-	_disable.tooltip_text = "Строка остаётся в листе, но не выполняется и не проверяется.\n" \
-			+ "Удобно, чтобы временно отключить что-то, не удаляя."
+	_disable.text = GdeI18n.t("Выключено")
+	_disable.tooltip_text = GdeI18n.t("Строка остаётся в листе, но не выполняется и не проверяется.\n") \
+			+ GdeI18n.t("Удобно, чтобы временно отключить что-то, не удаляя.")
 	_disable.toggled.connect(func(_on): _refresh_preview())
 	toggles.add_child(_disable)
 
@@ -251,7 +251,7 @@ func _build(params: Array, object_names: Array) -> void:
 		var value := str(params[i]) if i < params.size() else ""
 
 		var label := Label.new()
-		label.text = str(pd.get("label", "Параметр %d" % (i + 1)))
+		label.text = str(pd.get("label", GdeI18n.t("Параметр %d") % (i + 1)))
 		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		_grid.add_child(label)
 
@@ -277,7 +277,7 @@ func _build(params: Array, object_names: Array) -> void:
 				le.text_submitted.connect(func(_t): submitted.emit())
 				if kind == "number" or kind == "string":
 					has_expression = true
-					le.placeholder_text = "число, текст или выражение"
+					le.placeholder_text = GdeI18n.t("число, текст или выражение")
 				editor = le
 		_grid.add_child(editor)
 		_editors.append(editor)
@@ -323,13 +323,13 @@ func _make_options(items: Array, current: String, editable_text: bool) -> Contro
 	if found < 0:
 		# Значение из листа больше не существует — показываем его, а не теряем молча.
 		if not current.is_empty():
-			ob.add_item("%s (нет в листе)" % current, items.size())
+			ob.add_item(GdeI18n.t("%s (нет в листе)") % current, items.size())
 			ob.set_item_metadata(items.size(), current)
 			found = items.size()
 		elif editable_text and ob.item_count > 0:
 			found = 0
 	if ob.item_count == 0:
-		ob.add_item("— нет объектов в листе —", 0)
+		ob.add_item(GdeI18n.t("— нет объектов в листе —"), 0)
 		ob.set_item_metadata(0, "")
 		found = 0
 	ob.selected = maxi(found, 0)
@@ -370,7 +370,7 @@ func _refresh_hints(idx: int) -> void:
 		if shown >= 200:
 			break
 	if _hints.item_count == 0:
-		_hints.add_item("— ничего не подошло —")
+		_hints.add_item(GdeI18n.t("— ничего не подошло —"))
 		_hints.set_item_disabled(0, true)
 	_hint_text.text = ""
 
@@ -429,9 +429,9 @@ func _apply_hint(i: int) -> void:
 func _refresh_preview() -> void:
 	var text := GdeText.with_values(_def, {"id": _id, "params": current_values()}, _color)
 	if _invert.visible and _invert.button_pressed:
-		text = "[color=#f07070]НЕ[/color] " + text
+		text = GdeI18n.t("[color=#f07070]НЕ[/color] ") + text
 	if _disable.button_pressed:
-		text = "[color=#8a8a8a][s]%s[/s]  (выключено)[/color]" % text
+		text = GdeI18n.t("[color=#8a8a8a][s]%s[/s]  (выключено)[/color]") % text
 	_preview.text = text
 	_validate()
 

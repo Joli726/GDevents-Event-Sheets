@@ -23,7 +23,7 @@ func setup(p: Control, event_path: Array, accent: Color) -> void:
 	custom_minimum_size = Vector2(12, 0)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_MOVE
-	tooltip_text = "Меню события. Потяните, чтобы переставить"
+	tooltip_text = GdeI18n.t("Меню события. Потяните, чтобы переставить")
 	mouse_entered.connect(func():
 		_hot = true
 		queue_redraw())

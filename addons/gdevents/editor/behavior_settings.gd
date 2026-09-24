@@ -87,7 +87,7 @@ func rebuild() -> void:
 	_defaults.clear()
 	_info = GdeBehaviorInstaller.describe(scene_path, behavior) if not scene_path.is_empty() else {}
 	if _info.is_empty():
-		_form.add_child(_dim("Поведение не найдено в сцене объекта."))
+		_form.add_child(_dim(GdeI18n.t("Поведение не найдено в сцене объекта.")))
 		return
 
 	var meta := _settings_meta()
@@ -108,17 +108,17 @@ func rebuild() -> void:
 			continue
 		var group := str(p["group"])
 		if group != last_group:
-			_form.add_child(_group_caption(group if not group.is_empty() else "Основное"))
+			_form.add_child(_group_caption(group if not group.is_empty() else GdeI18n.t("Основное")))
 			last_group = group
 		_form.add_child(_row(p, m, has_preset and nm == "preset"))
 		shown += 1
 
 	if shown == 0:
-		_form.add_child(_dim("У этого поведения нет настроек."))
+		_form.add_child(_dim(GdeI18n.t("У этого поведения нет настроек.")))
 		return
 	_form.add_child(HSeparator.new())
 	var reset_all := Button.new()
-	reset_all.text = "  Вернуть все настройки по умолчанию"
+	reset_all.text = GdeI18n.t("  Вернуть все настройки по умолчанию")
 	reset_all.icon = GdeIcons.get_icon("undo")
 	reset_all.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	reset_all.pressed.connect(reset_all_values)
@@ -160,8 +160,8 @@ func _row(p: Dictionary, m: Dictionary, preset_row: bool) -> Control:
 
 	if preset_row:
 		var apply := Button.new()
-		apply.text = "Применить"
-		apply.tooltip_text = "Записать настройки выбранного пресета в поведение"
+		apply.text = GdeI18n.t("Применить")
+		apply.tooltip_text = GdeI18n.t("Записать настройки выбранного пресета в поведение")
 		apply.pressed.connect(apply_preset)
 		line.add_child(apply)
 
@@ -177,7 +177,7 @@ func _row(p: Dictionary, m: Dictionary, preset_row: bool) -> Control:
 	if preset_row:
 		# В комментариях поведений пресет «применяется галочкой ниже» — это
 		# про инспектор Godot. Здесь вместо галочки кнопка.
-		doc = "Выберите набор и нажмите «Применить» — его значения запишутся в настройки ниже."
+		doc = GdeI18n.t("Выберите набор и нажмите «Применить» — его значения запишутся в настройки ниже.")
 	if doc.length() > label.text.length() + 2:
 		var desc := _dim(doc)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -208,7 +208,7 @@ func _editor_for(p: Dictionary) -> Control:
 
 	if t == TYPE_BOOL:
 		var cb := CheckBox.new()
-		cb.text = "Да"
+		cb.text = GdeI18n.t("Да")
 		cb.button_pressed = bool(_values[nm])
 		cb.toggled.connect(func(on: bool) -> void: _changed(nm, on))
 		_rows[nm]["show"] = func(v: Variant) -> void: cb.set_pressed_no_signal(bool(v))
@@ -262,14 +262,14 @@ func _editor_for(p: Dictionary) -> Control:
 		var what := ""
 		if nm.ends_with("_object") or nm == "target":
 			choices = _object_names
-			what = "Объекты листа"
+			what = GdeI18n.t("Объекты листа")
 		elif nm.ends_with("_animation"):
 			choices = _info.get("animations", [])
-			what = "Анимации из спрайта объекта"
+			what = GdeI18n.t("Анимации из спрайта объекта")
 		if hint == PROPERTY_HINT_FILE or hint == PROPERTY_HINT_GLOBAL_FILE:
 			var browse := Button.new()
 			browse.text = "…"
-			browse.tooltip_text = "Выбрать файл"
+			browse.tooltip_text = GdeI18n.t("Выбрать файл")
 			browse.pressed.connect(func() -> void: _pick_file(nm, hs))
 			row.add_child(browse)
 		elif not what.is_empty():
@@ -286,16 +286,16 @@ func _editor_for(p: Dictionary) -> Control:
 		var show_scene := func(v: Variant) -> void:
 			var res := v as Resource
 			shown.text = res.resource_path if res != null else ""
-			shown.placeholder_text = "сцена не выбрана"
+			shown.placeholder_text = GdeI18n.t("сцена не выбрана")
 		show_scene.call(_values[nm])
 		var pick := Button.new()
-		pick.text = "Выбрать…"
+		pick.text = GdeI18n.t("Выбрать…")
 		pick.pressed.connect(func() -> void: _pick_file(nm, "*.tscn,*.scn"))
 		row2.add_child(pick)
 		var clear := Button.new()
 		clear.icon = GdeIcons.get_icon("close")
 		clear.flat = true
-		clear.tooltip_text = "Убрать сцену"
+		clear.tooltip_text = GdeI18n.t("Убрать сцену")
 		clear.pressed.connect(func() -> void: set_value(nm, null))
 		row2.add_child(clear)
 		_rows[nm]["show"] = show_scene
@@ -307,7 +307,7 @@ func _editor_for(p: Dictionary) -> Control:
 	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row3.add_child(note)
 	var open := Button.new()
-	open.text = "Открыть в инспекторе"
+	open.text = GdeI18n.t("Открыть в инспекторе")
 	open.disabled = not Engine.is_editor_hint()
 	open.pressed.connect(open_in_inspector)
 	row3.add_child(open)
@@ -322,7 +322,7 @@ func _choices_button(nm: String, what: String, choices: Array, le: LineEdit) -> 
 	mb.tooltip_text = what
 	var pop := mb.get_popup()
 	if choices.is_empty():
-		pop.add_item("— нечего выбрать —")
+		pop.add_item(GdeI18n.t("— нечего выбрать —"))
 		pop.set_item_disabled(0, true)
 	for i in range(choices.size()):
 		pop.add_item(str(choices[i]), i)
@@ -335,8 +335,8 @@ func _choices_button(nm: String, what: String, choices: Array, le: LineEdit) -> 
 
 static func _complex_note(v: Variant) -> String:
 	if v is PackedVector2Array:
-		return "Точек: %d — правятся в инспекторе" % (v as PackedVector2Array).size()
-	return "Правится в инспекторе Godot"
+		return GdeI18n.t("Точек: %d — правятся в инспекторе") % (v as PackedVector2Array).size()
+	return GdeI18n.t("Правится в инспекторе Godot")
 
 
 ## «Левая:1,Правая:2» -> [["Левая", 1], ["Правая", 2]]; без номеров — по порядку.
@@ -410,7 +410,7 @@ func _update_reset(nm: String) -> void:
 	var same := same_value(_values.get(nm), _defaults.get(nm))
 	reset.disabled = same
 	reset.modulate.a = 0.0 if same else 1.0
-	reset.tooltip_text = "" if same else "Вернуть значение по умолчанию: %s" % _show(_defaults.get(nm))
+	reset.tooltip_text = "" if same else GdeI18n.t("Вернуть значение по умолчанию: %s") % _show(_defaults.get(nm))
 
 
 static func same_value(a: Variant, b: Variant) -> bool:
@@ -425,13 +425,13 @@ static func same_value(a: Variant, b: Variant) -> bool:
 
 static func _show(v: Variant) -> String:
 	if v == null:
-		return "пусто"
+		return GdeI18n.t("пусто")
 	if v is bool:
-		return "да" if v else "нет"
+		return GdeI18n.t("да") if v else GdeI18n.t("нет")
 	if v is Resource:
 		return (v as Resource).resource_path
 	if v is String and (v as String).is_empty():
-		return "пусто"
+		return GdeI18n.t("пусто")
 	return str(v)
 
 
@@ -491,7 +491,7 @@ func _pick_file(nm: String, filters: String) -> void:
 		if not f.strip_edges().is_empty():
 			list.append(f.strip_edges())
 	_file.filters = list
-	_file.title = "Файл для «%s»" % label_for(nm, _settings_meta().get(nm, {}))
+	_file.title = GdeI18n.t("Файл для «%s»") % label_for(nm, _settings_meta().get(nm, {}))
 	GdeUi.popup_fit(_file, Vector2i(900, 620))
 
 
@@ -503,7 +503,7 @@ func _on_file_selected(path: String) -> void:
 	if int(p.get("type", TYPE_NIL)) == TYPE_OBJECT:
 		var res := load(path)
 		if res == null:
-			saved.emit("не загружается %s" % path)
+			saved.emit(GdeI18n.t("не загружается %s") % path)
 			return
 		set_value(nm, res)
 	else:

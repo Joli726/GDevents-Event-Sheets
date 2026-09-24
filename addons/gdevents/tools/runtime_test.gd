@@ -16,6 +16,8 @@ var _checks: int = 0
 
 
 func _ready() -> void:
+	# Тест сверяет русские надписи — язык плагина здесь русский.
+	GdeI18n.set_language("ru", false)
 	Gde.register_objects([{"name": "Enemy", "scene": ENEMY_SCENE}])
 	print("—— выборка ——")
 	_test_create_picks_only_new()

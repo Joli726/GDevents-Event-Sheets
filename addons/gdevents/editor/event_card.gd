@@ -48,7 +48,7 @@ func set_selected(v: bool) -> void:
 func set_errors(errors: Array[String]) -> void:
 	_has_errors = not errors.is_empty()
 	if _has_errors:
-		tooltip_text = "Это событие не соберётся:\n• " + "\n• ".join(errors)
+		tooltip_text = GdeI18n.t("Это событие не соберётся:\n• ") + "\n• ".join(errors)
 	add_theme_stylebox_override("panel", _style())
 
 
