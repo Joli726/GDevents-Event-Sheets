@@ -18,6 +18,9 @@ next to "2D / 3D / Script".
   found.
 - Click a row to select it, double-click to open its parameters, right-click
   for the menu. On hover, buttons appear on the right: invert, copy, delete.
+- **Values are edited right in the sheet**, as in GDevelop: click a
+  highlighted value — an object or a sign is picked from a list, a number or
+  text is typed in a field under the cursor (Enter — done, Escape — cancel).
 - **"Add event" under the last event** — a new empty event at the end of
   the sheet, as in GDevelop (or Ctrl+N).
 - The narrow strip on the left of an event card is both the event menu and a

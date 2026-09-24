@@ -173,7 +173,59 @@ func _process(_d: float) -> void:
 			_ok(_panel.get_combined_minimum_size().x <= 1000.0,
 					"и в узком окне 1000 px панель не вылезает за край (минимум %d)"
 					% int(_panel.get_combined_minimum_size().x))
+			get_tree().root.size = Vector2i(1500, 950)
+		70:
+			_start_inline_test()
+		72:
+			_ok(_panel._inline != null and _panel._inline.visible,
+					"щелчок по значению открыл правку на месте")
+			_panel._close_inline()
+			_panel.select_event([0])
+			# Щелчок мимо значения — по началу фразы — выделяет строку, как раньше.
+			if _inline_item != null:
+				_click(_inline_item._text.get_global_rect().position + Vector2(3, 8))
+		75:
+			_ok(_inline_item != null and _panel.is_instruction_selected(_inline_item.path, _inline_item.kind, _inline_item.index)
+					and _panel._inline == null, "щелчок мимо значения выделяет строку, правка не открывается")
 			_report()
+
+
+var _inline_item: GdeInstructionItem = null
+
+
+## Первое значение в строке с параметрами: считаем ширину текста до него
+## шрифтом строки и щёлкаем точно по нему — как рукой.
+func _start_inline_test() -> void:
+	_inline_item = null
+	for it: GdeInstructionItem in _all_items(_panel):
+		var inst: Dictionary = _panel.doc.instructions_of(it.path, it.kind)[it.index]
+		var params: Array = inst.get("params", [])
+		var def: Variant = _panel.instruction_def(it.kind, str(inst.get("id", "")))
+		if params.is_empty() or not (def is Dictionary) or str(params[0]).is_empty():
+			continue
+		var sentence := str((def as Dictionary).get("sentence", ""))
+		var at := sentence.find("_PARAM0_")
+		if at < 0 or sentence.substr(0, at).contains("_PARAM"):
+			continue
+		_inline_item = it
+		var font := it._text.get_theme_font("normal_font")
+		var fsize := it._text.get_theme_font_size("normal_font_size")
+		var prefix := sentence.substr(0, at)
+		var w := font.get_string_size(prefix, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+		var r := it._text.get_global_rect()
+		_panel._inline = null
+		_click(r.position + Vector2(w + 4.0, float(fsize) * 0.7))
+		return
+	_ok(false, "нашлась строка со значением для щелчка")
+
+
+func _all_items(n: Node) -> Array:
+	var out: Array = []
+	if n is GdeInstructionItem:
+		out.append(n)
+	for c: Node in n.get_children():
+		out.append_array(_all_items(c))
+	return out
 
 
 func _first_item_with_trash() -> GdeInstructionItem:

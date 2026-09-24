@@ -20,6 +20,10 @@ every such change comes with an automatic upgrade of old sheets.
 - **"Add event" under the last event**, as in GDevelop: a new empty event
   at the end of the sheet, selected and scrolled into view (also Ctrl+N).
   · **«Добавить событие» под последним событием**, как в GDevelop.
+- **Edit values right in the sheet**, as in GDevelop: click a highlighted
+  value — an object or a sign is picked from a list, a number or text is
+  typed in a field under the cursor (Enter — done, Escape — cancel, Ctrl+Z
+  undoes). · **Правка значений прямо в листе**: щелчок по значению.
 
 ## 0.9.1
 

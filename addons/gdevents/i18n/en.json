@@ -1116,5 +1116,7 @@
 	"Поведение снято. Вместе с ним удалено то, что оно создало само: %s": "The behavior is removed, together with what it had created itself: %s",
 	"Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт. Камеры в сцене нет — она появится сама.": "The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably. If the scene has no camera, one appears by itself.",
 	"Добавить событие": "Add event",
-	"Новое пустое событие в конце листа (Ctrl+N)": "A new empty event at the end of the sheet (Ctrl+N)"
+	"Новое пустое событие в конце листа (Ctrl+N)": "A new empty event at the end of the sheet (Ctrl+N)",
+	"\n\nЩёлкните по значению, чтобы изменить его прямо здесь.": "\n\nClick a value to change it right here.",
+	"Текст — в кавычках: \"Привет\". Можно и выражение: \"Счёт: \" + ToString(Variable(score))": "Text goes in quotes: \"Hello\". An expression works too: \"Score: \" + ToString(Variable(score))"
 }

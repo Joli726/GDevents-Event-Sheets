@@ -25,7 +25,8 @@ static func with_labels(def: Dictionary, object_name: String = "") -> String:
 
 
 ## Фраза с реальными значениями, в BBCode: параметры подсвечены.
-static func with_values(def: Variant, inst: Dictionary, param_color: Color) -> String:
+## links — значения ссылками [url=номер параметра]: по щелчку их правят прямо в листе.
+static func with_values(def: Variant, inst: Dictionary, param_color: Color, links: bool = false) -> String:
 	var id := str(inst.get("id", ""))
 	if def == null:
 		return GdeI18n.t("[color=#e05555]неизвестная инструкция «%s»[/color]") % _esc(id)
@@ -38,7 +39,10 @@ static func with_values(def: Variant, inst: Dictionary, param_color: Color) -> S
 		var value := str(raw[i]) if i < raw.size() else ""
 		var shown := value if not value.strip_edges().is_empty() \
 				else "‹%s›" % str((defs[i] as Dictionary).get("label", "…"))
-		s = s.replace("_PARAM%d_" % i, "[color=#%s]%s[/color]" % [hex, _esc(shown)])
+		var piece := "[color=#%s]%s[/color]" % [hex, _esc(shown)]
+		if links:
+			piece = "[url=%d]%s[/url]" % [i, piece]
+		s = s.replace("_PARAM%d_" % i, piece)
 	return s
 
 

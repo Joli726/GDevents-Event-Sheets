@@ -1745,3 +1745,106 @@ func _apply_hits_in(n: Node) -> void:
 		if c is GdeEventCard:
 			(c as GdeEventCard).set_hit(is_event_hit((c as GdeEventCard).path))
 		_apply_hits_in(c)
+
+
+# ------------------------------------------------------------- правка на месте ---
+
+const CMP_SIGNS := ["=", "≠", "<", ">", "≤", "≥"]
+const MOD_SIGNS := ["=", "+", "-", "*", "/"]
+
+var _inline: Popup = null
+
+
+## Щелчок по значению в строке листа: объект и знак — из списка, остальное —
+## в поле ввода прямо у курсора. Окно выбора открывать не нужно.
+func edit_param_inline(p: Array, kind: String, index: int, param_i: int, at: Vector2) -> void:
+	if doc == null:
+		return
+	var list := doc.instructions_of(p, kind)
+	if index < 0 or index >= list.size():
+		return
+	var inst: Dictionary = list[index]
+	var def: Variant = instruction_def(kind, str(inst.get("id", "")))
+	if not (def is Dictionary):
+		return
+	var defs: Array = (def as Dictionary).get("params", [])
+	if param_i < 0 or param_i >= defs.size():
+		return
+	select_instruction(p, kind, index)
+	var pkind := str((defs[param_i] as Dictionary).get("kind", "number"))
+	var params: Array = (inst.get("params", []) as Array).duplicate()
+	while params.size() < defs.size():
+		params.append("")
+	var cur := str(params[param_i])
+	var apply := func(v: String) -> void:
+		if v == cur:
+			return
+		params[param_i] = v
+		doc.set_instruction_params(p, kind, index, params)
+	_close_inline()
+	# at — экранная точка, как у меню строки (get_screen_position): так окно
+	# встаёт под курсор и во встроенных, и в отдельных окнах редактора.
+	var screen := Vector2i(at)
+
+	var choices: Array = []
+	match pkind:
+		"object", "objname":
+			doc.extra_objects = doc.function_objects(p)
+			choices = doc.object_names()
+		"cmpop":
+			choices = CMP_SIGNS
+		"modop":
+			choices = MOD_SIGNS
+	if not choices.is_empty():
+		var menu := PopupMenu.new()
+		for c: Variant in choices:
+			menu.add_radio_check_item(str(c))
+			menu.set_item_checked(menu.item_count - 1, str(c) == cur)
+		menu.index_pressed.connect(func(i: int): apply.call(menu.get_item_text(i)))
+		_show_inline(menu, screen)
+		return
+
+	var box := PopupPanel.new()
+	var le := LineEdit.new()
+	le.text = cur
+	le.custom_minimum_size = Vector2(maxf(160.0, 9.0 * cur.length() + 40.0), 0)
+	le.placeholder_text = str((defs[param_i] as Dictionary).get("label", ""))
+	if pkind == "string":
+		le.tooltip_text = GdeI18n.t("Текст — в кавычках: \"Привет\". Можно и выражение: \"Счёт: \" + ToString(Variable(score))")
+	box.add_child(le)
+	var done := {"v": false}
+	var commit := func() -> void:
+		if done["v"]:
+			return
+		done["v"] = true
+		apply.call(le.text)
+		box.hide()
+	le.text_submitted.connect(func(_t: String): commit.call())
+	le.gui_input.connect(func(ev: InputEvent):
+		var k := ev as InputEventKey
+		if k != null and k.pressed and k.keycode == KEY_ESCAPE:
+			done["v"] = true
+			box.hide()
+			le.accept_event())
+	# Щелчок мимо поля — тоже «готово», как в GDevelop.
+	box.popup_hide.connect(func(): commit.call())
+	_show_inline(box, screen)
+	le.grab_focus()
+	le.select_all()
+
+
+func _show_inline(pop: Popup, at: Vector2i) -> void:
+	_inline = pop
+	add_child(pop)
+	pop.popup_hide.connect(func():
+		if is_instance_valid(pop):
+			pop.queue_free(), CONNECT_DEFERRED)
+	pop.reset_size()
+	pop.position = at + Vector2i(0, 12)
+	pop.popup()
+
+
+func _close_inline() -> void:
+	if is_instance_valid(_inline):
+		_inline.hide()
+	_inline = null
