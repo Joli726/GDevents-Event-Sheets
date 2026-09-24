@@ -10,6 +10,7 @@
 extends Node2D
 
 const PATROL := preload("res://addons/gdevents/behaviors/patrol_enemy/patrol_enemy.gd")
+const PATHFINDER := preload("res://addons/gdevents/behaviors/pathfinder/pathfinder.gd")
 
 var _fails: int = 0
 var _checks: int = 0
@@ -24,6 +25,7 @@ func _ready() -> void:
 		{"name": "Enemy", "scene": "res://addons/gdevents/tests/enemy_virtual.tscn"},
 	])
 	await _patrol_enemy()
+	await _pathfinder()
 	_report()
 
 
@@ -100,6 +102,48 @@ func _patrol_enemy() -> void:
 	p.global_position = e.global_position + Vector2(90.0 * d2, 0.0)
 	await _frames(4)
 	_ok(not bool(b.call("sees_target")), "зрение: стена загораживает игрока")
+	w.queue_free()
+	await _frames(2)
+
+
+func _pathfinder() -> void:
+	print("— Поиск пути")
+	var w := _world()
+	w.position = Vector2(0, 2000)
+	# Стена поперёк дороги: напрямую не пройти, только в обход снизу или сверху.
+	_static(w, Vector2(0, -25), Vector2(20, 250))
+	var a := _character(w, Vector2(-150, 0), Vector2(16, 16))
+	a.motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
+	var p := _tagged(w, "Player", Vector2(150, 0))
+	var b := _beh(a, PATHFINDER, {"target_object": "Player", "speed": 300.0, "cell_size": 16.0})
+	var found: Array[bool] = [false]
+	b.connect("path_found", func() -> void: found[0] = true)
+	var went_around := false
+	var arrived := false
+	for i in 300:
+		await get_tree().physics_frame
+		var ly := a.global_position.y - w.global_position.y
+		if absf(a.global_position.x - w.global_position.x) < 20.0 and (ly > 100.0 or ly < -150.0):
+			went_around = true
+		if bool(b.call("has_arrived")):
+			arrived = true
+			break
+	_ok(found[0], "путь: найден, сигнал path_found")
+	_ok(went_around, "путь: обошёл стену, а не упёрся в неё")
+	_ok(arrived and a.global_position.distance_to(p.global_position) <= 10.0,
+			"путь: дошёл до цели (осталось %.0f px)" % a.global_position.distance_to(p.global_position))
+
+	# Цель замурована со всех сторон — пути нет.
+	var box := Vector2(400, 0)
+	for side: Array in [[Vector2(0, -40), Vector2(100, 10)], [Vector2(0, 40), Vector2(100, 10)],
+			[Vector2(-45, 0), Vector2(10, 90)], [Vector2(45, 0), Vector2(10, 90)]]:
+		_static(w, box + (side[0] as Vector2), side[1] as Vector2)
+	b.set("partial_path", false)
+	b.call("go_to", w.global_position.x + box.x, w.global_position.y + box.y)
+	var failed: Array[bool] = [false]
+	b.connect("path_failed", func() -> void: failed[0] = true)
+	await _frames(5)
+	_ok(failed[0] and bool(b.call("no_path")), "путь: до замурованной точки добраться нельзя")
 	w.queue_free()
 	await _frames(2)
 
