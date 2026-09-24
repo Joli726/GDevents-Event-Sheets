@@ -800,6 +800,23 @@ func _test_camera_follow() -> void:
 	var after := cam.global_position.x if cam != null else 0.0
 	_ok(step > 50.0 and step < 200.0, "плавность 10: за кадр треть пути не проходит, но движется (%.0f px)" % step)
 	_ok(after > 1490.0, "плавность 10: за секунду доехала (x = %.0f)" % after)
+	# Ритм: персонаж платформера ходит на шаге физики — камера тоже, и между
+	# шагами физики не сдвигается, иначе на 144-герцовом мониторе персонаж
+	# дрожит и оставляет «шлейф».
+	hero.position = Vector2(2000, 300)
+	Gde._physics_process(1.0 / 60.0)
+	var after_step := cam.global_position if cam != null else Vector2.ZERO
+	Gde._on_frame_pre_draw()
+	Gde._on_frame_pre_draw()
+	_ok(cam != null and cam.global_position == after_step and after_step.x > 1500.0,
+			"персонаж ходит на шаге физики — между шагами камера стоит")
+	# Персонаж, который ходит каждый кадр (вид сверху), — камера каждый кадр.
+	hero.position = Vector2(2600, 300)
+	Gde._on_frame_pre_draw()
+	var after_frame := cam.global_position if cam != null else Vector2.ZERO
+	Gde._physics_process(1.0 / 60.0)
+	_ok(cam != null and after_frame.x > after_step.x and cam.global_position == after_frame,
+			"персонаж ходит каждый кадр — камера каждый кадр, на шаге физики не дёргается")
 	_free([r2, hero])
 	Gde.camera_stop_follow()
 	if cam != null:
