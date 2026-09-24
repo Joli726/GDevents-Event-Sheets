@@ -320,6 +320,31 @@ func _test_scaffold() -> void:
 	_eq(GdeBehaviorInstaller.installed(path).size(), 0, "после снятия список пуст")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
+	# Каждое встроенное поведение в пустой сцене: каркас без ошибок проверки.
+	# Так нашлась форма «Урона при касании», лежавшая рядом с Area2D.
+	var broken: Array[String] = []
+	for bname: String in reg.behaviors:
+		var bd: Dictionary = reg.behaviors[bname]
+		var p2 := "user://gde_scaffold_%s.tscn" % bname.to_lower()
+		var r0 := Node2D.new()
+		r0.name = bname
+		var pk := PackedScene.new()
+		pk.pack(r0)
+		ResourceSaver.save(pk, p2)
+		r0.free()
+		GdeBehaviorInstaller.invalidate()
+		var added: Dictionary = await GdeBehaviorInstaller.add(p2, bname, str(bd["path"]),
+				{"target": bd.get("target", ""), "needs": bd.get("needs", [])})
+		GdeBehaviorInstaller.invalidate()
+		for it: Dictionary in GdeSceneCheck.check(p2, reg, []):
+			if str(it["level"]) == "error":
+				broken.append("%s: %s" % [bname, it["text"]])
+		if str(added.get("error", "")) != "":
+			broken.append("%s: %s" % [bname, added["error"]])
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p2))
+	_ok(broken.is_empty(), "каждое поведение в пустой сцене — каркас без ошибок (%d поведений)%s"
+			% [reg.behaviors.size(), "" if broken.is_empty() else ": " + "; ".join(broken)])
+
 
 func _has_class(n: Node, cls: String) -> bool:
 	if n.is_class(cls):
