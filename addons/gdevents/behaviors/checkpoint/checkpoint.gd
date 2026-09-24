@@ -38,7 +38,7 @@ const SAVED_META := "__gde_checkpoints"
 ## @group.en Respawn
 @export_group("Возрождение")
 ## Возрождать игрока здесь, когда его «Здоровье» кончилось.
-## @en Respawn the player here when its "Health" runs out.
+## @en Respawn on death — here, when the player's "Health" runs out.
 @export var respawn_on_death: bool = true
 ## Через сколько секунд после смерти появиться.
 ## @en How many seconds after death to appear.
@@ -47,16 +47,16 @@ const SAVED_META := "__gde_checkpoints"
 ## @en Invulnerability after appearing, seconds.
 @export_range(0.0, 30.0, 0.1) var invulnerable_after: float = 1.0
 ## Создать игрока заново, если его удалили при смерти.
-## @en Create the player again if it was deleted on death.
+## @en Recreate the player — if it was deleted on death.
 @export var recreate_if_deleted: bool = true
 ## Помнить точку после перезапуска сцены: игрок начнёт с неё.
 ## @en Remember the point after a scene restart: the player starts from it.
 @export var remember_after_restart: bool = true
 ## Сдвиг места появления по X от точки, пикселей.
-## @en Offset of the spawn place along X from the point, pixels.
+## @en Spawn offset X — from the point, pixels.
 @export_range(-1000.0, 1000.0, 1.0) var offset_x: float = 0.0
 ## Сдвиг места появления по Y от точки, пикселей. Минус — выше.
-## @en Offset of the spawn place along Y from the point, pixels. Minus — higher.
+## @en Spawn offset Y — from the point, pixels. Minus — higher.
 @export_range(-1000.0, 1000.0, 1.0) var offset_y: float = 0.0
 
 ## @group.en Look

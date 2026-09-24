@@ -27,9 +27,11 @@ const HEALTH := preload("res://addons/gdevents/behaviors/health/health.gd")
 const MELEE := preload("res://addons/gdevents/behaviors/melee/melee.gd")
 const ABILITY := preload("res://addons/gdevents/behaviors/ability/ability.gd")
 const STATES := preload("res://addons/gdevents/behaviors/state_machine/state_machine.gd")
+const STICK := preload("res://addons/gdevents/behaviors/stick_to/stick_to.gd")
+const BAR := preload("res://addons/gdevents/behaviors/value_bar/value_bar.gd")
 const RUNNER_SCENE := "user://gde_scenario_runner.tscn"
 
-const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states"]
+const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states", "stick_to", "value_bar"]
 
 var _fails: int = 0
 var _checks: int = 0
@@ -879,13 +881,89 @@ func _states() -> void:
 	for i in 10:
 		await get_tree().process_frame
 	_ok(not bool(sm.call("just_entered", "chase")), "состояния: «только что вошёл» — ненадолго")
-	_ok(float(sm.call("time_in_state")) > 0.1, "состояния: время в состоянии идёт")
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 150:
+		await get_tree().process_frame
+	_ok(float(sm.call("time_in_state")) > 0.1, "состояния: время в состоянии идёт (%.2f с)" % float(sm.call("time_in_state")))
 	sm.call("set_state_for", "stunned", 0.2, "")
 	_eq(sm.call("state"), "stunned", "состояния: оглушён на время")
 	# Время — настоящее: кадры отрисовки без экрана идут куда чаще 60 в секунду.
 	await _frames(20)
 	_eq(sm.call("state"), "chase", "состояния: через 0.2 с — обратно в прежнее")
 	_eq(changes.size(), 3, "состояния: сигнал state_changed на каждой смене")
+	w.queue_free()
+	await _frames(2)
+
+
+func _stick_to() -> void:
+	print("— Привязка к объекту")
+	var w := _world()
+	w.position = Vector2(0, 28000)
+	var foe := _tagged(w, "Enemy", Vector2(100, 0))
+	var face := Sprite2D.new()
+	foe.add_child(face)
+	var tag := _sprite_box(w, Vector2(0, 0))
+	var sb := _beh(tag, STICK, {"target_object": "Enemy", "offset_x": 10.0, "offset_y": -30.0})
+	await _frames(2)
+	_ok(tag.global_position.distance_to(foe.global_position + Vector2(10, -30)) < 0.5, "привязка: встала со смещением")
+	foe.position += Vector2(50, 20)
+	await _frames(1)
+	_ok(tag.global_position.distance_to(foe.global_position + Vector2(10, -30)) < 0.5, "привязка: следует за объектом")
+	face.flip_h = true
+	await _frames(1)
+	_ok(tag.global_position.distance_to(foe.global_position + Vector2(-10, -30)) < 0.5
+			and (tag.get_child(0) as Sprite2D).flip_h, "привязка: отразилась вместе с ним")
+	_ok(bool(sb.call("is_stuck")), "привязка: условие «привязан»")
+	foe.queue_free()
+	await _frames(3)
+	_ok(not is_instance_valid(tag) or tag.is_queued_for_deletion(), "привязка: исчезла вместе с ним")
+	w.queue_free()
+	await _frames(2)
+
+
+func _value_bar() -> void:
+	print("— Полоска значения")
+	var w := _world()
+	w.position = Vector2(0, 30000)
+	var hero := _node(w, Vector2.ZERO)
+	var health := _beh(hero, HEALTH, {"max_health": 10.0, "invulnerable_time": 0.0, "blink_on_hit": false, "min_damage": 0.0})
+	var bar := _beh(hero, BAR, {"fill_speed": 2.0, "trail_delay": 0.3, "trail_speed": 1.0})
+	# Полоска живёт в кадрах отрисовки и в настоящем времени — по ним и ждём.
+	for i in 3:
+		await get_tree().process_frame
+	_eq(bar.call("shown_share"), 1.0, "полоска: здоровье полное — полная")
+	health.call("damage", 5.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var s1 := float(bar.call("shown_share"))
+	_ok(s1 < 1.0 and s1 > 0.55, "полоска: убывает плавно, а не сразу (%.2f)" % s1)
+	_ok(float(bar.call("trail_share")) > 0.99, "полоска: след пока стоит")
+	var t0 := Time.get_ticks_msec()
+	var trail_moved_at := -1
+	while Time.get_ticks_msec() - t0 < 2500:
+		await get_tree().process_frame
+		if trail_moved_at < 0 and float(bar.call("trail_share")) < 0.99:
+			trail_moved_at = Time.get_ticks_msec() - t0
+		if not bool(bar.call("is_draining")):
+			break
+	_ok(trail_moved_at >= 200, "полоска: след ждёт, прежде чем догонять (%d мс)" % trail_moved_at)
+	_ok(absf(float(bar.call("shown_share")) - 0.5) < 0.01, "полоска: дошла до половины")
+	_ok(absf(float(bar.call("trail_share")) - 0.5) < 0.01 and not bool(bar.call("is_draining")), "полоска: след догнал")
+	var fill := bar.get_node("Bar").get_child(2) as ColorRect
+	_ok(absf(fill.size.x - 20.0) < 0.5, "полоска: нарисована в половину ширины (%.0f из 40)" % fill.size.x)
+	# Переменная сцены и место на экране.
+	Gde.var_set("mana", 25.0)
+	var ui := _node(w, Vector2(0, 0))
+	var b2 := _beh(ui, BAR, {"source": 2, "variable": "mana", "max_value": 100.0, "on_screen": true,
+			"fill_speed": 0.0, "offset_x": 20.0, "offset_y": 20.0})
+	for i in 3:
+		await get_tree().process_frame
+	_eq(b2.call("shown_share"), 0.25, "полоска: переменная сцены 25 из 100")
+	var layer_found := false
+	for c: Node in b2.get_children():
+		if c is CanvasLayer:
+			layer_found = true
+	_ok(layer_found, "полоска: на экране — в своём слое интерфейса")
 	w.queue_free()
 	await _frames(2)
 

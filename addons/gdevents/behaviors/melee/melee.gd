@@ -26,7 +26,7 @@ signal combo_finished
 ## Урон за удар. Бьёт через поведение «Здоровье» цели.
 ## @en Damage per strike. Hits through the target's "Health" behavior.
 @export_range(0.0, 1000.0, 0.5) var damage: float = 1.0
-## Прибавка урона на каждом следующем ударе комбо.
+## Прибавка урона — на каждом следующем ударе комбо.
 ## @en Damage added on each next strike of a combo.
 @export_range(0.0, 1000.0, 0.5) var combo_bonus: float = 0.5
 ## Отбрасывание цели, пикселей.
@@ -53,8 +53,8 @@ signal combo_finished
 
 ## @group.en Timing
 @export_group("Время")
-## С какого кадра анимации удара зона включается.
-## @en From which frame of the attack animation the zone turns on.
+## Первый кадр удара — с какого кадра анимации зона включается.
+## @en First hit frame — from which frame of the attack animation the zone turns on.
 @export_range(0, 60, 1) var hit_frame_from: int = 1
 ## По какой кадр зона включена.
 ## @en Up to which frame the zone is on.
@@ -62,8 +62,8 @@ signal combo_finished
 ## Длительность удара без анимации, секунд. С анимацией удар длится, пока она играет.
 ## @en Strike duration without an animation, seconds. With an animation, the strike lasts while it plays.
 @export_range(0.05, 5.0, 0.05) var swing_time: float = 0.3
-## Без анимации зона включена на этой доле удара — с середины.
-## @en Without an animation the zone is on for this share of the strike — from the middle.
+## Доля удара без анимации — сколько зона включена, считая от середины.
+## @en Active share — without an animation, the share of the strike the zone is on, around the middle.
 @export_range(0.05, 1.0, 0.05) var active_share: float = 0.4
 ## Перезарядка после комбо, секунд.
 ## @en Cooldown after a combo, seconds.
