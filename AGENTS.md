@@ -5,8 +5,10 @@ Cursor, Copilot, Gemini and others).
 
 **GDevents** is a Godot 4.7 editor plugin: GDevelop-style event sheets that
 compile to plain GDScript, plus ready-made behaviors and extensions. This
-repository is at the same time the plugin (`addons/gdevents/`) and the
-owner's small test game (`scenes/`, `events/`, `res/`).
+repository holds only the plugin (`addons/gdevents/`) and a minimal Godot
+project around it (`project.godot`) for development and tests. Games that
+use the plugin live in their own projects — do not add game scenes or
+assets here.
 
 ## Talking to the owner
 
