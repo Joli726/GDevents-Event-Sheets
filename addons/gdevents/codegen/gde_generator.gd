@@ -39,11 +39,16 @@ var _event_lines: Array = []
 ## Функции из событий листа (GdeFunctions.collect) и та, что собирается сейчас.
 var _fns: Array = []
 var _in_fn: Dictionary = {}
+## Отладка: в начале тела каждого события — «событие сработало» для панели.
+## В экспорт без отладки (release) эти строки не попадают.
+var debug_hooks: bool = true
+var _hit: int = -1
 
 
-static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
+static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String, debug: bool = true) -> Dictionary:
 	var g := GdeGenerator.new()
 	g._reg = reg
+	g.debug_hooks = debug
 	return g._run(sheet, source_path)
 
 
@@ -305,6 +310,10 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> bool:
 	var emitted := false
 	var cur := indent
+	if debug_hooks and _hit >= 0:
+		_line(indent, "if Gde.debugging: Gde.dbg_hit(self, %d)" % _hit)
+		emitted = true
+	_hit = -1
 	var opened: Array[int] = []
 	for a: Dictionary in actions:
 		var d: Variant = _reg.action(str(a.get("id", "")))
@@ -724,13 +733,18 @@ func _emit_event_map(source_path: String) -> void:
 		return
 	_line(0, "const GDE_EVENTS: Array = [")
 	for entry: Array in _event_lines:
-		_line(1, "[%d, %s, %s]," % [entry[0], _quote(str(entry[1])), _quote(str(entry[2]))])
+		var ints: Array[String] = []
+		for i: Variant in (entry[3] as Array):
+			ints.append(str(int(i)))
+		_line(1, "[%d, %s, %s, [%s]]," % [entry[0], _quote(str(entry[1])), _quote(str(entry[2])), ", ".join(ints)])
 	_line(0, "]")
 
 
 func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void:
 	_line(indent, "")
-	_event_lines.append([_out.size() + 1, str(_event_n), _event_summary(e, title)])
+	var at: Array = _path.slice(0, _include_at) if _include_at >= 0 else _path.duplicate()
+	_hit = _event_lines.size()
+	_event_lines.append([_out.size() + 1, str(_event_n), _event_summary(e, title), at])
 	_line(indent, GdeI18n.t("# ── Событие %d ─%s") % [_event_n, (" " + title) if title != "" else ""])
 	var conds: Array = e.get("conditions", [])
 	var acts: Array = e.get("actions", [])

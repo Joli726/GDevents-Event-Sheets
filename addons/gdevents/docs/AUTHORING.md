@@ -484,6 +484,7 @@ Event types and their keys (any other key is an error):
 | `repeat` | `count` (expression), `actions`, `children`, `locals` |
 | `while` | `conditions`, `actions`, `children`, `any`, `locals` — must have conditions |
 | `group` | `name`, `children` — a folder of events |
+| `function` | `name`, `kind` (`action` or `condition`), `sentence` (with `_PARAM0_`…), `description`, `params` (`[{"name", "kind": "object"/"number"/"string", "label"}]`), `children` — the body. Called as `fn.<name>`; inside, an object parameter is used by its name, numbers and texts as `Variable(name)`; a condition answers with the action `fn.return_true` |
 | `include` | `sheet` — path of another sheet whose events are built here, as if copied; its objects and variables are added to this sheet |
 | `comment` | `text` |
 

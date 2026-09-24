@@ -5,7 +5,7 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.4.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
+**Version 0.5.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
 instructions, your own behaviors and extensions, scene and file checks, an
 English and Russian interface.
 
@@ -63,6 +63,18 @@ next to "2D / 3D / Script".
   group names in one undo step.
 - **Collapsing.** The arrow in the header of an event or group with
   sub-events hides them.
+- **Functions made of events.** "Add event → Function" makes your own
+  action or condition: a name, a sentence such as `Hurt _PARAM0_ by _PARAM1_`
+  and parameters (object, number, text); its sub-events are the body. It
+  appears in the picker next to the built-in instructions, in its sheet and
+  in every sheet that includes it. Inside, an object parameter is written by
+  its name and means the instances picked at the call; numbers and texts are
+  `Variable(amount)`. A condition function answers with "Return: the
+  condition is true", and the instances picked at that moment go back to
+  the calling event.
+- **Debugger.** Run the game from the editor: events that fire light up
+  green in the sheet, and the **GDevents** tab of Godot's debugger shows
+  scene and global variables live and how many times each event fired.
 - **Errors in the game name the event.** If a sheet's code fails while the
   game runs, a line under the Godot error says which event of which sheet
   it was: "the error above is in event 5 of sheet res://level.gdes.json:
@@ -344,6 +356,9 @@ timers are independent, lists, effects, key hold and double tap.
 The twelfth, `tools/export_test.sh`, exports a game to a `.pck` (no export
 templates needed), runs it without the editor and checks that the sheet was
 rebuilt before the export and that the translations went into the game.
+The thirteenth, `tools/debugger_test.sh`, runs a game with Godot's
+debugger attached (`tools/debugger_server.gd` stands in for the editor) and
+checks that fired events and live variables arrive.
 
 There are also `tools/editor_shot.gd` and `tools/dialog_shot.tscn`: they put
 screenshots of the panel and the dialogs into `user://` — a quick way to see

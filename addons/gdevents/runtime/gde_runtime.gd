@@ -28,6 +28,15 @@ var _timers: Dictionary = {}
 ## Журнал ошибок, который называет событие листа. Один на игру.
 var _error_logger: GdeErrorLogger = null
 
+## Отладка из редактора: игра запущена с отладчиком Godot. Собранные листы
+## сообщают «событие сработало», и десять раз в секунду редактор получает
+## сработавшие события и значения переменных.
+var debugging: bool = false
+const DEBUG_INTERVAL := 0.1
+## Скрипт листа -> {номер события в GDE_EVENTS: сколько раз сработало}.
+var _dbg_hits: Dictionary = {}
+var _dbg_clock: float = 0.0
+
 
 func _ready() -> void:
 	process_priority = -100
@@ -35,6 +44,7 @@ func _ready() -> void:
 	if _error_logger == null:
 		_error_logger = GdeErrorLogger.new()
 		OS.add_logger(_error_logger)
+	debugging = EngineDebugger.is_active()
 
 
 func _exit_tree() -> void:
@@ -45,6 +55,34 @@ func _exit_tree() -> void:
 
 func error_logger() -> GdeErrorLogger:
 	return _error_logger
+
+
+## Событие листа сработало (его условия выполнены). Зовёт собранный код.
+func dbg_hit(runner: Object, index: int) -> void:
+	var s: Script = runner.get_script()
+	if s == null:
+		return
+	var hits: Dictionary = _dbg_hits.get(s, {})
+	hits[index] = int(hits.get(index, 0)) + 1
+	_dbg_hits[s] = hits
+
+
+## Что сработало с прошлого снимка и какие сейчас переменные — и сброс.
+## {"hits": {лист: [[путь события, раз], …]}, "scene": {…}, "global": {…}}
+func debug_snapshot() -> Dictionary:
+	var sheets: Dictionary = {}
+	for s: Script in _dbg_hits:
+		var consts := s.get_script_constant_map()
+		var sheet := str(consts.get("GDE_SHEET", s.resource_path))
+		var map: Array = consts.get("GDE_EVENTS", [])
+		var list: Array = sheets.get(sheet, [])
+		var hits: Dictionary = _dbg_hits[s]
+		for idx: int in hits:
+			if idx >= 0 and idx < map.size():
+				list.append([(map[idx] as Array)[3], hits[idx]])
+		sheets[sheet] = list
+	_dbg_hits.clear()
+	return {"hits": sheets, "scene": _scene_vars.duplicate(true), "global": _global_vars.duplicate(true)}
 
 
 # ---------------------------------------------------------------- объекты ---
@@ -1229,6 +1267,11 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_update_camera(delta)
 	_update_watch()
+	if debugging:
+		_dbg_clock += delta
+		if _dbg_clock >= DEBUG_INTERVAL:
+			_dbg_clock = 0.0
+			EngineDebugger.send_message("gdevents:state", [debug_snapshot()])
 
 
 func _keycode(name: String) -> int:

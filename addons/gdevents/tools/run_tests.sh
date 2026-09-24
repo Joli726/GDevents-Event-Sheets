@@ -62,6 +62,14 @@ else
 	failed+=(export)
 fi
 
+echo "== debugger"
+if GODOT=$GODOT bash addons/gdevents/tools/debugger_test.sh >"$LOG/debugger.log" 2>&1; then
+	tail -1 "$LOG/debugger.log"
+else
+	cat "$LOG/debugger.log" | tail -40
+	failed+=(debugger)
+fi
+
 echo
 if [ ${#failed[@]} -eq 0 ]; then
 	echo "ВСЕ ТЕСТЫ ПРОШЛИ"

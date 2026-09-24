@@ -7,7 +7,8 @@ extends RefCounted
 const SHEET_SUFFIX := ".gdes.json"
 
 
-static func build_all(root: String = "res://") -> Dictionary:
+## debug = false — для экспорта без отладки: без строк «событие сработало».
+static func build_all(root: String = "res://", debug: bool = true) -> Dictionary:
 	var lines: Array[String] = []
 	var reg := GdeRegistry.load_default()
 	for e: String in reg.errors:
@@ -24,7 +25,7 @@ static func build_all(root: String = "res://") -> Dictionary:
 	var ok := 0
 	var failed := 0
 	for sheet_path: String in find_sheets(root):
-		var r := build_one(sheet_path, reg)
+		var r := build_one(sheet_path, reg, debug)
 		lines.append_array(r["log"])
 		if r["ok"]:
 			ok += 1
@@ -33,7 +34,7 @@ static func build_all(root: String = "res://") -> Dictionary:
 	return {"ok": ok, "failed": failed, "log": lines}
 
 
-static func build_one(sheet_path: String, reg: GdeRegistry) -> Dictionary:
+static func build_one(sheet_path: String, reg: GdeRegistry, debug: bool = true) -> Dictionary:
 	var lines: Array[String] = []
 	var f := FileAccess.open(sheet_path, FileAccess.READ)
 	if f == null:
@@ -49,7 +50,7 @@ static func build_one(sheet_path: String, reg: GdeRegistry) -> Dictionary:
 	if str(m["error"]) != "":
 		return {"ok": false, "log": ["✗ %s: %s" % [sheet_path, m["error"]]]}
 
-	var res := GdeGenerator.generate(m["data"], reg, sheet_path)
+	var res := GdeGenerator.generate(m["data"], reg, sheet_path, debug)
 	var errors: Array = res["errors"]
 	var warnings: Array = res["warnings"]
 

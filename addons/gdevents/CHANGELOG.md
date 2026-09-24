@@ -8,6 +8,17 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.5.0
+
+- **Functions made of events**: own actions and conditions with object,
+  number and text parameters, shown in the picker next to the built-in
+  ones. · **Функции из событий**: свои действия и условия с параметрами.
+- **Debugger**: fired events light up in the sheet while the game runs from
+  the editor; the GDevents debugger tab shows live variables and event
+  counts. A release export builds sheets without the debug lines.
+  · **Отладка**: сработавшие события подсвечиваются, переменные видны
+  вживую во вкладке GDevents отладчика.
+
 ## 0.4.0
 
 - **Any of the conditions (OR)**: an event can join its conditions with OR

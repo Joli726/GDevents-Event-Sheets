@@ -7,8 +7,8 @@ conditions and actions instead of writing code; the sheets compile to plain,
 readable GDScript with no interpreter at runtime.
 
 - **Event sheet editor** inside Godot: conditions, actions, sub-events,
-  loops, groups, OR events, local variables, shared sheets, find and
-  replace, drag and drop, undo, errors shown right on the row — and a
+  loops, groups, OR events, local variables, shared sheets, your own
+  functions made of events, a live debugger, find and replace, drag and drop, undo, errors shown right on the row — and a
   runtime error names the event it came from.
 - **Object picking as in GDevelop**: "Bullet collides with Enemy → Delete
   Bullet" deletes exactly the bullets that hit.

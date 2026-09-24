@@ -1033,5 +1033,12 @@
 	"Фраза: Ранить _PARAM0_ на _PARAM1_": "Sentence: Hurt _PARAM0_ by _PARAM1_",
 	"Как функция читается в листе. _PARAM0_, _PARAM1_… — параметры по порядку": "How the function reads in the sheet. _PARAM0_, _PARAM1_… are the parameters in order",
 	"Параметры: %s": "Parameters: %s",
-	"target: object: Кого\namount: number: Сколько": "target: object: Whom\namount: number: How much"
+	"target: object: Кого\namount: number: Сколько": "target: object: Whom\namount: number: How much",
+	"Запустите игру: здесь появятся переменные и сработавшие события.": "Run the game: variables and fired events will appear here.",
+	"Имя": "Name",
+	"Игра идёт. Сработавшие события подсвечены в листе на вкладке «События».": "The game is running. Fired events are highlighted in the sheet on the Events tab.",
+	"Переменные сцены": "Scene variables",
+	"Глобальные переменные": "Global variables",
+	"Срабатывания событий": "Event firings",
+	"%s, событие %s": "%s, event %s"
 }

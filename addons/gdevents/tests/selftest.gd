@@ -34,6 +34,7 @@ func _events() -> void:
 	#        Print "расставлено" to the console
 	var _c1: GdePickContext = Gde.new_context()
 	if Gde.at_start(self):
+		if Gde.debugging: Gde.dbg_hit(self, 0)
 		Gde.create_object(_c1, "Enemy", 100.0, 0.0, self)
 		Gde.create_object(_c1, "Enemy", 300.0, 0.0, self)
 		Gde.create_object(_c1, "Bullet", 0.0, 0.0, self)
@@ -48,6 +49,7 @@ func _events() -> void:
 	var _c2: GdePickContext = Gde.new_context()
 	if Gde.at_start(self) \
 			and Gde.pick_nearest(_c2, "Enemy", 90.0, 0.0):
+		if Gde.debugging: Gde.dbg_hit(self, 1)
 		for _o1 in _c2.pick("Enemy"):
 			if not is_instance_valid(_o1): continue
 			Gde.main(_o1).global_position.x = 999.0
@@ -57,6 +59,7 @@ func _events() -> void:
 	# THEN:  Change scene variable ticks: + 1
 	var _c3: GdePickContext = Gde.new_context()
 	if Gde.every(self, 0, 0.1):
+		if Gde.debugging: Gde.dbg_hit(self, 2)
 		Gde.var_set("ticks", Gde.var_get("ticks") + 1.0)
 
 	# Через полсекунды считаем, кого куда занесло.
@@ -67,12 +70,14 @@ func _events() -> void:
 	var _c4: GdePickContext = Gde.new_context()
 	if Gde.timer_value(self, "итог") > 0.5 \
 			and Gde.once(self, 0):
+		if Gde.debugging: Gde.dbg_hit(self, 3)
 
 		# ── Event 5 ─
 		# IF:    X of Enemy > 900
 		# THEN:  Change scene variable уехал: + Enemy.Count()
 		var _c5: GdePickContext = _c4.copy()
 		if Gde.filter(_c5, "Enemy", func(_o2): return Gde.pos_of(_o2).x > 900.0):
+			if Gde.debugging: Gde.dbg_hit(self, 4)
 			Gde.var_set("уехал", Gde.var_get("уехал") + Gde.count(_c5, "Enemy"))
 
 		# ── Event 6 ─
@@ -80,6 +85,7 @@ func _events() -> void:
 		# THEN:  Change scene variable остался: + Enemy.Count()
 		var _c6: GdePickContext = _c4.copy()
 		if Gde.filter(_c6, "Enemy", func(_o3): return Gde.pos_of(_o3).x < 900.0):
+			if Gde.debugging: Gde.dbg_hit(self, 5)
 			Gde.var_set("остался", Gde.var_get("остался") + Gde.count(_c6, "Enemy"))
 
 	# ── Event 7 ─
@@ -91,17 +97,18 @@ func _events() -> void:
 	if Gde.timer_value(self, "итог") > 0.6 \
 			and Gde.once(self, 1) \
 			and Gde.pick_all(_c7, "Enemy"):
+		if Gde.debugging: Gde.dbg_hit(self, 6)
 		print(((((((((((("ИТОГ врагов=" + Gde.num_str(Gde.count(_c7, "Enemy"))) + " уехал=") + Gde.num_str(float(Gde.var_get("уехал")))) + " остался=") + Gde.num_str(float(Gde.var_get("остался")))) + " пуля=") + Gde.num_str(Gde.pos_of(_c7.first("Bullet")).x)) + " скорость=") + Gde.num_str(float(Gde.beh_get(_c7.first("Bullet"), "LinearMove", "speed")))) + " тиков=") + Gde.num_str(float(Gde.var_get("ticks")))))
 
 
 # Line map for error messages: line, event, what is in it.
 const GDE_SHEET := "res://addons/gdevents/tests/selftest.gdes.json"
 const GDE_EVENTS: Array = [
-	[29, "1", "IF At the beginning of the scene"],
-	[44, "2", "IF At the beginning of the scene"],
-	[54, "3", "IF Every 0.1 seconds"],
-	[63, "4", "IF Timer итог > 0.5 s"],
-	[69, "5", "IF X of Enemy > 900"],
-	[76, "6", "IF X of Enemy < 900"],
-	[83, "7", "IF Timer итог > 0.6 s"],
+	[29, "1", "IF At the beginning of the scene", [1]],
+	[45, "2", "IF At the beginning of the scene", [3]],
+	[56, "3", "IF Every 0.1 seconds", [4]],
+	[66, "4", "IF Timer итог > 0.5 s", [6]],
+	[73, "5", "IF X of Enemy > 900", [6, 0]],
+	[81, "6", "IF X of Enemy < 900", [6, 1]],
+	[89, "7", "IF Timer итог > 0.6 s", [7]],
 ]

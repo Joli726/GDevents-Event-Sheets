@@ -620,6 +620,9 @@ func _test_error_points_to_event() -> void:
 	]}
 	var r := GdeGenerator.generate(sheet, _reg, "res://уровень.gdes.json")
 	_ok(str(r["code"]).contains("const GDE_EVENTS"), "в собранном скрипте есть карта строк событий")
+	_ok(str(r["code"]).contains("Gde.dbg_hit(self, 0)"), "сборка с отладкой сообщает о событиях")
+	_ok(not str(GdeGenerator.generate(sheet, _reg, "res://уровень.gdes.json", false)["code"]).contains("dbg_hit"),
+			"сборка без отладки (экспорт release) — без этих строк")
 	var path := "user://gde_err_sheet.gd"
 	# «Сменить сцену» откладывает загрузку на следующий кадр, и её ошибка
 	# приходит уже без стека листа. Для настоящей ошибки скрипта строку

@@ -23,11 +23,14 @@ var _selected: bool = false
 var _has_errors: bool = false
 ## Событие нашлось поиском.
 var _found: bool = false
+## Событие только что сработало в запущенной игре.
+var _hit: bool = false
 ## Карточка комментария: своя окраска, и бросить событие «внутрь» нельзя.
 var comment: bool = false
 
 const ERROR_COLOR := Color(0.93, 0.36, 0.36)
 const FOUND_COLOR := Color(0.45, 0.75, 1.0)
+const HIT_COLOR := Color(0.45, 0.9, 0.5)
 
 
 func setup(p: Control, event_path: Array, accent: Color, selected: bool) -> void:
@@ -44,6 +47,13 @@ func set_selected(v: bool) -> void:
 	if _selected == v:
 		return
 	_selected = v
+	add_theme_stylebox_override("panel", _style())
+
+
+func set_hit(v: bool) -> void:
+	if _hit == v:
+		return
+	_hit = v
 	add_theme_stylebox_override("panel", _style())
 
 
@@ -87,6 +97,10 @@ func _style() -> StyleBoxFlat:
 	else:
 		sb.border_color = Color(1, 1, 1, 0.09)
 	sb.set_border_width_all(1)
+	if _hit:
+		sb.border_color = HIT_COLOR
+		sb.border_width_left = 4
+		sb.bg_color = Color(HIT_COLOR.r, HIT_COLOR.g, HIT_COLOR.b, 0.1)
 	if _found:
 		sb.bg_color = Color(FOUND_COLOR.r, FOUND_COLOR.g, FOUND_COLOR.b, 0.12)
 		if not _has_errors and not _selected:

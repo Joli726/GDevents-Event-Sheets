@@ -206,6 +206,7 @@ func _test_panel() -> void:
 
 	_test_search_and_fold()
 	_test_function_card()
+	_test_debug_view()
 
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
@@ -689,6 +690,31 @@ func _test_function_card() -> void:
 	_panel.doc.undo()
 	_panel.doc.undo()
 	_ok(_panel.registry.action("fn.Heal") == null, "функция удалена — из реестра тоже")
+
+
+## Снимок из игры: сработавшее событие подсвечено, во вкладке — переменные.
+func _test_debug_view() -> void:
+	var st := {"hits": {_panel.doc.path: [[[0], 3]], "res://другой.gdes.json": [[[1], 1]]},
+			"scene": {"score": 5.0, "hero": {"hp": 2.0}}, "global": {}}
+	# Вне редактора EditorDebuggerPlugin не создаётся — снимок идёт в панель
+	# напрямую, тем же вызовом, что делает плагин (связь с игрой проверяет
+	# tools/debugger_test.sh).
+	_panel.show_debug_state(st)
+	var card := _panel._find_card(_panel._rows, [0])
+	_ok(card != null and card._hit, "отладчик: сработавшее событие подсвечено в листе")
+	_ok(not _panel.is_event_hit([1]), "отладчик: событие чужого листа не подсвечено здесь")
+	_panel.clear_debug()
+	_ok(card != null and not card._hit, "отладчик: игра остановлена — подсветка снята")
+	var view := GdeDebugView.new()
+	view.show_state(st)
+	view.show_state(st)
+	var root: TreeItem = view._tree.get_root()
+	var scene_item := root.get_first_child()
+	_eq(scene_item.get_child_count(), 2, "вкладка отладчика: переменные сцены")
+	var hits_item := root.get_child(2)
+	_ok(hits_item.get_child_count() == 2 and hits_item.get_child(1).get_text(1) == "6"
+			or hits_item.get_child(0).get_text(1) == "6", "вкладка отладчика: срабатывания складываются")
+	view.free()
 
 
 func _find_label(n: Node, text: String) -> bool:

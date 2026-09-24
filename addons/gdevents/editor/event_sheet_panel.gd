@@ -1652,3 +1652,66 @@ func toggle_event_folded(p: Array) -> void:
 		doc.erase_event_field(p, "folded")
 	else:
 		doc.set_event_field(p, "folded", true)
+
+
+# ---------------------------------------------------------------- отладка ---
+
+## Сработавшие события: путь -> когда (мс) сработало последний раз.
+var _debug_hits: Dictionary = {}
+var _debug_timer: Timer = null
+const HIT_GLOW_MS := 450
+
+
+## Снимок из запущенной игры (GdeDebuggerPlugin): подсветить сработавшие
+## события открытого листа. Подсветка гаснет сама через полсекунды.
+func show_debug_state(st: Dictionary) -> void:
+	if doc == null:
+		return
+	var hits: Dictionary = st.get("hits", {})
+	var now := Time.get_ticks_msec()
+	for sheet: String in hits:
+		if sheet != doc.path:
+			continue
+		for pair: Variant in hits[sheet]:
+			if pair is Array and (pair as Array).size() == 2:
+				var p: Array = []
+				for x: Variant in (pair[0] as Array):
+					p.append(int(x))
+				_debug_hits[str(p)] = now
+	if _debug_timer == null:
+		_debug_timer = Timer.new()
+		_debug_timer.wait_time = 0.15
+		_debug_timer.timeout.connect(_apply_hits)
+		add_child(_debug_timer)
+	if _debug_timer.is_stopped():
+		_debug_timer.start()
+	_apply_hits()
+
+
+func clear_debug() -> void:
+	_debug_hits.clear()
+	if _debug_timer != null:
+		_debug_timer.stop()
+	_apply_hits()
+
+
+func is_event_hit(p: Array) -> bool:
+	return _debug_hits.has(str(p)) and Time.get_ticks_msec() - int(_debug_hits[str(p)]) < HIT_GLOW_MS
+
+
+func _apply_hits() -> void:
+	if _rows != null:
+		_apply_hits_in(_rows)
+	var now := Time.get_ticks_msec()
+	for k: String in _debug_hits.keys():
+		if now - int(_debug_hits[k]) >= HIT_GLOW_MS:
+			_debug_hits.erase(k)
+	if _debug_hits.is_empty() and _debug_timer != null:
+		_debug_timer.stop()
+
+
+func _apply_hits_in(n: Node) -> void:
+	for c: Node in n.get_children():
+		if c is GdeEventCard:
+			(c as GdeEventCard).set_hit(is_event_hit((c as GdeEventCard).path))
+		_apply_hits_in(c)
