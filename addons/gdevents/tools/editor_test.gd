@@ -171,6 +171,16 @@ func _test_panel() -> void:
 	_ok(_count_rows(_panel) > rows, "после добавления события дерево перестроилось")
 	_panel.doc.undo()
 
+	# «Любое из условий»: ключ появляется, подпись видна, выключение убирает ключ.
+	_panel.toggle_event_any([0])
+	var ev0: Dictionary = _panel.doc.event_at([0])
+	_ok(ev0.get("any", false) == true, "«Любое из условий» включается из меню события")
+	_ok(_find_label(_panel, GdeI18n.t("Любое из условий (ИЛИ)")), "на событии видна подпись «Любое из условий»")
+	_panel.toggle_event_any([0])
+	_ok(not (_panel.doc.event_at([0]) as Dictionary).has("any"), "выключение убирает ключ из листа")
+	_panel.doc.undo()
+	_panel.doc.undo()
+
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
 	_ok(GdeText.with_labels(def).contains("‹"), "фраза с подписями параметров")
@@ -576,6 +586,15 @@ func _test_roundtrip() -> void:
 	_ok(str(res["code"]).contains("pick_nearest"), "в сгенерированном коде есть сужение выборки")
 	_ok(str(res["code"]).contains("filter("), "и поштучный отбор по условию")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+
+func _find_label(n: Node, text: String) -> bool:
+	if n is Label and (n as Label).text == text:
+		return true
+	for c: Node in n.get_children():
+		if _find_label(c, text):
+			return true
+	return false
 
 
 func _count_rows(n: Node) -> int:

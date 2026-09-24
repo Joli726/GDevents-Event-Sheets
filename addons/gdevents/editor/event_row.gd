@@ -125,6 +125,16 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 
 ## Шапка специальных событий с редактированием прямо на месте.
 func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
+	_fill_type_header(row, e)
+	if e.get("any", false) and _type in ["standard", "foreach", "while"]:
+		var any := _caption(GdeI18n.t("Любое из условий (ИЛИ)"))
+		any.modulate = _accent
+		any.tooltip_text = GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события")
+		any.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.add_child(any)
+
+
+func _fill_type_header(row: HBoxContainer, e: Dictionary) -> void:
 	match _type:
 		"foreach":
 			row.add_child(_caption(GdeI18n.t("Для каждого объекта")))

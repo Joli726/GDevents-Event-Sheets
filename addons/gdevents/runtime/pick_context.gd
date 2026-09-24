@@ -61,6 +61,11 @@ func with_single(obj: String, n: Node) -> GdePickContext:
 	return c
 
 
+## Имена объектов, уже упомянутых в контексте.
+func names() -> Array:
+	return _picked.keys()
+
+
 ## Выбросить из всех списков освобождённые ноды.
 func compact() -> void:
 	for k: String in _picked:

@@ -336,6 +336,17 @@ func set_event_field(p: Array, key: String, value: Variant) -> void:
 	_commit()
 
 
+## Убрать ключ совсем, а не ставить false: лист остаётся таким, каким
+## был до включения, и в диффе не остаётся мусора.
+func erase_event_field(p: Array, key: String) -> void:
+	var e: Variant = event_at(p)
+	if e == null or not (e as Dictionary).has(key):
+		return
+	_snapshot()
+	(e as Dictionary).erase(key)
+	_commit()
+
+
 func toggle_disabled(p: Array) -> void:
 	var e: Variant = event_at(p)
 	if e == null:

@@ -325,6 +325,30 @@ func filter_pair_not(ctx: GdePickContext, a: String, b: String, pred: Callable) 
 	return not kept.is_empty()
 
 
+## Событие «Любое из условий» (ИЛИ). Каждое условие проверяется на своей
+## копии выборки — и все, а не до первого истинного: условия с памятью
+## («только что нажата», «один раз») должны видеть каждый кадр. В выборке
+## остаются экземпляры, отобранные хоть одним истинным условием; объекты,
+## которых касались только ложные, не сужаются.
+func any_of(ctx: GdePickContext, branches: Array) -> bool:
+	var hit := false
+	var union: Dictionary = {}   ## объект -> {нода: true}, порядок сохраняется
+	for b: Callable in branches:
+		var sub := ctx.copy()
+		if not bool(b.call(sub)):
+			continue
+		hit = true
+		for obj: String in sub.names():
+			var seen: Dictionary = union.get(obj, {})
+			for n: Node in sub.pick(obj):
+				seen[n] = true
+			union[obj] = seen
+	if hit:
+		for obj2: String in union:
+			ctx.set_pick(obj2, (union[obj2] as Dictionary).keys())
+	return hit
+
+
 # -------------------------------------------------------------- кадр/время ---
 
 ## Вызывается сгенерированным кодом в начале каждого кадра листа.

@@ -49,6 +49,8 @@ func _ready() -> void:
 	print("—— списки, значения на экране ——")
 	_test_lists()
 	await _test_screen_values()
+	print("—— любое из условий (ИЛИ) ——")
+	_test_any_of()
 	_finish()
 
 
@@ -488,6 +490,36 @@ func _test_screen_values() -> void:
 	_ok(Gde.screen_text().is_empty(), "на экране: «убрать надписи»")
 
 
+# ---------------------------------------------------------- любое из условий ---
+
+func _test_any_of() -> void:
+	var e1 := _thing("Enemy", Vector2(10, 0), Vector2(8, 8))
+	var e2 := _thing("Enemy", Vector2(200, 0), Vector2(8, 8))
+	var e3 := _thing("Enemy", Vector2(400, 0), Vector2(8, 8))
+	var off := _cond("system.compare", ["1", "=", "1"])
+	off["disabled"] = true
+	var r := _runner({"a": 1, "b": 0, "one": 0, "none": 0, "dis": 0}, [
+		_any([_cond("system.compare", ["Variable(a)", "=", "1"]), _cond("system.compare", ["Variable(b)", "=", "1"])],
+				[_act("var.modify", ["one", "=", "1"])]),
+		_any([_cond("system.compare", ["Variable(a)", "=", "5"]), _cond("system.compare", ["Variable(b)", "=", "5"])],
+				[_act("var.modify", ["none", "=", "1"])]),
+		_any([_cond("object.x", ["Enemy", "<", "50"]), _cond("object.x", ["Enemy", ">", "300"])],
+				[_act("object.variable", ["Enemy", "edge", "=", "1"])]),
+		_any([_cond("system.compare", ["1", "=", "1"]), _cond("object.x", ["Enemy", ">", "9999"])],
+				[_act("object.variable", ["Enemy", "all", "=", "1"])]),
+		_any([off, _cond("system.compare", ["1", "=", "2"])], [_act("var.modify", ["dis", "=", "1"])]),
+	])
+	_tick(r, 1)
+	_eq(Gde.var_get("one"), 1.0, "ИЛИ: хватает одного верного условия")
+	_eq(Gde.var_get("none"), 0.0, "ИЛИ: оба ложны — событие молчит")
+	var edge := [Gde.ovar_get(e1, "edge", 0.0), Gde.ovar_get(e2, "edge", 0.0), Gde.ovar_get(e3, "edge", 0.0)]
+	_eq(str(edge), str([1.0, 0.0, 1.0]), "ИЛИ: в выборке те, кого отобрало хоть одно условие")
+	var all := [Gde.ovar_get(e1, "all", 0.0), Gde.ovar_get(e2, "all", 0.0), Gde.ovar_get(e3, "all", 0.0)]
+	_eq(str(all), str([1.0, 1.0, 1.0]), "ИЛИ: ложное условие не сужает выборку, когда сработало другое")
+	_eq(Gde.var_get("dis"), 0.0, "ИЛИ: выключенное условие не делает событие верным")
+	_free([r, e1, e2, e3])
+
+
 # ------------------------------------------------------------------ лист ---
 
 func _cond(id: String, params: Array, inverted: bool = false) -> Dictionary:
@@ -503,6 +535,12 @@ func _event(conds: Array, acts: Array, children: Array = []) -> Dictionary:
 
 
 ## Собрать лист и повесить его раннер в сцену. Кадры — вручную, через _tick.
+func _any(conds: Array, acts: Array) -> Dictionary:
+	var e := _event(conds, acts)
+	e["any"] = true
+	return e
+
+
 func _runner(vars: Dictionary, events: Array) -> Node2D:
 	var objects: Array = []
 	for o: String in OBJECTS:

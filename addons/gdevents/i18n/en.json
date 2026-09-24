@@ -960,5 +960,9 @@
 	"лист сделан в более новой версии GDevents (формат %d, этот плагин понимает до %d) — обновите плагин": "the sheet was made with a newer GDevents (format %d, this plugin understands up to %d) — update the plugin",
 	"нет шага обновления листа из формата %d": "no upgrade step for sheet format %d",
 	"GDevents: листы событий не собираются (%d шт.) — в экспортированной игре останется их старый код. Подробности выше.": "GDevents: event sheets do not build (%d) — the exported game keeps their old code. Details above.",
-	"GDevents: листы собраны перед экспортом — %d": "GDevents: sheets built before export — %d"
+	"GDevents: листы собраны перед экспортом — %d": "GDevents: sheets built before export — %d",
+	"  ИЛИ: ": "  OR:  ",
+	"Любое из условий (ИЛИ)": "Any of the conditions (OR)",
+	"Событие сработает, если выполнено хотя бы одно условие, а не все сразу": "The event runs when at least one condition is true, not all of them",
+	"Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события": "The event runs when at least one condition is true. Turn it off in the event menu"
 }

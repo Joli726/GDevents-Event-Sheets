@@ -7,6 +7,8 @@ class_name GdeEventSheetPanel
 extends VBoxContainer
 
 const DEFAULT_ACCENT := Color(1, 0.78, 0.42)
+## События, у которых условия можно соединить через «или».
+const ANY_TYPES := ["standard", "foreach", "while"]
 
 ## Выбран другой язык — плагин перестроит панель на нём.
 signal language_changed(code: String)
@@ -856,6 +858,20 @@ func duplicate_event(p: Array) -> void:
 		doc.duplicate_event(p)
 
 
+## «Любое из условий»: условия события соединяются через «или».
+func toggle_event_any(p: Array) -> void:
+	if doc == null:
+		return
+	var e: Variant = doc.event_at(p)
+	if e == null:
+		return
+	var on := not bool((e as Dictionary).get("any", false))
+	if on:
+		doc.set_event_field(p, "any", true)
+	else:
+		doc.erase_event_field(p, "any")
+
+
 func toggle_event_disabled(p: Array) -> void:
 	if doc != null:
 		doc.toggle_disabled(p)
@@ -1182,6 +1198,12 @@ func event_menu(p: Array, at: Vector2) -> void:
 	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Подсобытие"), 1)
 	_event_menu.add_icon_item(GdeIcons.get_icon("comment"), GdeI18n.t("Комментарий после"), 2)
 	_event_menu.add_separator()
+	if e != null and str((e as Dictionary).get("type", "standard")) in ANY_TYPES:
+		_event_menu.add_check_item(GdeI18n.t("Любое из условий (ИЛИ)"), 12)
+		_event_menu.set_item_checked(_event_menu.item_count - 1, bool((e as Dictionary).get("any", false)))
+		_event_menu.set_item_tooltip(_event_menu.item_count - 1,
+				GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие, а не все сразу"))
+		_event_menu.add_separator()
 	_event_menu.add_icon_item(GdeIcons.get_icon("up"), GdeI18n.t("Выше	Alt+↑"), 3)
 	_event_menu.add_icon_item(GdeIcons.get_icon("down"), GdeI18n.t("Ниже	Alt+↓"), 4)
 	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Вложить в предыдущее"), 5)
@@ -1225,6 +1247,7 @@ func _on_event_menu(id: int) -> void:
 		9: remove_event(p)
 		10: copy_event(p)
 		11: paste()
+		12: toggle_event_any(p)
 
 
 func _on_add_root_event(id: int) -> void:

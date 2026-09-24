@@ -171,9 +171,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_emit_event_comment(e, indent)
 	_line(indent, _ctx_decl(ctx, _ctx_init(parent_ctx)))
 
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, ctx))
+	var conds := _gen_conditions(e, ctx)
 
 	var body := indent
 	if not conds.is_empty():
@@ -200,9 +198,7 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var inner := _new_ctx()
 	_line(indent + 1, _ctx_decl(inner, "%s.with_single(%s, %s)" % [outer, _quote(obj), it]))
 
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, inner))
+	var conds := _gen_conditions(e, inner)
 	var body := indent + 1
 	if not conds.is_empty():
 		_line(indent + 1, "if %s:" % _join_conds(conds, indent + 1))
@@ -239,9 +235,7 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "while true:")
 	var inner := _new_ctx()
 	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, inner))
+	var conds := _gen_conditions(e, inner)
 	if conds.is_empty():
 		_err(GdeI18n.t("событие «Пока» без условий — это вечный цикл"))
 		conds.append("false")
@@ -286,6 +280,29 @@ func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> boo
 
 
 # -------------------------------------------------------- условия/действия ---
+
+## Условия события: через «и» или, у события «Любое из условий», через «или».
+func _gen_conditions(e: Dictionary, ctx: String) -> Array[String]:
+	var conds: Array[String] = []
+	if not e.get("any", false):
+		for c: Dictionary in e.get("conditions", []):
+			conds.append(_gen_condition(c, ctx))
+		return conds
+	var branches: Array[String] = []
+	for c2: Dictionary in e.get("conditions", []):
+		var sub := _new_ctx()
+		var code := _gen_condition(c2, sub)
+		# Выключенное условие даёт «true» — в «или» оно сделало бы истинным
+		# всё событие. Его просто нет.
+		if c2.get("disabled", false):
+			continue
+		branches.append("func(%s: GdePickContext) -> bool: return %s" % [sub, code])
+	# Одной строкой: встроенная функция внутри скобок, разорванная переносом,
+	# у парсера GDScript капризна, а читают этот код по комментарию выше.
+	if not branches.is_empty():
+		conds.append("Gde.any_of(%s, [%s])" % [ctx, ", ".join(branches)])
+	return conds
+
 
 func _gen_condition(c: Dictionary, ctx: String) -> String:
 	_cond_i += 1
@@ -486,7 +503,8 @@ func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void
 	var acts: Array = e.get("actions", [])
 	for i in range(conds.size()):
 		var c: Dictionary = conds[i]
-		var prefix := GdeI18n.t("ЕСЛИ:  ") if i == 0 else GdeI18n.t("  И:   ")
+		var prefix := GdeI18n.t("ЕСЛИ:  ") if i == 0 \
+				else (GdeI18n.t("  ИЛИ: ") if e.get("any", false) else GdeI18n.t("  И:   "))
 		var neg := GdeI18n.t("НЕ ") if c.get("inverted", false) else ""
 		_line(indent, "# %s%s%s" % [prefix, neg, _sentence(_reg.condition(str(c.get("id", ""))), c)])
 	for i in range(acts.size()):
