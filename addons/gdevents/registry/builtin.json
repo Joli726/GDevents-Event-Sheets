@@ -949,6 +949,121 @@
       "params": [],
       "code": "Gde.waits_pending({self}) > 0.0",
       "description": "Истинно, пока в этом листе что-то отложено действием «Подождать» и ещё не выполнилось. Чтобы не запускать то же самое второй раз."
+    },
+    "object.timer": {
+      "group": "Таймеры",
+      "sentence": "Таймер _PARAM1_ у _PARAM0_ _PARAM2_ _PARAM3_ сек",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Таймер"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "pred": "Gde.otimer({o}, \"{1}\") {2} {3}",
+      "description": "У каждого экземпляра свой таймер: «таймер shot у Enemy > 2» — и каждый враг стреляет в свой срок, а не все хором. Таймер заводится сам при первой проверке."
+    },
+    "system.compare": {
+      "group": "Система",
+      "sentence": "_PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Первое значение"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "number",
+          "label": "Второе значение"
+        }
+      ],
+      "code": "({0}) {1} ({2})",
+      "description": "Сравнить два любых числа или выражения: Player.Frame() = 3, Enemy.DistanceTo(Player) < 50, Variable(score) ≥ Variable(best). Закрывает кучу мелких случаев разом."
+    },
+    "system.compare_text": {
+      "group": "Система",
+      "sentence": "Текст _PARAM0_ _PARAM1_ _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "string",
+          "label": "Первый текст"
+        },
+        {
+          "kind": "cmpop",
+          "label": "Знак"
+        },
+        {
+          "kind": "string",
+          "label": "Второй текст"
+        }
+      ],
+      "code": "({0}) {1} ({2})",
+      "description": "Сравнить два текста: Player.Animation() = \"Run\", VariableString(state) ≠ \"menu\". Обычно нужны «=» и «≠»."
+    },
+    "pick.in_radius": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять все _PARAM0_ в радиусе _PARAM3_ от точки _PARAM1_ ; _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        },
+        {
+          "kind": "number",
+          "label": "Радиус"
+        }
+      ],
+      "code": "Gde.pick_in_radius({ctx}, \"{0}\", {1}, {2}, {3})",
+      "description": "Оставляет в выборке всех, кто ближе радиуса к точке. Взрыв задевает всех рядом, а не одного."
+    },
+    "pick.in_radius_of": {
+      "group": "Выборка",
+      "icon": "object",
+      "sentence": "Взять все _PARAM0_ в радиусе _PARAM2_ от _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "Центр"
+        },
+        {
+          "kind": "number",
+          "label": "Радиус"
+        }
+      ],
+      "code": "Gde.pick_in_radius_of({ctx}, \"{0}\", \"{1}\", {2})",
+      "description": "Оставляет в выборке всех, кто ближе радиуса к отобранному объекту: «все Enemy в радиусе 80 от Explosion»."
     }
   },
   "actions": {
@@ -2158,6 +2273,44 @@
       "defer": true,
       "code": "pass",
       "description": "Всё, что стоит ниже в этом событии, и его подсобытия выполнятся через N секунд — с теми же отобранными объектами. Как «Подождать» в GDevelop: вспышка, пауза, взрыв."
+    },
+    "object.timer_reset": {
+      "group": "Таймеры",
+      "sentence": "Сбросить таймер _PARAM1_ у _PARAM0_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Таймер"
+        }
+      ],
+      "code": "Gde.otimer_reset({o}, \"{1}\")",
+      "description": "Обнуляет таймер каждого отобранного экземпляра — у остальных он идёт дальше."
+    },
+    "object.timer_pause": {
+      "group": "Таймеры",
+      "sentence": "Поставить таймер _PARAM1_ у _PARAM0_ на паузу: _PARAM2_ (1 да, 0 нет)",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Таймер"
+        },
+        {
+          "kind": "number",
+          "label": "1 пауза, 0 дальше"
+        }
+      ],
+      "code": "Gde.otimer_pause({o}, \"{1}\", bool({2}))",
+      "description": "Останавливает или снова пускает таймер экземпляра: оглушённый враг не копит время до выстрела."
     }
   },
   "expressions": {
@@ -2589,6 +2742,14 @@
       "params": [],
       "description": "1, если объект отражён по горизонтали, иначе 0.",
       "template": "float(Gde.is_flipped_h({ctx}.first(\"{obj}\")))"
+    },
+    "Timer": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.otimer({ctx}.first(\"{obj}\"), {0})",
+      "description": "Секунды на таймере экземпляра: Enemy.Timer(shot)."
     }
   },
   "operators": {

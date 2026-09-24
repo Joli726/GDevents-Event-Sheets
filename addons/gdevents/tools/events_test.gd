@@ -32,6 +32,10 @@ func _ready() -> void:
 	_test_wait_basic()
 	_test_wait_keeps_picking()
 	_test_wait_chain_and_children()
+	print("—— таймеры объекта, сравнение, радиус ——")
+	await _test_object_timers()
+	_test_compare()
+	_test_pick_radius()
 	_finish()
 
 
@@ -158,6 +162,84 @@ func _test_wait_chain_and_children() -> void:
 	_tick(r, 13)
 	_ok(Gde.var_get("y") == 1.0 and Gde.var_get("c") == 1.0, "подождать дважды: после второго — остальное и подсобытие, один раз")
 	_free([r])
+
+
+# -------------------------------------------- таймеры, сравнение, радиус ---
+
+func _test_object_timers() -> void:
+	var a := _thing("Enemy", Vector2(0, 0), Vector2(8, 8))
+	var b := _thing("Enemy", Vector2(50, 0), Vector2(8, 8))
+	var r := _runner({}, [
+		_event([_cond("object.timer", ["Enemy", "shot", ">", "0.15"])], [
+			_act("object.timer_reset", ["Enemy", "shot"]),
+			_act("object.variable", ["Enemy", "shots", "+", "1"]),
+		]),
+	])
+	_tick(r, 1)
+	await _wait_ms(80)
+	Gde.otimer_reset(b, "shot")
+	await _wait_ms(100)
+	_tick(r, 1)
+	_ok(float(Gde.ovar_get(a, "shots")) == 1.0 and float(Gde.ovar_get(b, "shots")) == 0.0,
+			"таймер объекта: у каждого свой — первый выстрелил, второй ещё нет")
+	await _wait_ms(100)
+	_tick(r, 1)
+	_ok(float(Gde.ovar_get(b, "shots")) == 1.0 and float(Gde.ovar_get(a, "shots")) == 1.0,
+			"таймер объекта: второй выстрелил в свой срок, первый ещё ждёт")
+	Gde.otimer_pause(a, "shot", true)
+	var t0 := Gde.otimer(a, "shot")
+	await _wait_ms(120)
+	_ok(absf(Gde.otimer(a, "shot") - t0) < 0.001, "таймер объекта: на паузе стоит")
+	Gde.otimer_pause(a, "shot", false)
+	await _wait_ms(60)
+	_ok(Gde.otimer(a, "shot") > t0 + 0.03, "таймер объекта: снята пауза — пошёл дальше")
+	var ex := GdeExpr.compile("Enemy.Timer(shot)", "_c", _reg)
+	_ok((ex["errors"] as Array).is_empty() and str(ex["code"]).contains("Gde.otimer"), "таймер объекта: выражение Enemy.Timer(shot)")
+	_free([r, a, b])
+
+
+func _wait_ms(ms: int) -> void:
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < ms:
+		await get_tree().process_frame
+
+
+func _test_compare() -> void:
+	var r := _runner({"a": 3, "yes": 0, "no": 0, "txt": 0}, [
+		_event([_cond("system.compare", ["Variable(a) + 2", "=", "5"])], [_act("var.modify", ["yes", "=", "1"])]),
+		_event([_cond("system.compare", ["Variable(a) * 2", "<", "3"])], [_act("var.modify", ["no", "=", "1"])]),
+		_event([_cond("system.compare_text", ["VariableString(name)", "=", "\"bob\""])], [_act("var.modify", ["txt", "=", "1"])]),
+	])
+	Gde.var_set("name", "bob")
+	_tick(r, 1)
+	_ok(Gde.var_get("yes") == 1.0 and Gde.var_get("no") == 0.0, "сравнить два значения: 3 + 2 = 5 — да, 3 × 2 < 3 — нет")
+	_eq(Gde.var_get("txt"), 1.0, "сравнить два текста: «bob» = «bob»")
+	_free([r])
+
+
+func _test_pick_radius() -> void:
+	var near := [_thing("Enemy", Vector2(50, 0), Vector2(8, 8)), _thing("Enemy", Vector2(0, 100), Vector2(8, 8))]
+	var far := _thing("Enemy", Vector2(300, 0), Vector2(8, 8))
+	var boom := _thing("Hero", Vector2(1000, 0), Vector2(8, 8))
+	var around := [_thing("Enemy", Vector2(1050, 0), Vector2(8, 8)), _thing("Enemy", Vector2(1000, 110), Vector2(8, 8))]
+	var outside := _thing("Enemy", Vector2(1400, 0), Vector2(8, 8))
+	var r := _runner({}, [
+		_event([_cond("system.trigger_once", []), _cond("pick.in_radius", ["Enemy", "0", "0", "150"])],
+				[_act("object.variable", ["Enemy", "hit", "=", "1"])]),
+		_event([_cond("system.trigger_once", []), _cond("pick.in_radius_of", ["Enemy", "Hero", "120"])],
+				[_act("object.variable", ["Enemy", "boom", "=", "1"])]),
+	])
+	_tick(r, 1)
+	var hit := 0
+	for n: Node in near:
+		hit += int(Gde.ovar_get(n, "hit", 0.0))
+	_ok(hit == 2 and float(Gde.ovar_get(far, "hit", 0.0)) == 0.0, "в радиусе от точки: задеты оба ближних, дальний — нет")
+	var boomed := 0
+	for n: Node in around:
+		boomed += int(Gde.ovar_get(n, "boom", 0.0))
+	_ok(boomed == 2 and float(Gde.ovar_get(outside, "boom", 0.0)) == 0.0 and float(Gde.ovar_get(near[0], "boom", 0.0)) == 0.0,
+			"в радиусе от объекта: взрыв задел всех рядом и никого дальше")
+	_free([r, far, boom, outside] + near + around)
 
 
 # ------------------------------------------------------------------ лист ---

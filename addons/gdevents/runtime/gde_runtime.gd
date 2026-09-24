@@ -262,6 +262,47 @@ func timer_advance(runner: Node, delta: float) -> void:
 	_advance_waits(runner, delta)
 
 
+# ------------------------------------------------------- таймеры объекта ---
+
+## Таймер экземпляра: у каждого врага свой, иначе десять врагов стреляли
+## хором. Хранится в метаданных объекта как время старта по часам Gde —
+## тикать каждый таймер каждого врага не нужно.
+func _otimer(n: Node, name: String) -> Dictionary:
+	var t: Dictionary = n.get_meta("__gde_timers", {})
+	if not t.has(name):
+		t[name] = {"start": _clock, "paused_at": -1.0}
+		n.set_meta("__gde_timers", t)
+	return t[name]
+
+
+func otimer(n: Node, name: String) -> float:
+	if not is_instance_valid(n):
+		return 0.0
+	var e := _otimer(n, name)
+	var until := float(e["paused_at"]) if float(e["paused_at"]) >= 0.0 else _clock
+	return until - float(e["start"])
+
+
+func otimer_reset(n: Node, name: String) -> void:
+	if not is_instance_valid(n):
+		return
+	var e := _otimer(n, name)
+	e["start"] = _clock
+	if float(e["paused_at"]) >= 0.0:
+		e["paused_at"] = _clock
+
+
+func otimer_pause(n: Node, name: String, paused: bool) -> void:
+	if not is_instance_valid(n):
+		return
+	var e := _otimer(n, name)
+	if paused and float(e["paused_at"]) < 0.0:
+		e["paused_at"] = _clock
+	elif not paused and float(e["paused_at"]) >= 0.0:
+		e["start"] = float(e["start"]) + _clock - float(e["paused_at"])
+		e["paused_at"] = -1.0
+
+
 # ------------------------------------------------------------ ожидание ---
 
 ## Отложенные «Подождать N секунд»: {"runner": id раннера, "left", "fn"}.
@@ -1352,6 +1393,39 @@ func pick_all(ctx: GdePickContext, obj: String) -> bool:
 
 
 ## Ближайший к другому объекту. Сужает оба списка: остаётся одна пара.
+## Взять все экземпляры в радиусе от точки: взрыв задевает всех рядом.
+func pick_in_radius(ctx: GdePickContext, obj: String, x: float, y: float, radius: float) -> bool:
+	var at := Vector2(x, y)
+	var r2 := radius * radius
+	var kept: Array = []
+	for n: Node in ctx.pick(obj):
+		if is_instance_valid(n) and pos_of(n).distance_squared_to(at) <= r2:
+			kept.append(n)
+	ctx.set_pick(obj, kept)
+	return not kept.is_empty()
+
+
+## То же вокруг объекта: остаются те, кто ближе радиуса хоть к одному
+## отобранному центру. Центры не трогаются.
+func pick_in_radius_of(ctx: GdePickContext, obj: String, center: String, radius: float) -> bool:
+	var r2 := radius * radius
+	var centers: Array = []
+	for c: Node in ctx.pick(center):
+		if is_instance_valid(c):
+			centers.append(pos_of(c))
+	var kept: Array = []
+	for n: Node in ctx.pick(obj):
+		if not is_instance_valid(n):
+			continue
+		var p := pos_of(n)
+		for c: Vector2 in centers:
+			if p.distance_squared_to(c) <= r2:
+				kept.append(n)
+				break
+	ctx.set_pick(obj, kept)
+	return not kept.is_empty()
+
+
 func pick_nearest_to(ctx: GdePickContext, obj: String, other: String) -> bool:
 	var best: Node = null
 	var best_other: Node = null
