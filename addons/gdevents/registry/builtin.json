@@ -856,6 +856,91 @@
         }
       ],
       "code": "Gde.last_key() == \"{0}\""
+    },
+    "object.collision_start": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ только что столкнулся с _PARAM1_",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "С чем"
+        }
+      ],
+      "pred": "Gde.touch_began({self}, {once}, {a}, {b})",
+      "description": "Срабатывает один раз — в момент касания. Для урона, звука, очков: «сталкивается» истинно каждый кадр, пока объекты касаются, и действие по нему повторялось бы."
+    },
+    "object.collision_end": {
+      "group": "Столкновения",
+      "sentence": "Касание _PARAM0_ и _PARAM1_ закончилось",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "С чем"
+        }
+      ],
+      "pred": "Gde.touch_ended({self}, {once}, {a}, {b})",
+      "description": "Срабатывает один раз, когда объекты перестали касаться: вышел из воды, сошёл с кнопки, покинул зону."
+    },
+    "object.touch_top": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ касается _PARAM1_ сверху",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "С чем"
+        }
+      ],
+      "pred": "Gde.touch_side({a}, {b}, 0)",
+      "description": "Первый объект стоит или приземлился на второй — прыжок врагу на голову, как в Марио."
+    },
+    "object.touch_bottom": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ касается _PARAM1_ снизу",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "С чем"
+        }
+      ],
+      "pred": "Gde.touch_side({a}, {b}, 1)",
+      "description": "Первый объект упёрся во второй снизу — удар головой о блок."
+    },
+    "object.touch_side": {
+      "group": "Столкновения",
+      "sentence": "_PARAM0_ касается _PARAM1_ сбоку",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "object",
+          "label": "С чем"
+        }
+      ],
+      "pred": "Gde.touch_side({a}, {b}, 2)",
+      "description": "Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага."
     }
   },
   "actions": {

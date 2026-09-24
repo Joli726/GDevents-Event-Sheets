@@ -307,7 +307,8 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 			if obj == "":
 				return "false"
 			var ov := _tmp("_o")
-			var pred := _fill(_template(d, "pred", id), {"ctx": ctx, "self": "self", "o": ov}, args, bare)
+			var pred := _fill(_template(d, "pred", id), _memory_subs(_template(d, "pred", id),
+					{"ctx": ctx, "self": "self", "o": ov}), args, bare)
 			var fn := "Gde.filter_not" if inverted else "Gde.filter"
 			return "%s(%s, %s, func(%s): return %s)" % [fn, ctx, _quote(obj), ov, pred]
 		"pair":
@@ -317,23 +318,29 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 				return "false"
 			var av := _tmp("_a")
 			var bv := _tmp("_b")
-			var pred2 := _fill(_template(d, "pred", id), {"ctx": ctx, "self": "self", "a": av, "b": bv}, args, bare)
+			var pred2 := _fill(_template(d, "pred", id), _memory_subs(_template(d, "pred", id),
+					{"ctx": ctx, "self": "self", "a": av, "b": bv}), args, bare)
 			var fn2 := "Gde.filter_pair_not" if inverted else "Gde.filter_pair"
 			return "%s(%s, %s, %s, func(%s, %s): return %s)" % [fn2, ctx, _quote(a), _quote(b), av, bv, pred2]
 		_:
 			# Условия с памятью («триггер один раз», «каждые N секунд») получают
 			# свой номер — иначе два таких условия в листе делили бы состояние.
 			var template := _template(d, "code", id)
-			var subs := {
-				"ctx": ctx, "self": "self",
-				"once": str(_once_n), "every": str(_every_n),
-			}
-			if template.contains("{once}"):
-				_once_n += 1
-			if template.contains("{every}"):
-				_every_n += 1
-			var code := _fill(template, subs, args, bare)
+			var code := _fill(template, _memory_subs(template, {"ctx": ctx, "self": "self"}), args, bare)
 			return "not (%s)" % code if inverted else code
+
+
+## Условия с памятью («триггер один раз», «каждые N секунд», «только что
+## столкнулся») получают свой номер — иначе два таких условия в листе
+## делили бы состояние. Нужен и парным, и объектным условиям.
+func _memory_subs(template: String, subs: Dictionary) -> Dictionary:
+	subs["once"] = str(_once_n)
+	subs["every"] = str(_every_n)
+	if template.contains("{once}"):
+		_once_n += 1
+	if template.contains("{every}"):
+		_every_n += 1
+	return subs
 
 
 func _gen_action(a: Dictionary, ctx: String, indent: int) -> bool:

@@ -817,5 +817,16 @@
 	"Виды параметров: object — объект листа (его отобранные экземпляры); objname — имя объекта; number — числовое выражение; string — текстовое выражение, текст в кавычках: %s; raw — голый текст без кавычек (клавиша, анимация, таймер, путь к файлу); varname — имя переменной, можно hp или player.hp; cmpop — = ≠ < > ≤ ≥; modop — = + - * /.": "Parameter kinds: object — a sheet object (its picked instances); objname — an object name; number — a number expression; string — a text expression, text in quotes: %s; raw — bare text without quotes (key, animation, timer, file path); varname — a variable name, hp or player.hp; cmpop — = ≠ < > ≤ ≥; modop — = + - * /.",
 	"Каждый параметр в листе — строка JSON: %s.": "Every parameter in a sheet is a JSON string: %s.",
 	"Поведение %s «%s»": "Behavior %s “%s”",
-	"Состояния: у «%s» нет состояния «%s». Есть: %s": "States: “%s” has no state “%s”. There are: %s"
+	"Состояния: у «%s» нет состояния «%s». Есть: %s": "States: “%s” has no state “%s”. There are: %s",
+	"_PARAM0_ только что столкнулся с _PARAM1_": "_PARAM0_ has just collided with _PARAM1_",
+	"Срабатывает один раз — в момент касания. Для урона, звука, очков: «сталкивается» истинно каждый кадр, пока объекты касаются, и действие по нему повторялось бы.": "Fires once — at the moment of touching. For damage, a sound, points: “collides” is true every frame while the objects touch, and an action on it would repeat.",
+	"С чем": "With what",
+	"Касание _PARAM0_ и _PARAM1_ закончилось": "The touch of _PARAM0_ and _PARAM1_ has ended",
+	"Срабатывает один раз, когда объекты перестали касаться: вышел из воды, сошёл с кнопки, покинул зону.": "Fires once when the objects stop touching: left the water, stepped off a button, left a zone.",
+	"_PARAM0_ касается _PARAM1_ сверху": "_PARAM0_ touches _PARAM1_ from above",
+	"Первый объект стоит или приземлился на второй — прыжок врагу на голову, как в Марио.": "The first object stands or has landed on the second one — jumping on an enemy's head, as in Mario.",
+	"_PARAM0_ касается _PARAM1_ снизу": "_PARAM0_ touches _PARAM1_ from below",
+	"Первый объект упёрся во второй снизу — удар головой о блок.": "The first object has bumped into the second one from below — hitting a block with the head.",
+	"_PARAM0_ касается _PARAM1_ сбоку": "_PARAM0_ touches _PARAM1_ from the side",
+	"Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага.": "A touch from the left or right — the enemy touched the player, not the player jumping on the enemy."
 }

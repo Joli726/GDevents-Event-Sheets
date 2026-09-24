@@ -306,7 +306,7 @@ func begin_scene(initial: Dictionary) -> void:
 ## Состояние раннеров хранится по id экземпляра. Раннеры ушедшей сцены
 ## освобождены — их записи больше никому не нужны.
 func _forget_dead_runners() -> void:
-	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused]:
+	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused, _touch]:
 		for id: Variant in store.keys():
 			if not is_instance_id_valid(int(id)):
 				store.erase(id)
@@ -750,7 +750,76 @@ func overlaps(a: Node, b: Node) -> bool:
 
 	if area_a != null or area_b != null:
 		return false
-	return aabb(a).intersects(aabb(b))
+	# Касание — тоже столкновение: тела не проникают друг в друга, и
+	# персонаж, стоящий на враге, иначе с ним «не сталкивался».
+	return aabb(a).grow(1.0).intersects(aabb(b))
+
+
+# ------------------------------------------------------------- касания ---
+
+## раннер -> номер условия -> {"frame", "prev": пары, "now": пары}
+var _touch: Dictionary = {}
+
+
+func _touch_state(runner: Node, idx: int) -> Dictionary:
+	var rid := runner.get_instance_id()
+	var per: Dictionary = _touch.get(rid, {})
+	var st: Dictionary = per.get(idx, {"frame": -1, "prev": {}, "now": {}})
+	var f := int(_runner_frames.get(rid, 0))
+	if int(st["frame"]) != f:
+		# Новый кадр листа: что касалось в прошлый раз — теперь «прежде».
+		st["prev"] = st["now"]
+		st["now"] = {}
+		st["frame"] = f
+	per[idx] = st
+	_touch[rid] = per
+	return st
+
+
+static func _pair_id(a: Node, b: Node) -> String:
+	return "%d:%d" % [a.get_instance_id(), b.get_instance_id()]
+
+
+## «Только что столкнулся»: касаются сейчас, а в прошлом кадре — нет.
+func touch_began(runner: Node, idx: int, a: Node, b: Node) -> bool:
+	var st := _touch_state(runner, idx)
+	var pid := _pair_id(a, b)
+	if not overlaps(a, b):
+		return false
+	(st["now"] as Dictionary)[pid] = true
+	return not (st["prev"] as Dictionary).has(pid)
+
+
+## «Касание закончилось»: в прошлом кадре касались, а сейчас — нет.
+func touch_ended(runner: Node, idx: int, a: Node, b: Node) -> bool:
+	var st := _touch_state(runner, idx)
+	var pid := _pair_id(a, b)
+	if overlaps(a, b):
+		(st["now"] as Dictionary)[pid] = true
+		return false
+	return (st["prev"] as Dictionary).has(pid)
+
+
+## С какой стороны a касается b: 0 — сверху (a стоит на b), 1 — снизу,
+## 2 — сбоку. Сторону решает, по какой оси прямоугольники перекрылись
+## меньше: приземлившийся перекрывается по высоте на пиксель, а по
+## ширине — на всю ступню.
+func touch_side(a: Node, b: Node, side: int) -> bool:
+	if not overlaps(a, b):
+		return false
+	var ra := aabb(a).grow(1.0)
+	var rb := aabb(b)
+	if ra.size == Vector2.ZERO or rb.size == Vector2.ZERO:
+		return false
+	var ox := minf(ra.end.x, rb.end.x) - maxf(ra.position.x, rb.position.x)
+	var oy := minf(ra.end.y, rb.end.y) - maxf(ra.position.y, rb.position.y)
+	var vertical := oy <= ox
+	match side:
+		0:
+			return vertical and ra.get_center().y < rb.get_center().y
+		1:
+			return vertical and ra.get_center().y > rb.get_center().y
+	return not vertical
 
 
 func pos_of(n: Node) -> Vector2:
