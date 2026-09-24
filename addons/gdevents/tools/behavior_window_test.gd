@@ -1,5 +1,5 @@
 ## Безголовый тест окна поведения — настроек и всего, что рядом:
-##   godot --headless --quit-after 2000 res://addons/gdevents/tools/behavior_window_test.tscn
+##   godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
 ##
 ## Окно пишет в сцену объекта, и ошибиться тут легко незаметно: форма
 ## показывает одно, а в файле другое. Поэтому каждая проверка правки
@@ -22,6 +22,8 @@ var _reg: GdeRegistry
 
 
 func _ready() -> void:
+	# Тест сверяет русские надписи — язык плагина здесь русский.
+	GdeI18n.set_language("ru", false)
 	_reg = GdeRegistry.load_default()
 	await _make_scene()
 	print("—— реестр: названия и описания настроек ——")
@@ -40,6 +42,9 @@ func _ready() -> void:
 	_test_diff()
 	print("—— своя копия и возврат к встроенной ——")
 	await _test_library()
+	print("—— английский интерфейс ——")
+	await _test_english_ui()
+	GdeI18n.set_language("ru", false)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCENE))
 	print("—— проверок: %d, провалено: %d" % [_checks, _fails])
 	get_tree().quit(1 if _fails > 0 else 0)
@@ -410,6 +415,140 @@ func _test_versions(copy: String, scene: String) -> void:
 	_eq(FileAccess.get_file_as_string(copy), stable, "с кодом стабильной версии")
 	_ok(FileAccess.get_file_as_string(scene).contains("path=\"%s\"" % copy), "и сцена снова на копии")
 	await GdeBehaviorLibrary.reset_to_builtin("Rotate", GdeRegistry.load_default())
+
+
+## Всё, что видит человек, в английском режиме — по-английски: панель,
+## окно объектов с настройками и кодом каждого поведения, окно выбора
+## условий и действий. Ищем любую кириллицу в надписях, подсказках, пунктах
+## меню и списков. Код поведения на вкладке «Код» не в счёт — это код.
+func _test_english_ui() -> void:
+	const EN_SCENE := "user://gde_window_en_test.tscn"
+	const EN_SHEET := "res://__gdevents_en_test.gdes.json"
+	GdeI18n.set_language("en", false)
+	var reg := GdeRegistry.load_default()
+	var root := Node2D.new()
+	root.name = "Hero"
+	var body := CharacterBody2D.new()
+	body.name = "Body"
+	root.add_child(body)
+	body.owner = root
+	var ps := PackedScene.new()
+	ps.pack(root)
+	root.free()
+	ResourceSaver.save(ps, EN_SCENE)
+	GdeBehaviorInstaller.invalidate()
+	var names := ["Shoot", "Platformer", "Follow", "Health", "Path", "Pickup", "TopDown", "Spawner", "Damage"]
+	for b: String in names:
+		var d: Dictionary = reg.behaviors[b]
+		await GdeBehaviorInstaller.add(EN_SCENE, b, str(d["path"]), {"target": d.get("target", ""), "needs": d.get("needs", [])})
+
+	var doc := GdeSheetDocument.create_empty("en")
+	doc.path = EN_SHEET
+	doc.add_object("Hero", EN_SCENE)
+	doc.add_event([], 0, "standard")
+	doc.add_instruction([0], "conditions", "key.pressed", ["Space"])
+	doc.add_instruction([0], "conditions", "Platformer::" + str((reg.behaviors["Platformer"]["conditions"] as Dictionary).keys()[0]), ["Hero"])
+	doc.add_instruction([0], "actions", "Shoot::fire", ["Hero"])
+	doc.add_instruction([0], "actions", "object.x", ["Hero", "+", "5"])
+	doc.add_event([], 1, "comment")
+	doc.save()
+
+	var found: Array[String] = []
+	var dlg := GdeObjectsDialog.new()
+	add_child(dlg)
+	dlg.open_for(doc, reg)
+	await get_tree().process_frame
+	for b: String in names:
+		dlg._select_behavior(b)
+		dlg._beh_panel._tabs.current_tab = 0
+		await get_tree().process_frame
+		_russian_in(dlg, found, "окно объектов, %s" % b)
+	dlg._tabs.current_tab = 1
+	_russian_in(dlg, found, "проверка сцены")
+	dlg.hide()
+	dlg.queue_free()
+
+	var panel := GdeEventSheetPanel.new()
+	panel.autosave_enabled = false
+	add_child(panel)
+	await get_tree().process_frame
+	panel.open_sheet(EN_SHEET)
+	await get_tree().process_frame
+	_russian_in(panel, found, "панель листа")
+	panel._picker.open_add(panel.registry, panel.doc, "conditions", "Hero")
+	await get_tree().process_frame
+	_russian_in(panel._picker, found, "выбор условия")
+	panel._picker.open_add(panel.registry, panel.doc, "actions", "Hero")
+	await get_tree().process_frame
+	_russian_in(panel._picker, found, "выбор действия")
+	panel._picker.hide()
+	panel.queue_free()
+
+	var uniq: Array[String] = []
+	for f: String in found:
+		if not uniq.has(f):
+			uniq.append(f)
+	var head := uniq.slice(0, 20)
+	_ok(uniq.is_empty(), "в английском интерфейсе нет русских надписей%s" %
+			("" if uniq.is_empty() else ":\n      " + "\n      ".join(head)))
+	for p: String in [EN_SHEET, EN_SHEET.trim_suffix(".gdes.json") + ".gd"]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(EN_SCENE))
+
+
+## Названия языков в переключателе — на своих языках, так и задумано.
+const LANGUAGE_NAMES := ["Русский", "Language / Язык"]
+
+
+func _russian_in(n: Node, out: Array[String], where: String) -> void:
+	if n is CodeEdit:
+		return  # код поведения — не интерфейс
+	var texts: Array[String] = []
+	if n is Control:
+		texts.append((n as Control).tooltip_text)
+	if n is Label:
+		texts.append((n as Label).text)
+	elif n is RichTextLabel:
+		texts.append((n as RichTextLabel).get_parsed_text())
+	elif n is LineEdit:
+		texts.append((n as LineEdit).text)
+		texts.append((n as LineEdit).placeholder_text)
+	elif n is Button:
+		texts.append((n as Button).text)
+	if n is OptionButton:
+		for i in range((n as OptionButton).item_count):
+			texts.append((n as OptionButton).get_item_text(i))
+	if n is MenuButton:
+		var pop := (n as MenuButton).get_popup()
+		for i in range(pop.item_count):
+			texts.append(pop.get_item_text(i))
+	if n is PopupMenu:
+		for i in range((n as PopupMenu).item_count):
+			texts.append((n as PopupMenu).get_item_text(i))
+	if n is ItemList:
+		for i in range((n as ItemList).item_count):
+			texts.append((n as ItemList).get_item_text(i))
+			texts.append((n as ItemList).get_item_tooltip(i))
+	if n is Tree and (n as Tree).get_root() != null:
+		var stack: Array[TreeItem] = [(n as Tree).get_root()]
+		while not stack.is_empty():
+			var it: TreeItem = stack.pop_back()
+			for c in range((n as Tree).columns):
+				texts.append(it.get_text(c))
+				texts.append(it.get_tooltip_text(c))
+			for ch: TreeItem in it.get_children():
+				stack.append(ch)
+	if n is Window:
+		texts.append((n as Window).title)
+	if n is AcceptDialog:
+		texts.append((n as AcceptDialog).dialog_text)
+	var cyr := RegEx.create_from_string("[А-Яа-яЁё]")
+	for t: String in texts:
+		if not t.is_empty() and cyr.search(t) != null and not LANGUAGE_NAMES.has(t):
+			out.append("%s: %s" % [where, t.replace("\n", " ").left(110)])
+	for c: Node in n.get_children(true):
+		_russian_in(c, out, where)
 
 
 func _rmdir(path: String) -> void:

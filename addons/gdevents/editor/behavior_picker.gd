@@ -11,16 +11,16 @@ var _entries: Array = []
 
 
 func _init() -> void:
-	title = "Добавить поведение"
-	ok_button_text = "Добавить"
-	cancel_button_text = "Отмена"
+	title = GdeI18n.t("Добавить поведение")
+	ok_button_text = GdeI18n.t("Добавить")
+	cancel_button_text = GdeI18n.t("Отмена")
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	add_child(box)
 
 	var hint := Label.new()
-	hint.text = "Поведение станет дочерней нодой в сцене объекта, а его настройки — в инспекторе."
+	hint.text = GdeI18n.t("Поведение станет дочерней нодой в сцене объекта, а его настройки откроются в окне объекта.")
 	hint.clip_text = true
 	hint.add_theme_font_size_override("font_size", 11)
 	hint.modulate = Color(1, 1, 1, 0.6)
@@ -62,7 +62,7 @@ func open_for(reg: GdeRegistry, already: Array) -> void:
 		_list.set_item_tooltip(idx, str(b.get("description", "")))
 
 	if _list.item_count == 0:
-		_desc.text = "[color=#c98a8a]Все доступные поведения уже добавлены этому объекту.[/color]"
+		_desc.text = GdeI18n.t("[color=#c98a8a]Все доступные поведения уже добавлены этому объекту.[/color]")
 		get_ok_button().disabled = true
 	else:
 		get_ok_button().disabled = false
@@ -76,11 +76,11 @@ func _on_selected(idx: int) -> void:
 		return
 	var e: Dictionary = _entries[idx]
 	var b: Dictionary = e["def"]
-	var desc := str(b.get("description", "Без описания."))
+	var desc := str(b.get("description", GdeI18n.t("Без описания.")))
 	var props: Dictionary = b.get("properties", {})
 	var acts: Dictionary = b.get("actions", {})
 	var conds: Dictionary = b.get("conditions", {})
-	var text := "[b]%s[/b]\n[color=#9aa0a6]%s[/color]\n[color=#7f868c]Свойств: %d · действий: %d · условий: %d[/color]" \
+	var text := GdeI18n.t("[b]%s[/b]\n[color=#9aa0a6]%s[/color]\n[color=#7f868c]Свойств: %d · действий: %d · условий: %d[/color]") \
 			% [str(b.get("title", e["name"])), desc, props.size(), acts.size(), conds.size()]
 	var scaffold := _scaffold_note(b)
 	if not scaffold.is_empty():
@@ -99,7 +99,7 @@ func _scaffold_note(b: Dictionary) -> String:
 		bits.append(str((n as Dictionary).get("name", "")))
 	if bits.is_empty():
 		return ""
-	return "Если в сцене этого нет, будет создано: %s" % ", ".join(bits)
+	return GdeI18n.t("Если в сцене этого нет, будет создано: %s") % ", ".join(bits)
 
 
 func _emit() -> void:

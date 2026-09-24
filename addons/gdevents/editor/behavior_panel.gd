@@ -82,16 +82,16 @@ func _init() -> void:
 	add_child(_tabs)
 
 	settings = GdeBehaviorSettings.new()
-	settings.name = "Настройки"
+	settings.name = GdeI18n.t("Настройки")
 	settings.saved.connect(func(err: String) -> void:
 		if err.is_empty():
-			message.emit("Настройки «%s» сохранены в %s" % [_title.text, scene_path.get_file()], false)
+			message.emit(GdeI18n.t("Настройки «%s» сохранены в %s") % [_title.text, scene_path.get_file()], false)
 		else:
 			message.emit(err, true))
 	_tabs.add_child(settings)
 
 	code = GdeBehaviorCode.new()
-	code.name = "Код"
+	code.name = GdeI18n.t("Код")
 	code.opened_in_editor.connect(func() -> void: left_for_editor.emit())
 	code.copy_requested.connect(func() -> void: copy_requested.emit(behavior))
 	code.reset_requested.connect(func() -> void: reset_requested.emit(behavior))
@@ -118,10 +118,10 @@ func show_behavior(scene: String, bname: String, reg: GdeRegistry, object_names:
 	else:
 		_icon.texture = GdeIcons.get_icon("behavior")
 		_title.text = bname
-		_about.text = "Скрипт этого поведения не найден в проекте."
+		_about.text = GdeI18n.t("Скрипт этого поведения не найден в проекте.")
 	_about.visible = not _about.text.is_empty()
 	_where.text = node_path
-	_where.tooltip_text = "Узел поведения в сцене объекта: %s" % node_path
+	_where.tooltip_text = GdeI18n.t("Узел поведения в сцене объекта: %s") % node_path
 	var entry: Dictionary = b if b != null else {}
 	# Код — того скрипта, что реально стоит на объекте.
 	code.show_script(script_path if not script_path.is_empty() else str(entry.get("path", "")), entry)

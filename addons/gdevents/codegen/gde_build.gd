@@ -11,15 +11,15 @@ static func build_all(root: String = "res://") -> Dictionary:
 	var lines: Array[String] = []
 	var reg := GdeRegistry.load_default()
 	for e: String in reg.errors:
-		lines.append("  реестр: %s" % e)
+		lines.append(GdeI18n.t("  реестр: %s") % e)
 	if not reg.behaviors.is_empty():
-		lines.append("Поведения: %s" % ", ".join(reg.behaviors.keys()))
+		lines.append(GdeI18n.t("Поведения: %s") % ", ".join(reg.behaviors.keys()))
 	# Своя копия или своё поведение с ошибкой — листы соберутся, а объекты
 	# в игре молча перестанут двигаться. Сказать об этом до запуска.
 	for bn: String in reg.behaviors:
 		var bp := str((reg.behaviors[bn] as Dictionary)["path"])
 		if bp.begins_with(GdeBehaviorLibrary.USER_DIR + "/") and GdeBehaviorLibrary.is_broken(bp):
-			lines.append("  ! поведение «%s» (%s) не собирается — объекты с ним в игре не работают" % [bn, bp])
+			lines.append(GdeI18n.t("  ! поведение «%s» (%s) не собирается — объекты с ним в игре не работают") % [bn, bp])
 
 	var ok := 0
 	var failed := 0
@@ -37,13 +37,13 @@ static func build_one(sheet_path: String, reg: GdeRegistry) -> Dictionary:
 	var lines: Array[String] = []
 	var f := FileAccess.open(sheet_path, FileAccess.READ)
 	if f == null:
-		return {"ok": false, "log": ["✗ %s: не открывается" % sheet_path]}
+		return {"ok": false, "log": [GdeI18n.t("✗ %s: не открывается") % sheet_path]}
 	var text := f.get_as_text()
 	f.close()
 
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
-		return {"ok": false, "log": ["✗ %s: некорректный JSON" % sheet_path]}
+		return {"ok": false, "log": [GdeI18n.t("✗ %s: некорректный JSON") % sheet_path]}
 
 	var res := GdeGenerator.generate(parsed, reg, sheet_path)
 	var errors: Array = res["errors"]
@@ -61,14 +61,14 @@ static func build_one(sheet_path: String, reg: GdeRegistry) -> Dictionary:
 	var compile_err := compile_error(code)
 	if compile_err != "":
 		lines.append("✗ %s" % sheet_path)
-		lines.append("    собранный GDScript не компилируется (%s) — это ошибка GDevents, а не листа; строка с ошибкой — выше в консоли"
+		lines.append(GdeI18n.t("    собранный GDScript не компилируется (%s) — это ошибка GDevents, а не листа; строка с ошибкой — выше в консоли")
 				% compile_err)
 		return {"ok": false, "log": lines}
 
 	var out_path := sheet_path.substr(0, sheet_path.length() - SHEET_SUFFIX.length()) + ".gd"
 	var out := FileAccess.open(out_path, FileAccess.WRITE)
 	if out == null:
-		lines.append("✗ %s: не записывается %s" % [sheet_path, out_path])
+		lines.append(GdeI18n.t("✗ %s: не записывается %s") % [sheet_path, out_path])
 		return {"ok": false, "log": lines}
 	out.store_string(code)
 	out.close()

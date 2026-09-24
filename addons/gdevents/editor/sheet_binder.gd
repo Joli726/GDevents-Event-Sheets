@@ -10,7 +10,7 @@
 class_name GdeSheetBinder
 extends RefCounted
 
-const NODE_PREFIX := "События_"
+const NODE_PREFIX := "События_"  # i18n: ключ — имя узла в сцене, переводить нельзя
 
 
 ## Сцены, в которых этот лист уже используется.
@@ -51,27 +51,27 @@ static func attach(scene_path: String, script_path: String, sheet_path: String) 
 	if not busy.is_empty():
 		return busy
 	if not ResourceLoader.exists(script_path):
-		return "Сначала нажмите «Собрать» — файл %s ещё не создан" % script_path.get_file()
+		return GdeI18n.t("Сначала нажмите «Собрать» — файл %s ещё не создан") % script_path.get_file()
 
 	var ps: PackedScene = ResourceLoader.load(scene_path, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE)
 	if ps == null:
-		return "не открывается сцена %s" % scene_path
+		return GdeI18n.t("не открывается сцена %s") % scene_path
 	var state := PackedScene.GEN_EDIT_STATE_MAIN if Engine.is_editor_hint() else PackedScene.GEN_EDIT_STATE_DISABLED
 	var root := ps.instantiate(state)
 	if root == null:
-		return "не разворачивается сцена %s" % scene_path
+		return GdeI18n.t("не разворачивается сцена %s") % scene_path
 
 	var scr: Script = load(script_path)
 	if scr == null:
 		root.free()
-		return "не загружается %s" % script_path
+		return GdeI18n.t("не загружается %s") % script_path
 
 	var wanted := node_name_for(sheet_path)
 	for c: Node in root.get_children():
 		var s := c.get_script() as Script
 		if s != null and s.resource_path == script_path:
 			root.free()
-			return "Лист уже привязан к этой сцене (нода «%s»)" % c.name
+			return GdeI18n.t("Лист уже привязан к этой сцене (нода «%s»)") % c.name
 
 	var node := Node2D.new()
 	node.name = wanted
@@ -83,11 +83,11 @@ static func attach(scene_path: String, script_path: String, sheet_path: String) 
 	var err := packed.pack(root)
 	if err != OK:
 		root.free()
-		return "не упаковывается сцена (код %d)" % err
+		return GdeI18n.t("не упаковывается сцена (код %d)") % err
 	err = ResourceSaver.save(packed, scene_path)
 	root.free()
 	if err != OK:
-		return "не сохраняется %s (код %d)" % [scene_path, err]
+		return GdeI18n.t("не сохраняется %s (код %d)") % [scene_path, err]
 	return ""
 
 
@@ -99,6 +99,6 @@ static func _busy_reason(scene_path: String) -> String:
 	if open_scenes is PackedStringArray or open_scenes is Array:
 		for s: String in open_scenes:
 			if s == scene_path:
-				return "Сцена %s открыта во вкладке — закройте её, иначе правки потеряются" \
+				return GdeI18n.t("Сцена %s открыта во вкладке — закройте её, иначе правки потеряются") \
 						% scene_path.get_file()
 	return ""

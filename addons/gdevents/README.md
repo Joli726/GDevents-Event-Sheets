@@ -1,226 +1,240 @@
 # GDevents
 
-Листы событий в стиле GDevelop для Godot 4. Условия и действия компилируются
-в обычный читаемый GDScript — никакого интерпретатора в рантайме.
+**English** · [Русский](README.ru.md)
 
-**Статус: фаза 3 — редактор с иконками и панелью поведений.**
-Перетаскивания мышью пока нет — перемещение через меню события.
+GDevelop-style event sheets for Godot 4. Conditions and actions compile to
+ordinary, readable GDScript — there is no interpreter at runtime.
 
-## Редактор
+**Version 0.1.0**: the event sheet editor, 14 ready-made behaviors, your own
+behaviors and extensions, scene and file checks, an English and Russian
+interface.
 
-Включите плагин — в верхней панели Godot рядом с «2D / 3D / Script»
-появится вкладка **«События»**.
+## Editor
 
-- Лист выбирается в выпадающем списке слева вверху; находятся все `*.gdes.json`.
-- Клик по строке выделяет её, двойной — открывает параметры, правый — меню.
-  При наведении справа появляются кнопки: инвертировать, копировать, удалить.
-- Узкая полоска слева от карточки события — и меню события, и ручка:
-  **потяните её, чтобы переставить событие**. Куда оно встанет, видно заранее:
-  полоса сверху — выше, снизу — ниже, подсветка всей карточки — внутрь
-  подсобытием.
-- **Условия и действия перетаскиваются мышью** — и внутри события, и между
-  событиями. Линия показывает, куда строка встанет. С зажатым Ctrl — копия
-  вместо переноса. Порядок важен: условия проверяются сверху вниз и сужают
-  выборку по очереди, действия выполняются сверху вниз.
-- События тоже можно бросать на комментарии — выше или ниже них.
-- **Тумблеры строки** — в окне настроек под параметрами, как в GDevelop.
-  У условия — «Инвертировать (НЕ)»: оно срабатывает, когда ложно, и выборка
-  переворачивается вместе с ним. У условия и действия — «Выключено»: строка
-  остаётся в листе, но не выполняется и не проверяется. Окно открывается и
-  у условий без параметров — их чаще всего и переворачивают. «Выключить»
-  есть и в меню по правой кнопке; выключенная строка помечена «ВЫКЛ».
-- Сцену можно **бросить прямо из файловой системы** в панель или в список
-  объектов — она добавится в лист.
-- **Сохранять и собирать вручную больше не нужно.** Лист сохраняется сам
-  через секунду после правки и по Ctrl+S; перед запуском игры он
-  пересобирается автоматически. Кнопки остались для тех, кто любит явно.
-- **Ошибки видны сразу, прямо на строке.** Лист проверяется при каждой
-  правке: сломанное событие обводится красным, сломанная строка помечается
-  «!», подробности — в подсказке при наведении. Опечатка в имени объекта
-  подсказывает правильное: «объекта «Plaer» нет в листе — может, «Player»?».
-  Выключенные события не проверяются — выключают как раз то, что пока сломано.
+Enable the plugin and an **Events** tab appears in the top bar of Godot,
+next to "2D / 3D / Script".
 
-### Проверка объектов
+- Choose the sheet in the drop-down at the top left; every `*.gdes.json` is
+  found.
+- Click a row to select it, double-click to open its parameters, right-click
+  for the menu. On hover, buttons appear on the right: invert, copy, delete.
+- The narrow strip on the left of an event card is both the event menu and a
+  handle: **drag it to move the event**. Where it will land is shown in
+  advance: a bar above — before, below — after, the whole card highlighted —
+  inside, as a sub-event.
+- **Conditions and actions can be dragged** within an event and between
+  events. A line shows where the row will go. Hold Ctrl to copy instead of
+  moving. Order matters: conditions are checked top to bottom and narrow the
+  picked instances in turn, actions run top to bottom.
+- Events can be dropped onto comments too — above or below them.
+- **Row toggles** are in the settings window under the parameters, as in
+  GDevelop. A condition has "Invert (NOT)": it fires when false, and the
+  picking flips with it. Conditions and actions have "Disabled": the row stays
+  in the sheet but is neither run nor checked. The window opens for
+  conditions without parameters too — those are the ones inverted most often.
+  "Disable" is also in the right-click menu; a disabled row is marked "OFF".
+- A scene can be **dropped straight from the FileSystem dock** onto the panel
+  or the object list — it is added to the sheet.
+- **No need to save and build by hand.** The sheet saves itself a second after
+  an edit and on Ctrl+S; before the game runs it is rebuilt automatically. The
+  buttons remain for those who like to do it explicitly.
+- **Errors show up immediately, right on the row.** The sheet is checked on
+  every edit: a broken event gets a red outline, a broken row an "!" mark,
+  and the details are in the tooltip. A typo in an object name suggests the
+  right one: "there is no object “Plaer” in the sheet — did you mean
+  “Player”?". Disabled events are not checked — people disable exactly what
+  is broken for now.
 
-Кнопка **«Ошибок в объектах: N»** появляется в панели, когда в сценах
-объектов есть то, из-за чего игра молча поведёт себя не так:
+### Object check
 
-- тело без формы столкновения — оно ни с чем не сталкивается и падает сквозь пол;
-- форма столкновения рядом с телом, а не внутри него;
-- поведение не на том узле (например, платформер не внутри `CharacterBody2D`);
-- анимация, которой нет в спрайте (опечатка в «Duble Jump», например);
-- спрайт без картинки, «Выстрел» без сцены снаряда, преследование без цели.
+An **"Errors in objects: N"** button appears in the panel when object scenes
+contain something that makes the game silently misbehave:
 
-У каждой находки — объяснение простыми словами и кнопки исправления.
-Где намерение не угадать, вариантов несколько: у пустого тела без формы
-это «Перенести форму внутрь» и «Удалить пустое тело». Для отсутствующей
-анимации — выбор из тех, что реально есть в спрайте.
+- a body without a collision shape — it collides with nothing and falls
+  through the floor;
+- a collision shape next to a body instead of inside it;
+- a behavior on the wrong node (for example, the platformer not inside a
+  `CharacterBody2D`);
+- an animation that the sprite does not have (a typo like "Duble Jump");
+- a sprite without a texture, "Shoot" without a projectile scene, "Follow"
+  without a target.
 
-Та же проверка из командной строки:
+Every finding comes with a plain-words explanation and fix buttons. Where the
+intent cannot be guessed there are several options: for an empty body without
+a shape, "Move the shape inside" and "Delete the empty body". For a missing
+animation — a choice among those the sprite really has.
+
+The same check from the command line:
 `godot --headless res://addons/gdevents/tools/check_scenes.tscn`.
 
-### Горячие клавиши
+### Keyboard shortcuts
 
-| Клавиши | Что делает |
+| Keys | What it does |
 | --- | --- |
-| `Ctrl+S` | сохранить лист |
-| `Ctrl+B` | собрать GDScript |
-| `Ctrl+Z` / `Ctrl+Shift+Z`, `Ctrl+Y` | отменить / повторить |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | копировать / вырезать / вставить |
-| `Ctrl+D` | дублировать выделенное событие |
-| `Alt+↑` / `Alt+↓` | сдвинуть выделенное условие, действие или событие |
-| `Ctrl+N` | новое событие в конец |
-| `Delete` | удалить выделенное |
-| `Enter` | открыть параметры выделенной строки |
-| `Escape` | снять выделение |
+| `Ctrl+S` | save the sheet |
+| `Ctrl+B` | build GDScript |
+| `Ctrl+Z` / `Ctrl+Shift+Z`, `Ctrl+Y` | undo / redo |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy / cut / paste |
+| `Ctrl+D` | duplicate the selected event |
+| `Alt+↑` / `Alt+↓` | move the selected condition, action or event |
+| `Ctrl+N` | new event at the end |
+| `Delete` | delete the selection |
+| `Enter` | open the parameters of the selected row |
+| `Escape` | clear the selection |
 
-Буфер обмена общий на все листы — событие можно перенести из одного в другой.
+The clipboard is shared by all sheets — an event can be moved from one to
+another.
 
-### Выбор и настройка условия или действия
+### Choosing and setting up a condition or action
 
-Одно окно на три колонки, как в GDevelop: **слева объекты** (с картинками
-из их спрайтов), **в середине** — что можно сделать с выбранным объектом,
-**справа** — настройки выбранного условия: живая фраза, описание, поля
-параметров, подсказки и тумблеры «Инвертировать (НЕ)» и «Выключено».
-Один щелчок по условию — и его настройки уже справа.
+One window with three columns, as in GDevelop: **objects on the left** (with
+pictures from their sprites), **in the middle** — what can be done with the
+selected object, **on the right** — the settings of the selected condition: a
+live sentence, the description, parameter fields, suggestions and the
+"Invert (NOT)" and "Disabled" toggles. One click on a condition and its
+settings are already on the right.
 
-Строка появляется в листе только по «Добавить»: «Отмена» не оставляет
-недозаполненных строк. Двойной щелчок по условию в списке добавляет его
-сразу, Enter в поле параметра — тоже.
+A row appears in the sheet only on "Add": "Cancel" leaves no half-filled rows.
+Double-clicking a condition in the list adds it at once, and so does Enter in
+a parameter field.
 
-Клавиатурой: начните печатать в поиске — первое найденное выбирается само,
-Enter переходит к первому полю (или сразу добавляет, если полей нет),
-Enter в поле добавляет.
+With the keyboard: start typing in the search — the first match is selected by
+itself, Enter moves to the first field (or adds right away if there are no
+fields), Enter in a field adds.
 
-Смена объекта слева не сбрасывает выбранное условие: оно остаётся, объект в
-параметрах меняется, введённые значения сохраняются.
+Changing the object on the left does not reset the selected condition: it
+stays, the object in its parameters changes, entered values are kept.
 
-**Правка существующей строки** (двойной щелчок в листе) открывает то же окно:
-условие выбрано, поля заполнены. Его можно заменить другим прямо здесь.
+**Editing an existing row** (double-click in the sheet) opens the same window
+with the condition selected and the fields filled in. It can be replaced by
+another one right there.
 
-**Общие** — то, что к объектам не привязано: клавиатура, переменные, таймеры,
-сцена, звук. Поиск сверху ищет сразу по всем объектам. У объекта
-показываются только те поведения, которые на нём реально стоят. Сверху
-списка — **«Недавние»**: последние выбранные инструкции.
+**Common** holds what is not tied to objects: keyboard, variables, timers,
+scene, sound, and the extensions. The search at the top looks through all
+objects at once. An object shows only the behaviors it really has. At the top
+of the list is **"Recent"**: the last chosen instructions.
 
-### Подсказки в параметрах
+### Parameter suggestions
 
-Под полями настроек идёт список того, что в это поле можно вписать,
-с фильтрацией по набранному и пояснением к каждому пункту. Щелчок
-подставляет значение, стрелка вниз из поля уводит фокус в список.
+Below the setting fields is a list of what can be typed into the field,
+filtered by what is typed, with an explanation for each item. A click inserts
+the value, the down arrow moves focus from the field into the list.
 
-Список зависит от того, что за параметр:
+The list depends on the parameter:
 
-- выражения — свои у каждого объекта листа и его поведений, плюс общие;
-- имена анимаций — читаются из `AnimatedSprite2D` самого объекта;
-- клавиши и действия ввода — из настроек проекта;
-- файлы звуков и сцен — из проекта.
+- expressions — each sheet object's own and its behaviors', plus the common
+  ones and the extensions';
+- animation names — read from the object's own `AnimatedSprite2D`;
+- keys and input actions — from the project settings;
+- sound and scene files — from the project.
 
-### Объекты и поведения
+### Objects and behaviors
 
-Кнопка **Объекты**: слева список с картинками объектов (первый кадр их
-собственного спрайта), справа выбранный объект — его сцена и две вкладки:
-**«Поведения»** и **«Проверка сцены»** (число находок — прямо на ярлычке).
+The **Objects** button: on the left a list with pictures of the objects (the
+first frame of their own sprite), on the right the selected object — its scene
+and two tabs: **"Behaviors"** and **"Scene check"** (the number of findings is
+right on the tab).
 
-**«Добавить поведение» сам кладёт ноду в сцену объекта и сохраняет её** —
-руками в дереве сцены лазить больше не нужно. После этого действия
-и условия поведения сразу появляются в списке для этого объекта.
+**"Add behavior" puts the node into the object's scene and saves it** — no
+need to dig through the scene tree by hand. The behavior's actions and
+conditions then appear in the list for that object right away.
 
-**Настройки поведения — рядом, как в GDevelop.** Щелчок по поведению
-слева открывает справа его описание и настройки; только что добавленное
-поведение открывается само. Названия и пояснения — русские, из
-`##`-комментариев над свойством, разбиты по тем же группам, что и в
-скрипте (`@export_group`). Числа — с пределами из `@export_range`,
-списки — из `@export_enum`, цель — выбором из объектов листа, анимация —
-из спрайта самого объекта, сцена снаряда — кнопкой «Выбрать…». У пресета
-кнопка «Применить». Изменённая настройка получает стрелку ↺ — вернуть
-значение по умолчанию; внизу — «Вернуть все настройки по умолчанию».
-Значения у каждого объекта свои и пишутся в его сцену через долю секунды
-после правки; в открытой вкладке правка ложится в историю — Ctrl+Z её
-отменит. Точки пути и прочее, что удобнее править мышью, открываются
-в инспекторе Godot.
+**Behavior settings are right there, as in GDevelop.** Clicking a behavior on
+the left opens its description and settings on the right; a freshly added
+behavior opens by itself. Names and hints come from the `##` comments above
+each property, in the interface language, split into the same groups as in
+the script (`@export_group`). Numbers have the limits from `@export_range`,
+lists come from `@export_enum`, a target is chosen from the sheet's objects,
+an animation from the object's own sprite, a projectile scene with a
+"Choose…" button. A preset has an "Apply" button. A changed setting gets a ↺
+arrow to reset it to the default; at the bottom is "Reset all settings to
+defaults". Values are per object and are written into its scene a fraction
+of a second after the edit; in an open tab the edit goes into the history,
+and Ctrl+Z undoes it. Path points and other things easier to edit with the
+mouse open in Godot's inspector.
 
-**Вкладка «Код»** рядом с настройками показывает, как поведение устроено
-внутри: исходник с подсветкой, только для чтения. «Перейти к…» перечисляет
-действия, условия и выражения поведения теми же фразами, что и в листе
-событий, и ставит курсор на их функцию. «Открыть в редакторе скриптов» —
-туда же, но с автодополнением, подсветкой ошибок и отладчиком.
+**The "Code" tab** next to the settings shows how the behavior works inside:
+the source with highlighting, read-only. "Go to…" lists the behavior's
+actions, conditions and expressions with the same sentences as in the event
+sheet and puts the cursor on their function. "Open in script editor" goes to
+the same place, but with autocompletion, error highlighting and the debugger.
 
-### Своя копия поведения и возврат к встроенному
+### Your own copy of a behavior and going back to the built-in one
 
-Встроенные поведения в `addons/gdevents/behaviors` **никогда не правятся** —
-это всегда целый, рабочий «дефолт», а обновление плагина не сотрёт ваши
-правки. Чтобы что-то изменить или добавить, на вкладке «Код» нажмите
-**«Изменить поведение…»**:
+Built-in behaviors in `addons/gdevents/behaviors` **are never edited** — they
+are always a whole, working "default", and a plugin update will not wipe your
+changes. To change or add something, press **"Edit behavior…"** on the Code
+tab:
 
-- рядом ляжет копия — `res://behaviors/<имя>/<имя>.gd`, с тем же именем
-  файла, а значит и с тем же именем поведения;
-- она заменит встроенное **у всех объектов проекта**: реестр берёт её
-  вместо встроенного, сцены объектов переключаются на её скрипт, а все
-  настройки объектов сохраняются;
-- копия сразу открывается в редакторе скриптов.
+- a copy is placed next to your project — `res://behaviors/<name>/<name>.gd`,
+  with the same file name and therefore the same behavior name;
+- it replaces the built-in one **for every object in the project**: the
+  registry takes it instead of the built-in one, object scenes switch to its
+  script, and all object settings are kept;
+- the copy opens in the script editor right away.
 
-**«Вернуть встроенную…»** переключает объекты обратно. Копия при этом не
-пропадает — она уходит в историю версий. Встроенная версия на момент
-копирования и история лежат в скрытой папке `.gdevents` рядом с копией:
-её не видят ни реестр, ни файловая система Godot, ни экспорт.
+**"Restore built-in…"** switches the objects back. The copy does not vanish —
+it goes into the version history. The built-in version as of copying and the
+history are kept in a hidden `.gdevents` folder next to the copy: neither the
+registry, nor Godot's FileSystem dock, nor the export see it.
 
-**«Новое на основе…»** делает отдельное поведение с новым именем — например
-«Выстрел врага» (`EnemyShoot`) рядом с «Выстрелом игрока». Его добавляют
-объектам обычной кнопкой «Добавить поведение».
+**"New based on this…"** makes a separate behavior with a new name — for
+example "Enemy shot" (`EnemyShoot`) next to the player's "Shoot". It is added
+to objects with the usual "Add behavior" button.
 
-**Версии.** «Версии ▾» → «Запомнить текущую версию…» сохраняет код под
-названием — «стабильная», «до рывка». Любую версию можно открыть,
-посмотреть «Отличия от текущего» и «Восстановить»; текущий код перед этим
-сам уходит в историю, так что и восстановление можно отменить. После
-«Вернуть встроенную» прошлые копии остаются в списке у встроенного
-поведения: восстановление такой версии снова делает из неё копию и
-переключает на неё объекты.
+**Versions.** "Versions ▾" → "Remember current version…" saves the code under
+a name — "stable", "before the dash". Any version can be opened, compared with
+"Difference from current" and brought back with "Restore"; the current code
+goes into the history first, so a restore can be undone too. After "Restore
+built-in", the past copies stay in the list of the built-in behavior:
+restoring such a version makes a copy of it again and switches the objects to
+it.
 
-**«Сравнить со встроенной»** показывает, что изменено в копии: добавленные
-строки — зелёным, убранные — красным, неизменное свёрнуто. Если плагин
-обновился и встроенная версия поменялась уже после того, как вы сделали
-копию, вкладка «Код» об этом скажет: «Что изменилось» покажет правки
-обновления — перенесите нужное в копию, — а «Учтено» уберёт напоминание.
+**"Compare with built-in"** shows what is changed in the copy: added lines in
+green, removed in red, unchanged folded. If the plugin was updated and the
+built-in version changed after you made the copy, the Code tab says so: "What
+changed" shows the update's edits — carry over what you need into the copy —
+and "Noted" dismisses the reminder.
 
-Копия или своё поведение, которое не собирается, помечено в списке
-поведений как «ошибка», а сборка перед запуском игры предупреждает о нём:
-листы соберутся, а объекты с таким поведением в игре работать не будут.
+A copy or your own behavior that does not compile is marked "error" in the
+behavior list, and the build before running the game warns about it: the
+sheets will build, but objects with such a behavior will not work in the game.
 
-Окно настроек строится из самого скрипта поведения, так что своё
-поведение в `res://behaviors/` получает его без единой лишней строки.
+The settings window is built from the behavior script itself, so your own
+behavior in `res://behaviors/` gets it without a single extra line.
 
-**Поведение приносит с собой каркас.** Создайте пустую сцену, накиньте
-«Персонаж платформера» — и в сцене появятся `CharacterBody2D`, форма
-столкновения и `AnimatedSprite2D`. Останется добавить спрайты. Что именно
-будет создано, написано в окне выбора поведения заранее. Если нужный узел
-в сцене уже есть, ничего не создаётся.
+**A behavior brings its skeleton along.** Create an empty scene, add
+"Platformer character" — and the scene gets a `CharacterBody2D`, a collision
+shape and an `AnimatedSprite2D`. All that is left is to add sprites. What
+exactly will be created is written in the behavior picker in advance. If the
+needed node already exists in the scene, nothing is created.
 
-**Закрывать сцену не нужно.** Если она открыта во вкладке, правка идёт по
-живому дереву и сохраняется через редактор — ничего не теряется.
+**No need to close the scene.** If it is open in a tab, the edit goes through
+the live tree and is saved through the editor — nothing is lost.
 
-Рядом с каждым поведением видно, **на каком узле** оно висит
-(`CharacterBody2D/Platformer`). Это важно: в живой сцене поведение почти
-никогда не лежит на корне.
+Next to each behavior you can see **which node** it sits on
+(`CharacterBody2D/Platformer`). This matters: in a live scene a behavior is
+almost never on the root.
 
-## Как собрать
+## Building
 
-Кнопкой **Сохранить и собрать** в редакторе, или из меню
-**Проект → Инструменты → GDevents: пересобрать листы событий**.
+With the **Build** button in the editor, or from the menu
+**Project → Tools → GDevents: rebuild event sheets**.
 
-Из командной строки:
+From the command line:
 
 ```bash
 godot --headless --script res://addons/gdevents/tools/build_cli.gd
 ```
 
-Каждый `**/*.gdes.json` превращается в соседний `.gd` с тем же именем.
-Полученный скрипт вешается на корень сцены (или на отдельную ноду в ней).
+Every `**/*.gdes.json` becomes a `.gd` with the same name next to it. The
+"Attach to scene…" button adds the resulting script to a scene as a child
+node, so the scene root keeps its own script.
 
-Листы остаются обычным JSON — их по-прежнему можно править текстом
-или попросить Клода, редактор ничего не портит при круговом проходе.
+Sheets stay plain JSON — they can still be edited as text or by an AI; the
+editor keeps them intact on a round trip.
 
-## Тесты
+## Tests
 
 ```bash
 godot --headless --script res://addons/gdevents/tools/editor_test.gd
@@ -230,93 +244,105 @@ godot --headless --script res://addons/gdevents/tools/build_tests.gd
 godot --headless --quit-after 200 res://addons/gdevents/tests/selftest.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/runtime_test.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/library_test.tscn
-godot --headless --quit-after 2000 res://addons/gdevents/tools/behavior_window_test.tscn
+godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
+godot --headless --script res://addons/gdevents/tools/i18n_test.gd
 ```
 
-Первый — модель документа, буфер обмена, поиск поведений в сцене, понятность
-названий, ошибки на строках, каркас сцены и проверка сцен с исправлением.
-Второй — поведения в деле: что все они компилируются, падение, прыжок,
-анимация из события поверх платформера, броня, путь, урон, подбор,
-появление, толчок персонажа, стрельба по взгляду, выбор главного узла.
-Третий водит по панели настоящей мышью: наведение, клики по кнопкам строк
-и событий, ширина панели в узком окне. Остальные тесты зовут методы
-напрямую и не видят, что под курсором, — так однажды проскочили кнопки,
-которые мигали и не нажимались. Четвёртый собирает тестовый лист, пятый его
-запускает и печатает строку вида:
+The first covers the document model, the clipboard, finding behaviors in a
+scene, clear names, errors on rows, the scene skeleton and the scene check
+with fixes.
+The second — behaviors in action: that all of them compile, falling, jumping,
+an animation from an event over the platformer, armor, the path, damage,
+pickups, spawning, pushing a character, shooting where the character faces,
+choosing the main node.
+The third drives the panel with a real mouse: hovering, clicks on row and
+event buttons, the panel width in a narrow window. The other tests call
+methods directly and cannot see what is under the cursor — that is how
+buttons once slipped through that flickered and could not be pressed.
+The fourth builds a test sheet, the fifth runs it and prints a line like:
 
 ```
 ИТОГ врагов=2 уехал=1 остался=1 пуля=60.3 скорость=100 тиков=6
 ```
 
-Здесь важна каждая цифра. `уехал=1 остался=1` — выборка сузилась до одного
-экземпляра, а не сработала на всех (сломайся она — было бы `2` и `0`).
-`пуля>0` и `скорость=100` — поведение, лежащее не на корне, а внутри
-`CharacterBody2D`, нашлось и отработало; на этой раскладке раньше молчало всё.
+(RESULT enemies, left, stayed, bullet, speed, ticks.) Every number matters.
+`уехал=1 остался=1` (left=1 stayed=1) — picking narrowed down to one instance
+instead of acting on all (were it broken, it would be `2` and `0`). `пуля>0`
+and `скорость=100` — a behavior that sits not on the root but inside a
+`CharacterBody2D` was found and worked; everything used to stay silent with
+this layout.
 
-Шестой сверяет выборку с GDevelop на живых нодах: «Создать» отбирает только
-новый объект, «НЕ» оставляет в выборке тех, кто условию не отвечает, второй
-раннер листа не обнуляет переменные сцены. Там же — генератор: дробные
-переменные, кавычки в именах, проверка компиляции собранного кода.
-Седьмой проходит всю библиотеку: каждое условие (и с «НЕ»), действие и
-выражение, встроенные и из поведений, собирается в отдельный лист,
-компилируется и выполняется на объекте со всеми поведениями разом. Новая
-инструкция в `builtin.json` или новое `@export`-свойство поведения
-проверяются им автоматически.
-Восьмой — окно поведения: русские названия и группы, запись правки в файл
-сцены, сброс к значению по умолчанию, пресет, выбор цели и анимации,
-переход к другому поведению без потери правки, вкладка «Код» и переход
-к функции действия, своя копия поведения (переключение сцен с сохранением
-настроек, копия в истории после возврата, новое поведение на основе),
-версии (запомнить, восстановить, вернуть копию после возврата к встроенной),
-сравнение со встроенной и напоминание об её обновлении.
+The sixth compares picking with GDevelop on live nodes: "Create" picks only
+the new object, "NOT" keeps in the picking those who do not match, a second
+sheet runner does not reset scene variables. The generator is tested there
+too: fractional variables, quotes in names, the compile check of the built
+code.
+The seventh goes through the whole library: every condition (also with NOT),
+action and expression — built-in, from behaviors and from extensions — is
+built into its own sheet, compiled and run on an object that has all
+behaviors at once. A new instruction in `builtin.json` or a new `@export`
+property of a behavior is covered by it automatically.
+The eighth — the behavior window: names and groups, writing an edit into the
+scene file, resetting to the default, a preset, choosing a target and an
+animation, switching to another behavior without losing the edit, the Code tab
+and jumping to an action's function, your own copy (switching scenes while
+keeping settings, the copy in the history after going back, a new behavior
+based on another), versions (remember, restore, bring back a copy after
+restoring the built-in one), comparing with the built-in one and the reminder
+about its update, the English interface without Russian leftovers.
+The ninth — translations: every interface string and the whole built-in
+library, behaviors and extensions have English text with the same
+placeholders, and no Russian strings bypass `GdeI18n.t()` in the code.
 
-Ещё есть `tools/editor_shot.gd` и `tools/dialog_shot.tscn`: кладут снимки
-панели и диалогов в `user://` — быстрый способ увидеть раскладку,
-не открывая редактор. Инструменты, которым нужны поведения, запускаются
-сценой, а не через `--script`: без автозагрузки `Gde` скрипты поведений
-не компилируются, и результат вышел бы ложно-чистым.
+There are also `tools/editor_shot.gd` and `tools/dialog_shot.tscn`: they put
+screenshots of the panel and the dialogs into `user://` — a quick way to see
+the layout without opening the editor. Tools that need behaviors run as a
+scene, not through `--script`: without the `Gde` autoload behavior scripts do
+not compile, and the result would be falsely clean.
 
-## Главное: выборка объектов
+## The main thing: picking objects
 
-Это то, ради чего всё затевалось. Условие не возвращает «да/нет» — оно
-**сужает список экземпляров**, с которым работают следующие условия и действия.
+This is what it was all for. A condition does not return "yes/no" — it
+**narrows the list of instances** that the following conditions and actions
+work with.
 
 ```
-ЕСЛИ:  Bullet сталкивается с Enemy
-ТО:    Удалить объект Bullet
-       Изменить переменную hp у Enemy: - 1
+IF:    Bullet collides with Enemy
+THEN:  Delete object Bullet
+       Change variable hp of Enemy: - 1
 ```
 
-Удалятся не все пули и не все враги, а ровно те, что реально столкнулись.
-Подсобытия получают копию выборки родителя. Созданный объект сразу попадает
-в выборку текущего события — если событие этот объект ещё не отбирало, то
-только он: «Создать Bullet» и следом «Повернуть Bullet» трогают новую пулю,
-а не все пули уровня. Удалённый — сразу из неё убирается.
+Not all bullets and not all enemies are affected, but exactly those that
+really collided. Sub-events get a copy of the parent's picking. A created
+object is picked by the current event right away — if the event has not
+picked that object yet, only the new one: "Create Bullet" followed by "Rotate
+Bullet" touches the new bullet, not every bullet of the level. A deleted one
+is removed from the picking at once.
 
-«НЕ» у условия объекта переворачивает проверку для каждого экземпляра:
-«НЕ Enemy видим → Удалить Enemy» удалит невидимых, даже если рядом есть
-видимые. У «НЕ сталкивается» сужается только первый объект.
+"NOT" on an object condition flips the check for each instance: "NOT Enemy is
+visible → Delete Enemy" deletes the invisible ones even if there are visible
+ones nearby. With "NOT collides" only the first object is narrowed.
 
-Регрессионный тест на это — `demo/selftest.gdes.json`, гоняется headless:
+The regression test for this is `tests/selftest.gdes.json`, run headless:
 
 ```bash
-godot --headless --quit-after 600 res://demo/selftest.tscn
+godot --headless --quit-after 200 res://addons/gdevents/tests/selftest.tscn
 ```
 
-Должен напечатать `ИТОГ score=1 Enemy=1 Bullet=1`.
+What each number of its result line means is in the "Tests" section.
 
-## Формат листа
+## Sheet format
 
 ```jsonc
 {
   "format": 1,
-  "extends": "Node2D",              // базовый класс сгенерированного скрипта
+  "extends": "Node2D",              // base class of the generated script
 
-  "objects": [                      // тип объекта = сцена .tscn
+  "objects": [                      // object type = a .tscn scene
     { "name": "Player", "scene": "res://demo/demo_player.tscn" }
   ],
-  "groups": { "Враги": ["Goblin", "Orc"] },   // группы объектов GDevelop
-  "variables": { "score": 0 },                // переменные сцены
+  "groups": { "Enemies": ["Goblin", "Orc"] },   // GDevelop object groups
+  "variables": { "score": 0 },                  // scene variables
 
   "events": [
     {
@@ -327,206 +353,331 @@ godot --headless --quit-after 600 res://demo/selftest.tscn
       "actions": [
         { "id": "object.x", "params": ["Player", "+", "220 * TimeDelta()"] }
       ],
-      "children": []                // подсобытия
+      "children": []                // sub-events
     }
   ]
 }
 ```
 
-Типы событий: `foreach` берёт `"object"`, `repeat` — `"count"`,
-`comment` — `"text"`, `group` — `"name"`. Любое событие можно временно
-выключить через `"disabled": true`.
+Event types: `foreach` takes `"object"`, `repeat` — `"count"`, `comment` —
+`"text"`, `group` — `"name"`. Any event can be switched off for a while with
+`"disabled": true`. Sub-events go only in `"children"`, NOT is
+`"inverted": true`; every parameter is a string, and text inside it is in
+quotes: `"\"Score: \" + ToString(Variable(score))"`. The exact ids of all
+instructions with their parameter kinds are printed by `tools/library_list.gd`
+(see "Checking your files").
 
-## Выражения
+## Expressions
 
-Синтаксис как в GDevelop, транспилируется в GDScript:
+The syntax is as in GDevelop, transpiled to GDScript:
 
 ```
 220 * TimeDelta()
 RandomInRange(40, 440)
-"Счёт: " + ToString(Variable(score))
+"Score: " + ToString(Variable(score))
 Player.X() + 50
 Enemy.Variable(hp)
 Player.Shoot::CooldownLeft()
+Clock::Hour()
 ```
 
-Числа всегда компилируются во float — чтобы `3 / 2` давало `1.5`, как в
-GDevelop, а не `1`, как в голом GDScript.
+Numbers always compile to float — so that `3 / 2` gives `1.5`, as in
+GDevelop, and not `1`, as in plain GDScript.
 
-## Библиотека
+## Library
 
-В `registry/builtin.json` — **54 условия, 67 действий и 64 выражения**
-в 18 группах: Движение, Выборка, Столкновения, Объекты, Переменные,
-Анимация, Вид, Плавность, Текст, Клавиатура, Мышь, Таймеры, Звук, Камера,
-Физика, Сохранение, Сцена, Система.
-Это курированный слой: правится текстом, фразы на русском.
-**У каждой инструкции есть описание** — оно видно в окне выбора и подсказкой
-в листе.
+`registry/builtin.json` holds **54 conditions, 67 actions and 64
+expressions** in 18 groups: Movement, Picking, Collisions, Objects,
+Variables, Animation, Appearance, Tweens, Text, Keyboard, Mouse, Timers,
+Sound, Camera, Physics, Saving, Scene, System.
+It is a curated layer: edited as text, its sentences are written in Russian
+and translated into English through `i18n/en.json`.
+**Every instruction has a description** — it is shown in the picker and as a
+tooltip in the sheet.
 
-Поле `icon` у инструкции или карта групп в `editor/gde_icons.gd` задают значок.
-Набор — [Tabler Icons](https://tabler.io/icons) (MIT), см. `icons/LICENSE.txt`.
+The `icon` field of an instruction or the group map in `editor/gde_icons.gd`
+sets its icon. The set is [Tabler Icons](https://tabler.io/icons) (MIT), see
+`icons/LICENSE.txt`.
 
-### Группа «Выборка» — та самая механика GDevelop
+### The "Picking" group — the very GDevelop mechanic
 
-Эти условия не столько отвечают «да/нет», сколько решают, с какими
-именно экземплярами будут работать следующие строки события:
+These conditions do not so much answer "yes/no" as decide which instances
+the following rows of the event work with:
 
-- **Взять ближайший к точке / к объекту** — сужают до одного;
-- **Взять самый далёкий**, **Взять случайный**;
-- **Взять все** — сбрасывает сужение, сделанное выше.
+- **Pick the nearest to a point / to an object** — narrows down to one;
+- **Pick the farthest**, **Pick a random one**;
+- **Pick all** — resets the narrowing made above.
 
-Важно: `Enemy.Count()` считает **отобранные** экземпляры, а не всех живых —
-точно как в GDevelop. Чтобы посчитать всех, сначала поставьте «Взять все».
+Important: `Enemy.Count()` counts the **picked** instances, not all living
+ones — exactly as in GDevelop. To count all of them, put "Pick all" first.
 
-### Группа «Плавность»
+### The "Tweens" group
 
-Одно действие вместо события со счётчиком: «Плавно переместить в X;Y за
-N сек», «плавно сдвинуть на…», масштаб, поворот, прозрачность. Условие
-«идёт плавное изменение» позволяет дождаться конца. На объекте живёт одно
-плавное изменение: новое отменяет старое — иначе два «переместить» дрались
-бы за одну позицию.
+One action instead of an event with a counter: "Smoothly move to X;Y in N
+sec", "smoothly shift by…", scale, rotation, opacity. The condition "a tween
+is running" lets you wait for the end. An object has one tween at a time: a
+new one cancels the old one — otherwise two "move" tweens would fight over one
+position.
 
-### Анимации: события главнее поведений
+### Animations: events win over behaviors
 
-«Платформер» и «Вид сверху» сами переключают анимации. Анимация,
-запущенная событием, теперь главнее: она держится, пока её запускают, и в
-любом случае один полный проход. Раньше платформер перебивал её на
-следующем же кадре, и «двойной прыжок» из события просто не был виден.
-Для самых частых случаев событий не нужно вовсе — у платформера есть
-слоты «Анимация прыжка в воздухе» и «Анимация скольжения по стене».
+"Platformer character" and "Top-down movement" switch animations by
+themselves. An animation started by an event now wins: it holds while the
+event keeps starting it, and in any case for one full pass. The platformer
+used to override it on the very next frame, and a "double jump" from an event
+was simply invisible. For the most common cases no events are needed at all —
+the platformer has slots for the air-jump animation and the wall-slide
+animation.
 
-### Куда смотрит объект
+### Where the object faces
 
-**«Выстрелить» само стреляет туда, куда смотрит персонаж** (флажок
-«Стрелять туда, куда смотрит спрайт», включён по умолчанию). В платформере
-персонаж не поворачивается, а отражается — две ветки «смотрит влево /
-вправо» ради выстрела больше не нужны. Есть и действие «Выстрелить туда,
-куда смотрит, со сдвигом N градусов» — для стрельбы вверх под углом.
+**"Shoot" fires where the character faces by itself** (a checkbox, on by
+default). In a platformer the character does not rotate but flips — two
+"faces left / right" branches just for shooting are no longer needed. There
+is also the action "Shoot where it faces, turned by N degrees" — for shooting
+upward at an angle.
 
-Условие **«отражён по горизонтали (смотрит влево)»** и обратное к нему
-(правая кнопка → «Инвертировать») — способ развести две ветки: стрелять
-влево или вправо. Если ветку разводить не хочется, есть выражение
-`Player.Facing()`: оно даёт `1` вправо и `-1` влево, так что
+The condition **"is flipped horizontally (faces left)"** and its opposite
+(right-click → "Invert") are the way to split two branches: shoot left or
+right. If you do not want branches, there is the expression `Player.Facing()`:
+it gives `1` to the right and `-1` to the left, so
 
 ```
-Создать Bullet в позиции Player.X() + 20 * Player.Facing() ; Player.Y()
-Изменить «Направление в градусах» у Bullet: = 90 - 90 * Player.Facing()
+Create Bullet at position Player.X() + 20 * Player.Facing() ; Player.Y()
+Change "Direction in degrees" of Bullet: = 90 - 90 * Player.Facing()
 ```
 
-отправляет пулю туда же, куда смотрит игрок, одной строкой.
+sends the bullet the way the player faces in one line.
 
-Отражение ставится действием «Отразить по горизонтали» и само собой —
-поведениями «Персонаж платформера» и «Вид сверху», если у них включён
-соответствующий флажок.
+Flipping is set by the action "Flip horizontally" and by itself — by the
+"Platformer character" and "Top-down movement" behaviors, if their checkbox
+for it is on.
 
-## Свои поведения
+## Your own behaviors
 
-Поведение — дочерняя нода объекта, скрипт наследует `GdeBehavior`.
-**Единственный источник правды — сам файл `.gd`:**
+A behavior is a child node of an object whose script extends `GdeBehavior`.
+**The only source of truth is the `.gd` file itself:**
 
 ```gdscript
+@tool
 extends GdeBehavior
 
-@export var fire_rate: float = 0.25     # свойство + действие + условие + выражение
-@export var bullet_scene: PackedScene   # только свойство (в редакторе событий его нечем заполнить)
+@export var fire_rate: float = 0.25     # property + action + condition + expression
+@export var bullet_scene: PackedScene   # property only (nothing to fill it with in the event editor)
 
-## @action Выстрелить из _PARAM0_
+## @action Shoot from _PARAM0_
 func fire() -> void: ...
 
-## @condition _PARAM0_ может стрелять
+## @condition _PARAM0_ can shoot
 func can_fire() -> bool: ...
 
-## @expression Секунд до следующего выстрела
+## @expression Seconds until the next shot
 func cooldown_left() -> float: ...
 ```
 
-`_PARAM0_` — всегда сам объект, `_PARAM1_` и далее — аргументы метода.
-Отредактировал файл → пересобрал → новое действие доступно в листе.
-Имя поведения берётся из имени файла (`shoot.gd` → `Shoot`), либо задаётся
-явно комментарием `## @behavior Имя`.
+`_PARAM0_` is always the object itself, `_PARAM1_` and on are the method's
+arguments. The full rules, a template that passes the check without a single
+remark, and a table of common mistakes are in
+[`docs/AUTHORING.md`](docs/AUTHORING.md) (see "For AI assistants").
+Edited the file → rebuilt → the new action is available in the sheet.
+The behavior's name comes from the file name (`shoot.gd` → `Shoot`), or is
+set explicitly with the comment `## @behavior Name`.
 
-В идентификаторах листа члены поведения адресуются как `Shoot::fire`.
-Автоматические действия для свойств называются `Shoot::set_fire_rate`.
+In sheet ids, behavior members are addressed as `Shoot::fire`. The automatic
+actions for properties are called `Shoot::set_fire_rate`.
 
-### Аннотации поведения
+### Behavior annotations
 
-| Аннотация | Зачем |
+| Annotation | What for |
 | --- | --- |
-| `## @behavior Имя` | идентификатор в листах (латиницей) |
-| `## @title Название` | как поведение называется в интерфейсе |
-| `## @description …` | описание в списке выбора |
-| `## @icon имя` | иконка из `icons/` |
-| `## @target CharacterBody2D` | узел, на котором поведение работает; нет такого в сцене — будет создан |
-| `## @needs CollisionShape2D Форма` | узел, без которого поведение бесполезно; создаётся автоматически |
-| `## @internal` | над `@export` — не делать из свойства действие и условие |
+| `## @behavior Name` | the id in sheets (Latin letters) |
+| `## @title Title` | what the behavior is called in the interface |
+| `## @description …` | the description in the picker |
+| `## @icon name` | an icon from `icons/` |
+| `## @target CharacterBody2D` | the node the behavior works on; created if the scene has none |
+| `## @needs CollisionShape2D Shape` | a node the behavior is useless without; created automatically |
+| `## @internal` | above an `@export` — do not make an action and a condition from the property |
 
-В `@needs` через `|` перечисляются равноценные варианты:
-`## @needs Sprite2D|AnimatedSprite2D Спрайт` значит «нужен хоть какой-то
-спрайт», а создаётся первый из списка.
+In `@needs`, equivalent options are listed with `|`:
+`## @needs Sprite2D|AnimatedSprite2D Sprite` means "some sprite is needed",
+and the first one in the list is created.
 
-### Названия свойств берутся из ##-комментариев
+### Property names come from `##` comments
 
-Обычный комментарий над `@export` — не только подсказка в инспекторе.
-Из него строится название действия и условия: берётся первая мысль
-до точки, запятой или тире.
+A plain comment above an `@export` is not just an inspector hint. The name of
+the action and the condition is built from it: its first thought up to a
+period, a comma or a dash.
 
 ```gdscript
-## Разгон — как быстро набирается скорость.
+## Acceleration — how fast the speed builds up.
 @export var acceleration: float = 1600.0
 ```
 
-даёт «Изменить «Разгон» у Player (Персонаж платформера): = 2000»
-и полное описание в подсказке. Комментария нет — в список попадёт голое
-`acceleration`, а это ровно та строка, которая ничего не объясняет.
-Поэтому пишите первым делом название, потом пояснение.
+gives "Change “Acceleration” of Player (Platformer character): = 2000" and the
+full description in the tooltip. Without the comment the list gets the bare
+`acceleration` — exactly the line that explains nothing. So write the name
+first, then the explanation.
 
-Ищутся поведения в `addons/gdevents/behaviors/` и в `res://behaviors/`.
+Behaviors are looked for in `addons/gdevents/behaviors/` and in
+`res://behaviors/`.
 
-### Пресеты
+### Presets
 
-У Platformer, TopDown и Shoot есть готовые наборы настроек. В инспекторе:
-выберите пресет и поставьте галочку **Apply Preset** — она запишет
-значения в поля ниже и сама снимется. Дальше правьте руками.
+Platformer, TopDown, Shoot and several others have ready-made sets of
+settings. In the behavior window, pick a preset and press "Apply"; in the
+inspector, pick it and tick **Apply Preset** — it writes the values into the
+fields below and unticks itself. Then edit by hand.
 
-Галочка именно кнопка, а не переключатель: иначе пресет перезаписывал бы
-ваши правки при каждой загрузке сцены.
+The checkbox is a button, not a switch: otherwise a preset would overwrite
+your edits every time the scene loads.
 
-### Готовые поведения
+### Ready-made behaviors
 
-| Название | Что даёт |
+| Name | What it gives |
 |---|---|
-| **Platformer** | Койот-тайм, буфер прыжка, переменная высота, ускоренное падение, разворот с ускорением, управление в воздухе, двойной прыжок, скольжение и прыжок от стен, автоанимации. Пресеты: Классический, Ледяной, Луна, Отзывчивый. Нужен `CharacterBody2D` |
-| **Shoot** | Разброс, дробь, очереди, магазин и перезарядка, отдача, звук, наследование скорости стрелка, стрельба по ближайшему объекту. Пресеты: Пистолет, Дробовик, Пулемёт, Очередь |
-| **TopDown** | 4/8/свободное движение, рывок с перезарядкой, плавный поворот, толчок, анимации. Пресеты: Классический, Скользкий, Танк, Резкий |
-| **Health** | Плоская и процентная броня, неуязвимость с миганием, регенерация с задержкой, задержка смерти, сцена на гибель, урон сквозь неуязвимость |
-| **LinearMove** | Разгон, гравитация (дуга вместо прямой), сопротивление, отскок от краёв, угасание перед смертью, наведение на объект |
-| **Follow** | Три режима: гнаться, убегать, держать дистанцию. Зона замечания отдельно от зоны потери — враг не дёргается на границе |
-| **Draggable** | Ограничение осей, сетка, плавное следование, границы экрана, подъём поверх остальных, возврат на место |
-| **Oscillate** | Три формы волны, сдвиг фазы (волна из нескольких объектов), колебание положения, поворота и размера |
-| **Rotate** | Разгон, качание туда-сюда, прилипание к шагу, доворот до заданного угла |
-| **DestroyOutside** | Три режима: удалить, зациклить как в «Астероидах», не выпускать. Края настраиваются по отдельности |
-| **Path** | Движение по точкам: кольцом, туда-обратно, один раз. Ожидание на точках, разгон, поворот и отражение по направлению, переход к любой точке. Пресеты: Патруль, Лифт, Квадрат, Туда и обратно |
-| **Damage** | Урон тому, кого коснулся: перезарядка по каждой жертве, отброс, пробитие нескольких целей, самоуничтожение, урон сквозь неуязвимость. Пресеты: Шипы, Пуля, Пробивающий снаряд, Яд |
-| **Pickup** | Монеты, кристаллы, аптечки, патроны: покачивание, магнит к сборщику, прибавка к переменной, лечение или патроны — без единого события. Пресеты: Монета, Кристалл, Аптечка, Патроны |
-| **Spawner** | Точка появления: интервал с разбросом, пачки, предел всего и предел живых, случайное место в круге. Пресеты: Волна врагов, Дождь монет, Босс, Фонтан |
+| **Platformer** | Coyote time, jump buffer, variable height, faster falling, turning with acceleration, air control, double jump, wall slide and wall jump, automatic animations. Presets: Classic, Icy, Moon, Responsive. Needs a `CharacterBody2D` |
+| **Shoot** | Spread, shotgun pellets, bursts, magazine and reload, recoil, sound, inheriting the shooter's velocity, shooting at the nearest object. Presets: Pistol, Shotgun, Machine gun, Burst |
+| **TopDown** | 4/8/free movement, dash with cooldown, smooth turning, pushing, animations. Presets: Classic, Slippery, Tank, Snappy |
+| **Health** | Flat and percentage armor, invulnerability with blinking, regeneration with a delay, death delay, a scene on death, damage through invulnerability |
+| **LinearMove** | Acceleration, gravity (an arc instead of a line), drag, bouncing off edges, fading before death, homing on an object |
+| **Follow** | Three modes: chase, flee, keep distance. The noticing zone is separate from the losing zone — an enemy does not twitch at the border |
+| **Draggable** | Axis lock, grid, smooth following, screen bounds, raising above the rest, returning to place |
+| **Oscillate** | Three wave shapes, phase shift (a wave of several objects), oscillating position, rotation and size |
+| **Rotate** | Acceleration, swinging back and forth, snapping to a step, turning to a given angle |
+| **DestroyOutside** | Three modes: delete, wrap around as in "Asteroids", keep in. Edges are set separately |
+| **Path** | Movement by points: loop, back and forth, once. Waiting at points, acceleration, turning and flipping by direction, going to any point. Presets: Patrol, Elevator, Square, There and back |
+| **Damage** | Damage to whoever it touches: a cooldown per victim, knockback, piercing several targets, self-destruction, damage through invulnerability. Presets: Spikes, Bullet, Piercing projectile, Poison |
+| **Pickup** | Coins, crystals, medkits, ammo: bobbing, a magnet to the collector, adding to a variable, healing or ammo — without a single event. Presets: Coin, Crystal, Medkit, Ammo |
+| **Spawner** | A spawn point: an interval with randomness, batches, a total limit and a limit of living ones, a random place in a circle. Presets: Enemy wave, Coin rain, Boss, Fountain |
 
-У каждого поведения есть сигналы (`jumped`, `landed`, `died`, `fired`…) —
-их можно подключать из обычного GDScript, мимо листа событий.
+Every behavior has signals (`jumped`, `landed`, `died`, `fired`…) — they can
+be connected from ordinary GDScript, bypassing the event sheet.
 
-## Чего пока нет
+## Your own events: extensions
 
-- Поиска по листу.
-- Редактирования переменных сцены из редактора (пока правятся в JSON).
-- Листов на сигналах и на `_physics_process` — пока только покадровый.
-- Поведений, собранных из событий (event-based behaviors из GDevelop).
-- Переименование метода поведения ломает листы, которые на него ссылались:
-  сборка сообщит «неизвестное действие», но чинить придётся руками.
+A behavior is an ability of an object: running, shooting, taking damage. For
+everything else — your own conditions, actions and expressions not tied to a
+behavior — there are **extensions**, as in GDevelop. An extension is one file
+`res://extensions/<name>/<name>.gd` with static functions and the same
+annotations as behaviors:
 
-## Известные компромиссы
+```gdscript
+## @extension Clock
+## @title Часы
+## @title.en Clock
+## @icon timer
+extends GdeExtension
 
-- На каждое событие создаётся контекст выборки — лишняя аллокация на кадр.
-  Заметно это станет на сотнях событий; тогда имеет смысл пропускать
-  контекст для событий, не трогающих объекты.
-- Условия компилируются в лямбды: читаемо, но лямбда в GDScript аллоцируется.
-- Столкновения точны для `Area2D`; для остального — по AABB, взятому из
-  `CollisionShape2D` или спрайта.
+## @condition Сейчас от _PARAM0_ до _PARAM1_ часов
+## @condition.en It is between _PARAM0_ and _PARAM1_ o'clock
+## @param from С какого часа
+## @param.en from From hour
+static func is_hour_between(from: float, to: float) -> bool: ...
+
+## @expression Текущий час, 0…23
+## @expression.en Current hour, 0…23
+static func hour() -> float: ...        # in a sheet: Clock::Hour()
+```
+
+- Conditions and actions appear in the picker in the "Common" section, in a
+  group named after the extension; expressions are written as `Clock::Hour()`.
+- Parameters are `float`, `int`, `bool`, `String`; values from the sheet are
+  converted to the right type automatically.
+- A first parameter of type `Node` (`Node2D`, `CharacterBody2D`…) makes the
+  condition or action an **object** one: it works with the picked instances,
+  like "Change X of ‹Object›", and the function receives the instance itself.
+- State between calls lives in `static var`; the runtime is reached through
+  `Gde`.
+- `library_test` checks every instruction of every extension by itself.
+
+The example shipped with the plugin is
+`addons/gdevents/extensions/clock/clock.gd`: system time, the day of the week
+and a clock hand.
+
+## Checking your files
+
+One command checks your behavior, extension or sheet the way the plugin will
+use it:
+
+```bash
+godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn -- res://behaviors/enemy_shoot/enemy_shoot.gd
+godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn -- res://events/level.gdes.json
+godot --headless --quit-after 5000 res://addons/gdevents/tools/check.tscn          # everything of yours at once
+```
+
+- The script compiles — errors come with line numbers.
+- The plugin sees the file, and the name from `@behavior` / `@extension`
+  matches the file name.
+- Every condition, action and expression is built into a real sheet and run on
+  a live object.
+- Warnings: a parameter without `@param`, a setting without a description,
+  text without a translation, `class_name`, `_ready()` without `super()`.
+- For a sheet: its structure (the key `events` instead of `children` used to
+  vanish silently), the object scenes and every instruction and expression,
+  with where the error is: "event 2 › 1, action 3".
+
+`✗` is an error (exit code 1), `!` works but is worth fixing. The report is in
+the plugin language; `-- --lang=en` or `--lang=ru` at the end sets it
+explicitly.
+
+The full list of instructions with exact ids and parameter kinds — for those
+who write sheets as text:
+
+```bash
+godot --headless --script res://addons/gdevents/tools/library_list.gd
+godot --headless --script res://addons/gdevents/tools/library_list.gd -- Shoot
+```
+
+## For AI assistants
+
+Behaviors and events can be given to any AI model. So that it writes them
+correctly the first time, the project provides:
+
+- [`docs/AUTHORING.md`](docs/AUTHORING.md) — the full guide: where files go,
+  annotations, behavior and extension templates, the sheet format,
+  expressions, the `Gde` runtime, common mistakes, verification and the
+  definition of done;
+- `AGENTS.md` at the repository root — the entry point that Codex, Cursor,
+  Copilot and others read by themselves; `CLAUDE.md` — the same for Claude
+  Code;
+- the `.claude/skills/gdevents` skill — Claude Code loads it by itself when
+  the task is about behaviors, extensions or sheets;
+- in Claude Code cloud sessions the `.claude/hooks/session-start.sh` hook
+  installs Godot 4.7.1, so the check works right away.
+
+If a model does not see these files, it is enough to tell it: "read
+addons/gdevents/docs/AUTHORING.md and verify the result with the command from
+it".
+
+## Languages
+
+The plugin works in English and Russian. The language is asked on the first
+start (English by default) and can then be changed at the end of the toolbar
+or in "Editor Settings → GDevents"; every person has their own. The interface
+and the built-in library are translated with the dictionary
+`i18n/<language>.json`, whose keys are the Russian texts from the code.
+Behaviors and extensions are translated right in their own file: `@title.en`,
+`@action.en`, `## @en …` under a setting description, `@options.en` for list
+items, `@group.en` above `@export_group`, `@param.en` for parameter labels.
+The main text may be in either language, the translation next to it.
+`i18n_test` makes sure everything in the plugin is translated. An exported
+game uses the player's system language.
+
+## Not there yet
+
+- Search in a sheet.
+- Editing scene variables in the editor (for now they are edited in JSON).
+- Sheets driven by signals or `_physics_process` — only per-frame for now.
+- Behaviors made of events (event-based behaviors from GDevelop).
+- Renaming a behavior method breaks the sheets that referred to it: the build
+  reports "unknown action", but fixing is manual.
+
+## Known trade-offs
+
+- Every event creates a picking context — an extra allocation per frame. It
+  will become noticeable with hundreds of events; then it makes sense to skip
+  the context for events that do not touch objects.
+- Conditions compile to lambdas: readable, but a lambda in GDScript
+  allocates.
+- Collisions are exact for `Area2D`; for everything else they use the AABB
+  taken from a `CollisionShape2D` or the sprite.

@@ -8,6 +8,9 @@ extends VBoxContainer
 
 const DEFAULT_ACCENT := Color(1, 0.78, 0.42)
 
+## Выбран другой язык — плагин перестроит панель на нём.
+signal language_changed(code: String)
+
 var doc: GdeSheetDocument
 var registry: GdeRegistry
 var accent: Color = DEFAULT_ACCENT
@@ -20,6 +23,7 @@ var _sheets: OptionButton
 var _rows: VBoxContainer
 var _scroll: ScrollContainer
 var _status: RichTextLabel
+var _lang: OptionButton
 var _save_btn: Button
 var _undo_btn: Button
 var _redo_btn: Button
@@ -115,32 +119,32 @@ func _build_ui() -> void:
 
 	_sheets = OptionButton.new()
 	_sheets.custom_minimum_size = Vector2(250, 0)
-	_sheets.tooltip_text = "Лист событий"
+	_sheets.tooltip_text = GdeI18n.t("Лист событий")
 	_sheets.item_selected.connect(_on_sheet_selected)
 	bar.add_child(_sheets)
 
-	bar.add_child(_icon_button("refresh", "Перечитать поведения и список листов", _reload))
-	bar.add_child(_icon_button("newfile", "Создать новый лист", func():
+	bar.add_child(_icon_button("refresh", GdeI18n.t("Перечитать поведения и список листов"), _reload))
+	bar.add_child(_icon_button("newfile", GdeI18n.t("Создать новый лист"), func():
 		GdeUi.popup_fit(_new_file, Vector2i(900, 620))))
 
 	bar.add_child(_sep())
 
 	var add_menu := MenuButton.new()
-	add_menu.text = "  Добавить событие"
+	add_menu.text = GdeI18n.t("  Добавить событие")
 	add_menu.icon = GdeIcons.get_icon("plus")
 	var am := add_menu.get_popup()
-	am.add_icon_item(GdeIcons.get_icon("action"), "Обычное событие", 0)
-	am.add_icon_item(GdeIcons.get_icon("comment"), "Комментарий", 1)
-	am.add_icon_item(GdeIcons.get_icon("foreach"), "Для каждого объекта", 2)
-	am.add_icon_item(GdeIcons.get_icon("repeat"), "Повторить N раз", 3)
-	am.add_icon_item(GdeIcons.get_icon("refresh"), "Пока выполняется", 4)
-	am.add_icon_item(GdeIcons.get_icon("group"), "Группа", 5)
+	am.add_icon_item(GdeIcons.get_icon("action"), GdeI18n.t("Обычное событие"), 0)
+	am.add_icon_item(GdeIcons.get_icon("comment"), GdeI18n.t("Комментарий"), 1)
+	am.add_icon_item(GdeIcons.get_icon("foreach"), GdeI18n.t("Для каждого объекта"), 2)
+	am.add_icon_item(GdeIcons.get_icon("repeat"), GdeI18n.t("Повторить N раз"), 3)
+	am.add_icon_item(GdeIcons.get_icon("refresh"), GdeI18n.t("Пока выполняется"), 4)
+	am.add_icon_item(GdeIcons.get_icon("group"), GdeI18n.t("Группа"), 5)
 	am.id_pressed.connect(_on_add_root_event)
 	bar.add_child(add_menu)
 
-	bar.add_child(_icon_button("object", "Объекты листа и их поведения", func():
+	bar.add_child(_icon_button("object", GdeI18n.t("Объекты листа и их поведения"), func():
 		if doc != null:
-			_objects.open_for(doc, registry), "Объекты"))
+			_objects.open_for(doc, registry), GdeI18n.t("Объекты")))
 
 	# Проблемы в сценах объектов: тело без формы, пустой спрайт, анимация
 	# с опечаткой. Godot о них молчит, поэтому кнопка видна всегда, пока
@@ -153,22 +157,22 @@ func _build_ui() -> void:
 
 	bar.add_child(_sep())
 
-	_undo_btn = _icon_button("undo", "Отменить", func():
+	_undo_btn = _icon_button("undo", GdeI18n.t("Отменить"), func():
 		if doc != null:
 			doc.undo())
 	bar.add_child(_undo_btn)
-	_redo_btn = _icon_button("redo", "Повторить", func():
+	_redo_btn = _icon_button("redo", GdeI18n.t("Повторить"), func():
 		if doc != null:
 			doc.redo())
 	bar.add_child(_redo_btn)
 
 	_save_btn = _icon_button("save",
-			"Сохранить лист (Ctrl+S). Лист и так сохраняется сам через секунду после правки",
-			save_sheet, "Сохранить")
+			GdeI18n.t("Сохранить лист (Ctrl+S). Лист и так сохраняется сам через секунду после правки"),
+			save_sheet, GdeI18n.t("Сохранить"))
 	bar.add_child(_save_btn)
 	bar.add_child(_icon_button("build",
-			"Собрать GDScript сейчас (Ctrl+B). Перед запуском игры сборка идёт сама",
-			save_and_build, "Собрать"))
+			GdeI18n.t("Собрать GDScript сейчас (Ctrl+B). Перед запуском игры сборка идёт сама"),
+			save_and_build, GdeI18n.t("Собрать")))
 
 	# Статус занимает остаток строки. Жёсткий минимум в 440 px убран: длинное
 	# сообщение переносится внутри, а не толкает панель за край окна.
@@ -184,6 +188,19 @@ func _build_ui() -> void:
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(_status)
+
+	# Язык плагина — на виду, в конце панели инструментов. Смену выполняет
+	# плагин: всё, что построено на старом языке, строится заново.
+	_lang = OptionButton.new()
+	for i in range(GdeI18n.LANGUAGES.size()):
+		_lang.add_item(str(GdeI18n.NAMES[GdeI18n.LANGUAGES[i]]), i)
+	_lang.select(maxi(0, GdeI18n.LANGUAGES.find(GdeI18n.language())))
+	_lang.tooltip_text = "Language / Язык"  # i18n: как есть
+	_lang.item_selected.connect(func(i: int) -> void:
+		var code: String = GdeI18n.LANGUAGES[i]
+		if code != GdeI18n.language():
+			language_changed.emit(code))
+	bar.add_child(_lang)
 	# Кнопки не тянутся по высоте строки, даже если соседу понадобилось больше.
 	for c: Node in bar.get_children():
 		(c as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -212,7 +229,7 @@ func _build_ui() -> void:
 	warn_row.add_child(_warn_label)
 
 	var bind_btn := Button.new()
-	bind_btn.text = "  Привязать к сцене…"
+	bind_btn.text = GdeI18n.t("  Привязать к сцене…")
 	bind_btn.icon = GdeIcons.get_icon("scene")
 	bind_btn.pressed.connect(func(): GdeUi.popup_fit(_bind_file, Vector2i(900, 620)))
 	warn_row.add_child(bind_btn)
@@ -227,8 +244,8 @@ func _build_ui() -> void:
 	hm.add_theme_constant_override("margin_bottom", 2)
 	hm.add_child(head)
 	add_child(hm)
-	head.add_child(_column_caption("УСЛОВИЯ", 0.45))
-	head.add_child(_column_caption("ДЕЙСТВИЯ", 0.55))
+	head.add_child(_column_caption(GdeI18n.t("УСЛОВИЯ"), 0.45))
+	head.add_child(_column_caption(GdeI18n.t("ДЕЙСТВИЯ"), 0.55))
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -268,19 +285,19 @@ func _build_ui() -> void:
 	add_child(_objects)
 
 	_new_file = FileDialog.new()
-	_new_file.title = "Новый лист событий"
+	_new_file.title = GdeI18n.t("Новый лист событий")
 	_new_file.file_mode = FileDialog.FILE_MODE_SAVE_FILE
 	_new_file.access = FileDialog.ACCESS_RESOURCES
-	_new_file.filters = PackedStringArray(["*.gdes.json ; Листы событий"])
+	_new_file.filters = PackedStringArray([GdeI18n.t("*.gdes.json ; Листы событий")])
 	_new_file.current_file = "events.gdes.json"
 	_new_file.file_selected.connect(_create_sheet)
 	add_child(_new_file)
 
 	_bind_file = FileDialog.new()
-	_bind_file.title = "К какой сцене привязать лист"
+	_bind_file.title = GdeI18n.t("К какой сцене привязать лист")
 	_bind_file.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	_bind_file.access = FileDialog.ACCESS_RESOURCES
-	_bind_file.filters = PackedStringArray(["*.tscn ; Сцены"])
+	_bind_file.filters = PackedStringArray([GdeI18n.t("*.tscn ; Сцены")])
 	_bind_file.file_selected.connect(_attach_to_scene)
 	add_child(_bind_file)
 
@@ -335,9 +352,9 @@ func refresh_sheet_list() -> void:
 	_sheet_paths = GdeBuild.find_sheets("res://")
 	_sheets.clear()
 	if _sheet_paths.is_empty():
-		_sheets.add_item("— листов нет —", 0)
+		_sheets.add_item(GdeI18n.t("— листов нет —"), 0)
 		_sheets.disabled = true
-		_set_status("Нет ни одного листа. Нажмите иконку «Создать новый лист».", true)
+		_set_status(GdeI18n.t("Нет ни одного листа. Нажмите иконку «Создать новый лист»."), true)
 		return
 	_sheets.disabled = false
 	var select := 0
@@ -378,7 +395,7 @@ func _reload() -> void:
 	if doc != null and doc.is_dirty():
 		refresh_sheet_list()
 		_rebuild()
-		_set_status("Поведения обновлены. Лист не перечитан — есть несохранённые правки.", false)
+		_set_status(GdeI18n.t("Поведения обновлены. Лист не перечитан — есть несохранённые правки."), false)
 		return
 	var keep := doc.path if doc != null else ""
 	doc = null
@@ -397,7 +414,7 @@ func open_sheet(p: String) -> void:
 	doc.changed.connect(_rebuild)
 	_rebuild()
 	check_objects()
-	_set_status("Открыт %s" % p.get_file(), false)
+	_set_status(GdeI18n.t("Открыт %s") % p.get_file(), false)
 	_check_binding()
 
 
@@ -427,12 +444,12 @@ func check_objects() -> void:
 			warns += w
 	_problems_btn.visible = errs + warns > 0
 	if errs > 0:
-		_problems_btn.text = "  Ошибок в объектах: %d" % errs
+		_problems_btn.text = GdeI18n.t("  Ошибок в объектах: %d") % errs
 		_problems_btn.modulate = Color(1, 0.6, 0.6)
 	else:
-		_problems_btn.text = "  Поправить в объектах: %d" % warns
+		_problems_btn.text = GdeI18n.t("  Поправить в объектах: %d") % warns
 		_problems_btn.modulate = Color(1, 0.85, 0.55)
-	_problems_btn.tooltip_text = "В сценах объектов есть то, из-за чего игра поведёт себя не так, как задумано. Нажмите — откроется объект с находками и кнопками исправления."
+	_problems_btn.tooltip_text = GdeI18n.t("В сценах объектов есть то, из-за чего игра поведёт себя не так, как задумано. Нажмите — откроется объект с находками и кнопками исправления.")
 
 
 func _check_binding() -> void:
@@ -443,12 +460,12 @@ func _check_binding() -> void:
 		_warn_bar.visible = false
 		return
 	if not ResourceLoader.exists(sp):
-		_warn_label.text = "Лист ещё не собран. Нажмите «Собрать», а потом привяжите к сцене."
+		_warn_label.text = GdeI18n.t("Лист ещё не собран. Нажмите «Собрать», а потом привяжите к сцене.")
 		_warn_bar.visible = true
 		return
 	var scenes := GdeSheetBinder.users(sp)
 	if scenes.is_empty():
-		_warn_label.text = "Этот лист ни к одной сцене не привязан — в игре он не работает."
+		_warn_label.text = GdeI18n.t("Этот лист ни к одной сцене не привязан — в игре он не работает.")
 		_warn_bar.visible = true
 	else:
 		_warn_bar.visible = false
@@ -461,7 +478,7 @@ func _attach_to_scene(scene_path: String) -> void:
 	if not err.is_empty():
 		_set_status(err, true)
 		return
-	_set_status("Лист привязан к %s — теперь события будут исполняться" % scene_path.get_file(), false)
+	_set_status(GdeI18n.t("Лист привязан к %s — теперь события будут исполняться") % scene_path.get_file(), false)
 	var ei := _editor_singleton()
 	if ei != null:
 		var fs: Object = ei.call("get_resource_filesystem")
@@ -476,7 +493,7 @@ func _create_sheet(p: String) -> void:
 	if not p.ends_with(GdeBuild.SHEET_SUFFIX):
 		p = p.trim_suffix(".json").trim_suffix(".gdes") + GdeBuild.SHEET_SUFFIX
 	if FileAccess.file_exists(p):
-		_set_status("Файл %s уже есть — выберите другое имя" % p.get_file(), true)
+		_set_status(GdeI18n.t("Файл %s уже есть — выберите другое имя") % p.get_file(), true)
 		return
 	var d := GdeSheetDocument.create_empty(p.get_file().trim_suffix(GdeBuild.SHEET_SUFFIX))
 	d.path = p
@@ -491,7 +508,7 @@ func _create_sheet(p: String) -> void:
 			_sheets.selected = i
 			open_sheet(p)
 			break
-	_set_status("Создан %s — добавьте объекты кнопкой «Объекты»" % p.get_file(), false)
+	_set_status(GdeI18n.t("Создан %s — добавьте объекты кнопкой «Объекты»") % p.get_file(), false)
 
 
 func save_sheet() -> void:
@@ -499,7 +516,7 @@ func save_sheet() -> void:
 		return
 	var err := doc.save()
 	if err.is_empty():
-		_set_status("Сохранён %s" % doc.path.get_file(), false)
+		_set_status(GdeI18n.t("Сохранён %s") % doc.path.get_file(), false)
 		_refresh_buttons()
 	else:
 		_set_status(err, true)
@@ -517,9 +534,9 @@ func save_and_build() -> void:
 	for line: String in report["log"]:
 		print(line)
 	if report["failed"] > 0:
-		_set_status("Сборка не удалась — подробности в консоли (%d лист.)" % report["failed"], true)
+		_set_status(GdeI18n.t("Сборка не удалась — подробности в консоли (%d лист.)") % report["failed"], true)
 	else:
-		_set_status("Собрано листов: %d" % report["ok"], false)
+		_set_status(GdeI18n.t("Собрано листов: %d") % report["ok"], false)
 	_check_binding()
 	var ei := _editor_singleton()
 	if ei != null:
@@ -572,7 +589,7 @@ func _live_check() -> void:
 		(_live_errors[key] as Array).append(item)
 		_live_error_count += 1
 	if _live_error_count > 0:
-		_set_status("Ошибок в листе: %d — строки подсвечены красным, наведите для подробностей"
+		_set_status(GdeI18n.t("Ошибок в листе: %d — строки подсвечены красным, наведите для подробностей")
 				% _live_error_count, true)
 
 
@@ -601,16 +618,16 @@ func _empty_state() -> Control:
 	m.add_child(box)
 
 	var t := Label.new()
-	t.text = "Лист пуст"
+	t.text = GdeI18n.t("Лист пуст")
 	t.add_theme_font_size_override("font_size", 18)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(t)
 
 	var s := Label.new()
-	s.text = "1. «Объекты» — добавьте сцены, из которых состоит игра.\n" \
-			+ "2. «Добавить событие» — создайте первое событие.\n" \
-			+ "3. «+ Условие» и «+ Действие» внутри события.\n" \
-			+ "4. «Собрать» — и запускайте сцену."
+	s.text = GdeI18n.t("1. «Объекты» — добавьте сцены, из которых состоит игра.\n") \
+			+ GdeI18n.t("2. «Добавить событие» — создайте первое событие.\n") \
+			+ GdeI18n.t("3. «+ Условие» и «+ Действие» внутри события.\n") \
+			+ GdeI18n.t("4. «Собрать» — и запускайте сцену.")
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	s.modulate = Color(1, 1, 1, 0.5)
 	box.add_child(s)
@@ -622,7 +639,7 @@ func _refresh_buttons() -> void:
 		return
 	_undo_btn.disabled = not doc.can_undo()
 	_redo_btn.disabled = not doc.can_redo()
-	_save_btn.text = "  Сохранить *" if doc.is_dirty() else "  Сохранить"
+	_save_btn.text = GdeI18n.t("  Сохранить *") if doc.is_dirty() else GdeI18n.t("  Сохранить")
 
 
 func _set_status(text: String, is_error: bool) -> void:
@@ -642,7 +659,7 @@ func save_if_dirty() -> void:
 		return
 	var err := doc.save()
 	if err.is_empty():
-		_set_status("Сохранено", false)
+		_set_status(GdeI18n.t("Сохранено"), false)
 		_refresh_buttons()
 	else:
 		_set_status(err, true)
@@ -654,7 +671,7 @@ func _autosave_now() -> void:
 
 
 func report_build_failure(report: Dictionary) -> void:
-	_set_status("Сборка не удалась (%d лист.) — подробности в консоли" % report["failed"], true)
+	_set_status(GdeI18n.t("Сборка не удалась (%d лист.) — подробности в консоли") % report["failed"], true)
 
 
 # -------------------------------------------------- вызовы из строк ---
@@ -712,7 +729,7 @@ func edit_instruction(p: Array, kind: String, index: int) -> void:
 		return
 	var inst: Dictionary = list[index]
 	if instruction_def(kind, str(inst.get("id", ""))) == null:
-		_set_status("Инструкция «%s» больше не существует" % str(inst.get("id", "")), true)
+		_set_status(GdeI18n.t("Инструкция «%s» больше не существует") % str(inst.get("id", "")), true)
 		return
 	_editing = [p, kind, index]
 	_picker.open_edit(registry, doc, kind, inst, accent)
@@ -804,7 +821,7 @@ func is_instruction_selected(p: Array, kind: String, index: int) -> bool:
 func event_summary(p: Array) -> String:
 	var e: Variant = doc.event_at(p) if doc != null else null
 	if e == null:
-		return "Событие"
+		return GdeI18n.t("Событие")
 	var d: Dictionary = e
 	var title := GdeText.event_title(d)
 	if not title.is_empty():
@@ -816,7 +833,7 @@ func event_summary(p: Array) -> String:
 		var def: Variant = instruction_def("conditions", str(first.get("id", "")))
 		if def != null:
 			return GdeText.with_labels(def as Dictionary)
-	return "Событие: условий %d, действий %d" % [conds.size(), acts.size()]
+	return GdeI18n.t("Событие: условий %d, действий %d") % [conds.size(), acts.size()]
 
 
 # --------------------------------------------------------- правки из строк ---
@@ -914,7 +931,7 @@ func _drop_data(_at: Vector2, data: Variant) -> void:
 	if added.is_empty():
 		return
 	save_sheet()
-	_set_status("Добавлено в лист: %s" % ", ".join(added), false)
+	_set_status(GdeI18n.t("Добавлено в лист: %s") % ", ".join(added), false)
 
 
 # --------------------------------------------------------- буфер обмена ---
@@ -925,8 +942,8 @@ func copy_instruction(p: Array, kind: String, index: int) -> void:
 		return
 	_clip_instruction = (list[index] as Dictionary).duplicate(true)
 	_clip_inst_kind = kind
-	_set_status("Скопировано — «Вставить» появится у «+ %s»"
-			% ("Условие" if kind == "conditions" else "Действие"), false)
+	_set_status(GdeI18n.t("Скопировано — «Вставить» появится у «+ %s»")
+			% (GdeI18n.t("Условие") if kind == "conditions" else GdeI18n.t("Действие")), false)
 
 
 ## Что лежит в буфере: "conditions", "actions" или "" — для кнопки «Вставить».
@@ -948,7 +965,7 @@ func clipboard_text() -> String:
 		var v := str(params[i]) if i < params.size() else ""
 		s = s.replace("_PARAM%d_" % i, v if not v.is_empty() else "‹%s›" % str((defs[i] as Dictionary).get("label", "…")))
 	if _clip_instruction.get("inverted", false):
-		s = "НЕ " + s
+		s = GdeI18n.t("НЕ ") + s
 	return s
 
 
@@ -960,7 +977,7 @@ func paste_instruction_into(p: Array, kind: String) -> void:
 	doc.insert_instruction(p, kind, 9999, _clip_instruction.duplicate(true))
 	var idx := doc.instructions_of(p, kind).size() - 1
 	select_instruction(p, kind, idx)
-	_set_status("Вставлено", false)
+	_set_status(GdeI18n.t("Вставлено"), false)
 
 
 func cut_instruction(p: Array, kind: String, index: int) -> void:
@@ -973,7 +990,7 @@ func copy_event(p: Array) -> void:
 	if e == null:
 		return
 	_clip_event = (e as Dictionary).duplicate(true)
-	_set_status("Событие скопировано. Ctrl+V вставит его после выделенного", false)
+	_set_status(GdeI18n.t("Событие скопировано. Ctrl+V вставит его после выделенного"), false)
 
 
 func paste() -> void:
@@ -987,7 +1004,7 @@ func paste() -> void:
 		if _sel_what == "instruction" and _sel_kind == kind:
 			at = _sel_index + 1
 		doc.insert_instruction(target, kind, at, _clip_instruction.duplicate(true))
-		_set_status("Вставлено", false)
+		_set_status(GdeI18n.t("Вставлено"), false)
 		return
 	if not _clip_event.is_empty():
 		var parent: Array = []
@@ -996,9 +1013,9 @@ func paste() -> void:
 			parent = _sel_path.slice(0, _sel_path.size() - 1)
 			idx = int(_sel_path[_sel_path.size() - 1]) + 1
 		doc.insert_event(parent, idx, _clip_event.duplicate(true))
-		_set_status("Событие вставлено", false)
+		_set_status(GdeI18n.t("Событие вставлено"), false)
 		return
-	_set_status("Буфер пуст — сначала Ctrl+C", true)
+	_set_status(GdeI18n.t("Буфер пуст — сначала Ctrl+C"), true)
 
 
 # ------------------------------------------------------------ горячие клавиши ---
@@ -1113,7 +1130,7 @@ func _delete_selection() -> void:
 	match _sel_what:
 		"instruction": remove_instruction(_sel_path, _sel_kind, _sel_index)
 		"event": remove_event(_sel_path)
-		_: _set_status("Сначала выберите условие, действие или событие", true)
+		_: _set_status(GdeI18n.t("Сначала выберите условие, действие или событие"), true)
 
 
 # ------------------------------------------------------------------- меню ---
@@ -1123,21 +1140,21 @@ func instruction_menu(p: Array, kind: String, index: int, at: Vector2) -> void:
 	_menu_kind = kind
 	_menu_index = index
 	_inst_menu.clear()
-	_inst_menu.add_icon_item(GdeIcons.get_icon("edit"), "Редактировать…", 0)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("edit"), GdeI18n.t("Редактировать…"), 0)
 	if kind == "conditions":
-		_inst_menu.add_icon_item(GdeIcons.get_icon("invert"), "Инвертировать (НЕ)", 1)
+		_inst_menu.add_icon_item(GdeIcons.get_icon("invert"), GdeI18n.t("Инвертировать (НЕ)"), 1)
 	var off: bool = (doc.instructions_of(p, kind)[index] as Dictionary).get("disabled", false) \
 			if index < doc.instructions_of(p, kind).size() else false
-	_inst_menu.add_icon_item(GdeIcons.get_icon("disabled"), "Включить" if off else "Выключить", 8)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("disabled"), GdeI18n.t("Включить") if off else GdeI18n.t("Выключить"), 8)
 	_inst_menu.add_separator()
-	_inst_menu.add_icon_item(GdeIcons.get_icon("up"), "Выше	Alt+↑", 2)
-	_inst_menu.add_icon_item(GdeIcons.get_icon("down"), "Ниже	Alt+↓", 3)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("up"), GdeI18n.t("Выше	Alt+↑"), 2)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("down"), GdeI18n.t("Ниже	Alt+↓"), 3)
 	_inst_menu.add_separator()
-	_inst_menu.add_icon_item(GdeIcons.get_icon("copy"), "Копировать	Ctrl+C", 5)
-	_inst_menu.add_icon_item(GdeIcons.get_icon("copy"), "Вырезать	Ctrl+X", 6)
-	_inst_menu.add_icon_item(GdeIcons.get_icon("plus"), "Вставить	Ctrl+V", 7)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("copy"), GdeI18n.t("Копировать	Ctrl+C"), 5)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("copy"), GdeI18n.t("Вырезать	Ctrl+X"), 6)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("plus"), GdeI18n.t("Вставить	Ctrl+V"), 7)
 	_inst_menu.add_separator()
-	_inst_menu.add_icon_item(GdeIcons.get_icon("trash"), "Удалить	Delete", 4)
+	_inst_menu.add_icon_item(GdeIcons.get_icon("trash"), GdeI18n.t("Удалить	Delete"), 4)
 	_inst_menu.position = Vector2i(at)
 	_inst_menu.reset_size()
 	_inst_menu.popup()
@@ -1161,21 +1178,21 @@ func event_menu(p: Array, at: Vector2) -> void:
 	var e: Variant = doc.event_at(p)
 	var disabled: bool = (e as Dictionary).get("disabled", false) if e != null else false
 	_event_menu.clear()
-	_event_menu.add_icon_item(GdeIcons.get_icon("plus"), "Событие после", 0)
-	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), "Подсобытие", 1)
-	_event_menu.add_icon_item(GdeIcons.get_icon("comment"), "Комментарий после", 2)
+	_event_menu.add_icon_item(GdeIcons.get_icon("plus"), GdeI18n.t("Событие после"), 0)
+	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Подсобытие"), 1)
+	_event_menu.add_icon_item(GdeIcons.get_icon("comment"), GdeI18n.t("Комментарий после"), 2)
 	_event_menu.add_separator()
-	_event_menu.add_icon_item(GdeIcons.get_icon("up"), "Выше	Alt+↑", 3)
-	_event_menu.add_icon_item(GdeIcons.get_icon("down"), "Ниже	Alt+↓", 4)
-	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), "Вложить в предыдущее", 5)
-	_event_menu.add_icon_item(GdeIcons.get_icon("outdent"), "На уровень выше", 6)
+	_event_menu.add_icon_item(GdeIcons.get_icon("up"), GdeI18n.t("Выше	Alt+↑"), 3)
+	_event_menu.add_icon_item(GdeIcons.get_icon("down"), GdeI18n.t("Ниже	Alt+↓"), 4)
+	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Вложить в предыдущее"), 5)
+	_event_menu.add_icon_item(GdeIcons.get_icon("outdent"), GdeI18n.t("На уровень выше"), 6)
 	_event_menu.add_separator()
-	_event_menu.add_icon_item(GdeIcons.get_icon("copy"), "Дублировать	Ctrl+D", 7)
-	_event_menu.add_icon_item(GdeIcons.get_icon("copy"), "Копировать	Ctrl+C", 10)
-	_event_menu.add_icon_item(GdeIcons.get_icon("plus"), "Вставить	Ctrl+V", 11)
+	_event_menu.add_icon_item(GdeIcons.get_icon("copy"), GdeI18n.t("Дублировать	Ctrl+D"), 7)
+	_event_menu.add_icon_item(GdeIcons.get_icon("copy"), GdeI18n.t("Копировать	Ctrl+C"), 10)
+	_event_menu.add_icon_item(GdeIcons.get_icon("plus"), GdeI18n.t("Вставить	Ctrl+V"), 11)
 	_event_menu.add_icon_item(GdeIcons.get_icon("disabled"),
-			"Включить" if disabled else "Выключить", 8)
-	_event_menu.add_icon_item(GdeIcons.get_icon("trash"), "Удалить	Delete", 9)
+			GdeI18n.t("Включить") if disabled else GdeI18n.t("Выключить"), 8)
+	_event_menu.add_icon_item(GdeIcons.get_icon("trash"), GdeI18n.t("Удалить	Delete"), 9)
 	_event_menu.position = Vector2i(at)
 	_event_menu.reset_size()
 	_event_menu.popup()
@@ -1197,12 +1214,12 @@ func _on_event_menu(id: int) -> void:
 			if idx > 0:
 				doc.move_event(p, parent + [idx - 1], 9999)
 			else:
-				_set_status("Некуда вложить: событие первое в списке", true)
+				_set_status(GdeI18n.t("Некуда вложить: событие первое в списке"), true)
 		6:
 			if p.size() > 1:
 				doc.move_event(p, p.slice(0, p.size() - 2), p[p.size() - 2] + 1)
 			else:
-				_set_status("Событие уже на верхнем уровне", true)
+				_set_status(GdeI18n.t("Событие уже на верхнем уровне"), true)
 		7: duplicate_event(p)
 		8: toggle_event_disabled(p)
 		9: remove_event(p)

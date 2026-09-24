@@ -37,7 +37,7 @@ static func compile(src: String, ctx_var: String, registry: Object) -> Dictionar
 		return {"code": "0.0", "type": "number", "errors": p._errors}
 	var r := p._expr()
 	if p._peek()["t"] != "eof":
-		p._err("лишнее в конце выражения: «%s»" % str(p._peek()["v"]))
+		p._err(GdeI18n.t("лишнее в конце выражения: «%s»") % str(p._peek()["v"]))
 	return {"code": r[0], "type": r[1], "errors": p._errors}
 
 
@@ -84,7 +84,7 @@ static func _lex(src: String, errors: Array[String]) -> Array:
 					buf += src[j]
 				j += 1
 			if not closed:
-				errors.append("незакрытая кавычка")
+				errors.append(GdeI18n.t("незакрытая кавычка"))
 			toks.append({"t": "str", "v": buf})
 			i = j + 1
 			continue
@@ -113,7 +113,7 @@ static func _lex(src: String, errors: Array[String]) -> Array:
 			toks.append({"t": "op", "v": c})
 			i += 1
 			continue
-		errors.append("непонятный символ «%s»" % c)
+		errors.append(GdeI18n.t("непонятный символ «%s»") % c)
 		i += 1
 	toks.append({"t": "eof", "v": ""})
 	return toks
@@ -158,7 +158,7 @@ func _eat_op(v: String) -> bool:
 	if _is_op(v):
 		_next()
 		return true
-	_err("ожидалось «%s»" % v)
+	_err(GdeI18n.t("ожидалось «%s»") % v)
 	return false
 
 
@@ -218,7 +218,7 @@ func _primary() -> Array:
 		return inner
 	if t["t"] == "id":
 		return _ident()
-	_err("не понимаю «%s»" % str(t["v"]))
+	_err(GdeI18n.t("не понимаю «%s»") % str(t["v"]))
 	_next()
 	return ["0.0", "number"]
 
@@ -231,7 +231,7 @@ func _ident() -> Array:
 	if _is_op("("):
 		var def: Variant = _reg.free_expr(name)
 		if def == null:
-			_err("неизвестная функция «%s»" % name)
+			_err(GdeI18n.t("неизвестная функция «%s»") % name)
 			_skip_args()
 			return ["0.0", "number"]
 		var args := _args(def)
@@ -240,10 +240,25 @@ func _ident() -> Array:
 		var fsubs := {"ctx": _ctx, "self": "self"}
 		return [_fill(def["template"], fsubs, args), def.get("type", "number")]
 
+	# Выражение расширения: Clock::Hour().
+	if _is_op("::"):
+		_next()
+		if _peek()["t"] != "id":
+			_err(GdeI18n.t("после «%s::» ожидалось имя функции") % name)
+			return ["0.0", "number"]
+		var efn: String = str(_next()["v"])
+		var edef: Variant = _reg.ext_expr(name, efn) if _reg != null and _reg.has_method("ext_expr") else null
+		if edef == null:
+			_err(GdeI18n.t("у расширения «%s» нет выражения «%s»") % [name, efn])
+			_skip_args()
+			return ["0.0", "number"]
+		var eargs := _args(edef)
+		return [_fill(edef["template"], {"ctx": _ctx, "self": "self"}, eargs), edef.get("type", "number")]
+
 	if _is_op("."):
 		_next()
 		if _peek()["t"] != "id":
-			_err("после «%s.» ожидалось имя функции" % name)
+			_err(GdeI18n.t("после «%s.» ожидалось имя функции") % name)
 			return ["0.0", "number"]
 		var member: String = str(_next()["v"])
 		if not known_objects.is_empty() and not known_objects.has(name):
@@ -252,12 +267,12 @@ func _ident() -> Array:
 		if _is_op("::"):
 			_next()
 			if _peek()["t"] != "id":
-				_err("после «%s::» ожидалось имя функции" % member)
+				_err(GdeI18n.t("после «%s::» ожидалось имя функции") % member)
 				return ["0.0", "number"]
 			var bfn: String = str(_next()["v"])
 			var bdef: Variant = _reg.behavior_expr(member, bfn)
 			if bdef == null:
-				_err("у поведения «%s» нет выражения «%s»" % [member, bfn])
+				_err(GdeI18n.t("у поведения «%s» нет выражения «%s»") % [member, bfn])
 				_skip_args()
 				return ["0.0", "number"]
 			var bargs := _args(bdef)
@@ -266,13 +281,13 @@ func _ident() -> Array:
 
 		var odef: Variant = _reg.object_expr(member)
 		if odef == null:
-			_err("неизвестное выражение объекта «%s»" % member)
+			_err(GdeI18n.t("неизвестное выражение объекта «%s»") % member)
 			_skip_args()
 			return ["0.0", "number"]
 		var oargs := _args(odef)
 		return [_fill(odef["template"], {"ctx": _ctx, "obj": name}, oargs), odef.get("type", "number")]
 
-	_err("«%s» само по себе не является выражением" % name)
+	_err(GdeI18n.t("«%s» само по себе не является выражением") % name)
 	return ["0.0", "number"]
 
 
@@ -286,8 +301,8 @@ static func _unknown_object(name: String) -> String:
 			best_score = sc
 			best = o
 	if best_score >= 0.5:
-		return "объекта «%s» нет в листе — может, «%s»?" % [name, best]
-	return "объекта «%s» нет в листе" % name
+		return GdeI18n.t("объекта «%s» нет в листе — может, «%s»?") % [name, best]
+	return GdeI18n.t("объекта «%s» нет в листе") % name
 
 
 ## Разбор аргументов по описанию параметров. Параметры вида varname/raw
@@ -301,7 +316,7 @@ func _args(def: Dictionary) -> Array:
 	if _is_op(")"):
 		_next()
 		if kinds.size() > 0:
-			_err("«%s» ожидает %d аргумент(ов)" % [def.get("name", "?"), kinds.size()])
+			_err(GdeI18n.t("«%s» ожидает %d аргумент(ов)") % [def.get("name", "?"), kinds.size()])
 		return out
 	var idx := 0
 	while true:
@@ -318,7 +333,7 @@ func _args(def: Dictionary) -> Array:
 		break
 	_eat_op(")")
 	if idx != kinds.size():
-		_err("«%s» ожидает %d аргумент(ов), получено %d" % [def.get("name", "?"), kinds.size(), idx])
+		_err(GdeI18n.t("«%s» ожидает %d аргумент(ов), получено %d") % [def.get("name", "?"), kinds.size(), idx])
 	return out
 
 
@@ -332,7 +347,7 @@ func _raw_path() -> String:
 			continue
 		break
 	if parts.is_empty():
-		_err("ожидалось имя переменной")
+		_err(GdeI18n.t("ожидалось имя переменной"))
 		return ""
 	return ".".join(parts)
 

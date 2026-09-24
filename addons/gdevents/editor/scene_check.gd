@@ -70,26 +70,26 @@ static func _check_root(root: Node, reg: GdeRegistry, object_names: Array) -> Ar
 			var fixes: Array = []
 			if orphan != null:
 				adopted[orphan] = true
-				what += " Рядом лежит форма «%s» — если тело нужно, ей место внутри него." % orphan.name
-				fixes.append(_fx("move_shape", "Перенести форму внутрь", [_p(root, orphan), _p(root, n)]))
+				what += GdeI18n.t(" Рядом лежит форма «%s» — если тело нужно, ей место внутри него.") % orphan.name
+				fixes.append(_fx("move_shape", GdeI18n.t("Перенести форму внутрь"), [_p(root, orphan), _p(root, n)]))
 			else:
-				fixes.append(_fx("add_shape", "Добавить форму", [_p(root, n)]))
+				fixes.append(_fx("add_shape", GdeI18n.t("Добавить форму"), [_p(root, n)]))
 			# Пустое тело, скорее всего, лишнее: его добавили «на всякий случай».
 			if n.get_child_count() == 0 and n != root:
-				fixes.append(_fx("delete_node", "Удалить пустое тело", [_p(root, n)]))
+				fixes.append(_fx("delete_node", GdeI18n.t("Удалить пустое тело"), [_p(root, n)]))
 			out.append(_issue("error", what, root, n, fixes))
 
 	for o: Node in orphans:
 		if adopted.has(o):
 			continue
 		out.append(_issue("warn",
-				"Форма «%s» лежит не внутри тела. События считают её прямоугольником, но физика её не видит — объект проходит сквозь стены."
-				% o.name, root, o, [_fx("wrap_area", "Сделать областью (Area2D)", [_p(root, o)])]))
+				GdeI18n.t("Форма «%s» лежит не внутри тела. События считают её прямоугольником, но физика её не видит — объект проходит сквозь стены.")
+				% o.name, root, o, [_fx("wrap_area", GdeI18n.t("Сделать областью (Area2D)"), [_p(root, o)])]))
 
 	for n: Node in nodes:
 		if n is CollisionShape2D and (n as CollisionShape2D).shape == null:
-			out.append(_issue("error", "У формы «%s» не задана фигура — она пустая." % n.name,
-					root, n, [_fx("fill_shape", "Задать прямоугольник", [_p(root, n)])]))
+			out.append(_issue("error", GdeI18n.t("У формы «%s» не задана фигура — она пустая.") % n.name,
+					root, n, [_fx("fill_shape", GdeI18n.t("Задать прямоугольник"), [_p(root, n)])]))
 
 	var frames := _sprite_frames(root)
 	for n: Node in nodes:
@@ -102,19 +102,19 @@ static func _check_root(root: Node, reg: GdeRegistry, object_names: Array) -> Ar
 
 static func _body_problem(n: Node) -> String:
 	if n is RigidBody2D:
-		return "«%s» (RigidBody2D) без формы столкновения: ни с чем не сталкивается и падает сквозь пол." % n.name
+		return GdeI18n.t("«%s» (RigidBody2D) без формы столкновения: ни с чем не сталкивается и падает сквозь пол.") % n.name
 	if n is CharacterBody2D:
-		return "«%s» (CharacterBody2D) без формы: персонаж проваливается сквозь землю." % n.name
+		return GdeI18n.t("«%s» (CharacterBody2D) без формы: персонаж проваливается сквозь землю.") % n.name
 	if n is StaticBody2D:
-		return "«%s» (StaticBody2D) без формы: по нему нельзя ходить, об него нельзя удариться." % n.name
+		return GdeI18n.t("«%s» (StaticBody2D) без формы: по нему нельзя ходить, об него нельзя удариться.") % n.name
 	if n is Area2D:
-		return "«%s» (Area2D) без формы: касания с ней не срабатывают." % n.name
-	return "«%s» без формы столкновения." % n.name
+		return GdeI18n.t("«%s» (Area2D) без формы: касания с ней не срабатывают.") % n.name
+	return GdeI18n.t("«%s» без формы столкновения.") % n.name
 
 
 static func _check_sprite(n: Node, root: Node, out: Array) -> void:
 	if n is Sprite2D and (n as Sprite2D).texture == null:
-		out.append(_issue("warn", "Спрайт «%s» без картинки — объект невидим. Выберите Texture в инспекторе."
+		out.append(_issue("warn", GdeI18n.t("Спрайт «%s» без картинки — объект невидим. Выберите Texture в инспекторе.")
 				% n.name, root, n))
 	elif n is AnimatedSprite2D:
 		var fr := (n as AnimatedSprite2D).sprite_frames
@@ -126,7 +126,7 @@ static func _check_sprite(n: Node, root: Node, out: Array) -> void:
 					empty = false
 					break
 		if empty:
-			out.append(_issue("warn", "В «%s» нет ни одного кадра — объект невидим. Добавьте кадры в SpriteFrames."
+			out.append(_issue("warn", GdeI18n.t("В «%s» нет ни одного кадра — объект невидим. Добавьте кадры в SpriteFrames.")
 					% n.name, root, n))
 
 
@@ -141,11 +141,11 @@ static func _check_behavior(n: Node, bname: String, root: Node, reg: GdeRegistry
 	if not target.is_empty() and host != null and not host.is_class(target):
 		var proper := _find_class(root, target)
 		if proper != null:
-			out.append(_issue("error", "«%s» висит на «%s», а работает только внутри %s — сейчас оно ничего не двигает."
+			out.append(_issue("error", GdeI18n.t("«%s» висит на «%s», а работает только внутри %s — сейчас оно ничего не двигает.")
 					% [title, host.name, target], root, n,
-					[_fx("move_behavior", "Перенести в «%s»" % proper.name, [_p(root, n), _p(root, proper)])]))
+					[_fx("move_behavior", GdeI18n.t("Перенести в «%s»") % proper.name, [_p(root, n), _p(root, proper)])]))
 		else:
-			out.append(_issue("error", "«%s» работает только внутри %s, а в сцене его нет." % [title, target],
+			out.append(_issue("error", GdeI18n.t("«%s» работает только внутри %s, а в сцене его нет.") % [title, target],
 					root, n))
 
 	# Анимации по имени — самая частая тихая ошибка: опечатка в имени,
@@ -161,29 +161,29 @@ static func _check_behavior(n: Node, bname: String, root: Node, reg: GdeRegistry
 				continue
 			var same := _ci_match(want, frames)
 			var nice := str(labels.get(pn, pn))
-			var text := "Анимации «%s» нет в спрайте («%s», «%s»). Есть: %s." \
+			var text := GdeI18n.t("Анимации «%s» нет в спрайте («%s», «%s»). Есть: %s.") \
 					% [want, title, nice, ", ".join(PackedStringArray(frames))]
 			if not same.is_empty():
 				out.append(_issue("warn", text, root, n,
-						[_fx("set_prop", "Взять «%s»" % same, [_p(root, n), pn, same])]))
+						[_fx("set_prop", GdeI18n.t("Взять «%s»") % same, [_p(root, n), pn, same])]))
 			else:
 				# Выбор из того, что реально есть в спрайте, — опечатку так
 				# исправить быстрее всего.
 				out.append(_issue("warn", text, root, n, [
-						_fx("pick_prop", "Выбрать из спрайта", [_p(root, n), pn, frames.duplicate()]),
-						_fx("set_prop", "Не использовать", [_p(root, n), pn, ""])]))
+						_fx("pick_prop", GdeI18n.t("Выбрать из спрайта"), [_p(root, n), pn, frames.duplicate()]),
+						_fx("set_prop", GdeI18n.t("Не использовать"), [_p(root, n), pn, ""])]))
 
 	if "bullet_scene" in n and n.get("bullet_scene") == null:
-		out.append(_issue("warn", "У «%s» не выбрана сцена снаряда — выстрел ничего не создаст. Выберите её в инспекторе." % title,
+		out.append(_issue("warn", GdeI18n.t("У «%s» не выбрана сцена снаряда — выстрел ничего не создаст. Выберите её в инспекторе.") % title,
 				root, n))
 
 	if "target_object" in n:
 		var t := str(n.get("target_object"))
 		if t.is_empty():
-			out.append(_issue("warn", "У «%s» не указана цель — пока её не задать (в инспекторе или действием), поведение ничего не делает." % title,
+			out.append(_issue("warn", GdeI18n.t("У «%s» не указана цель — пока её не задать (в инспекторе или действием), поведение ничего не делает.") % title,
 					root, n))
 		elif not object_names.is_empty() and not object_names.has(t):
-			out.append(_issue("warn", "Цель «%s» у «%s» не объявлена в листе — поведение её не найдёт." % [t, title],
+			out.append(_issue("warn", GdeI18n.t("Цель «%s» у «%s» не объявлена в листе — поведение её не найдёт.") % [t, title],
 					root, n))
 
 
@@ -204,12 +204,12 @@ static func _apply(root: Node, one_fix: Dictionary) -> String:
 			var shape := _node(root, arg[0])
 			var body := _node(root, arg[1])
 			if shape == null or body == null:
-				return "узлы не найдены — сцену успели поменять"
+				return GdeI18n.t("узлы не найдены — сцену успели поменять")
 			_reparent_keep(shape, body, root)
 		"add_shape":
 			var body2 := _node(root, arg[0])
 			if body2 == null:
-				return "тело не найдено"
+				return GdeI18n.t("тело не найдено")
 			var cs := CollisionShape2D.new()
 			var rect := RectangleShape2D.new()
 			rect.size = _sprite_size(root)
@@ -220,14 +220,14 @@ static func _apply(root: Node, one_fix: Dictionary) -> String:
 		"fill_shape":
 			var s := _node(root, arg[0]) as CollisionShape2D
 			if s == null:
-				return "форма не найдена"
+				return GdeI18n.t("форма не найдена")
 			var r := RectangleShape2D.new()
 			r.size = _sprite_size(root)
 			s.shape = r
 		"wrap_area":
 			var o := _node(root, arg[0])
 			if o == null:
-				return "форма не найдена"
+				return GdeI18n.t("форма не найдена")
 			var area := Area2D.new()
 			area.name = "Area2D"
 			var parent := o.get_parent()
@@ -239,23 +239,23 @@ static func _apply(root: Node, one_fix: Dictionary) -> String:
 			var beh := _node(root, arg[0])
 			var host := _node(root, arg[1])
 			if beh == null or host == null:
-				return "узлы не найдены"
+				return GdeI18n.t("узлы не найдены")
 			beh.get_parent().remove_child(beh)
 			host.add_child(beh)
 			_own(beh, root)
 		"set_prop":
 			var nb := _node(root, arg[0])
 			if nb == null:
-				return "узел не найден"
+				return GdeI18n.t("узел не найден")
 			nb.set(str(arg[1]), arg[2])
 		"delete_node":
 			var dn := _node(root, arg[0])
 			if dn == null or dn == root:
-				return "узел не найден"
+				return GdeI18n.t("узел не найден")
 			dn.get_parent().remove_child(dn)
 			dn.queue_free()
 		_:
-			return "для этой находки автоматического исправления нет"
+			return GdeI18n.t("для этой находки автоматического исправления нет")
 	return ""
 
 

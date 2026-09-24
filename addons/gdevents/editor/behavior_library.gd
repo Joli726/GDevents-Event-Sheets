@@ -104,16 +104,16 @@ static func project_scenes(root: String = "res://") -> Array[String]:
 static func make_copy(bname: String, reg: GdeRegistry) -> Dictionary:
 	var entry: Dictionary = reg.behaviors.get(bname, {})
 	if entry.is_empty():
-		return {"error": "поведения «%s» нет" % bname}
+		return {"error": GdeI18n.t("поведения «%s» нет") % bname}
 	if kind_of(entry) != "builtin":
-		return {"error": "«%s» — уже не встроенное поведение, копировать нечего" % bname}
+		return {"error": GdeI18n.t("«%s» — уже не встроенное поведение, копировать нечего") % bname}
 	var builtin := str(entry["path"])
 	var dst := copy_path_for(builtin)
 	if FileAccess.file_exists(dst):
-		return {"error": "копия уже есть: %s" % dst}
+		return {"error": GdeI18n.t("копия уже есть: %s") % dst}
 	var src := FileAccess.get_file_as_string(builtin)
 	if src.is_empty():
-		return {"error": "не читается %s" % builtin}
+		return {"error": GdeI18n.t("не читается %s") % builtin}
 
 	var err := _write(dst, src)
 	if not err.is_empty():
@@ -136,12 +136,12 @@ static func make_copy(bname: String, reg: GdeRegistry) -> Dictionary:
 static func reset_to_builtin(bname: String, reg: GdeRegistry) -> Dictionary:
 	var entry: Dictionary = reg.behaviors.get(bname, {})
 	if kind_of(entry) != "copy":
-		return {"error": "у «%s» нет своей копии" % bname}
+		return {"error": GdeI18n.t("у «%s» нет своей копии") % bname}
 	var copy := str(entry["path"])
 	var builtin := str(entry["builtin_path"])
 	var src := FileAccess.get_file_as_string(copy)
 	if not src.is_empty():
-		save_version(copy, src, "Перед возвратом к встроенной")
+		save_version(copy, src, GdeI18n.t("Перед возвратом к встроенной"))
 	var sw := await switch_scripts(copy, builtin)
 	if not (sw["errors"] as Array).is_empty():
 		# Часть сцен не переключилась — удалять копию нельзя, они на ней.
@@ -159,14 +159,14 @@ static func create_from(bname: String, new_name: String, new_title: String,
 		reg: GdeRegistry) -> Dictionary:
 	var entry: Dictionary = reg.behaviors.get(bname, {})
 	if entry.is_empty():
-		return {"error": "поведения «%s» нет" % bname}
+		return {"error": GdeI18n.t("поведения «%s» нет") % bname}
 	var why := name_problem(new_name, reg)
 	if not why.is_empty():
 		return {"error": why}
 	var file := snake(new_name)
 	var dst := USER_DIR.path_join(file).path_join(file + ".gd")
 	if FileAccess.file_exists(dst):
-		return {"error": "файл уже есть: %s" % dst}
+		return {"error": GdeI18n.t("файл уже есть: %s") % dst}
 	var src := FileAccess.get_file_as_string(str(entry["path"]))
 	src = _retag(src, new_name, new_title if not new_title.strip_edges().is_empty() else new_name)
 	var err := _write(dst, src)
@@ -181,11 +181,11 @@ static func create_from(bname: String, new_name: String, new_title: String,
 static func name_problem(new_name: String, reg: GdeRegistry) -> String:
 	var re := RegEx.create_from_string("^[A-Z][A-Za-z0-9]*$")
 	if re.search(new_name) == null:
-		return "имя поведения — латиницей с большой буквы, без пробелов: например EnemyShoot"
+		return GdeI18n.t("имя поведения — латиницей с большой буквы, без пробелов: например EnemyShoot")
 	if GdeBehaviorInstaller.pascal(snake(new_name)) != new_name:
-		return "имя «%s» не восстанавливается из имени файла — уберите подряд идущие заглавные" % new_name
+		return GdeI18n.t("имя «%s» не восстанавливается из имени файла — уберите подряд идущие заглавные") % new_name
 	if reg.behaviors.has(new_name):
-		return "поведение «%s» уже есть" % new_name
+		return GdeI18n.t("поведение «%s» уже есть") % new_name
 	return ""
 
 
@@ -232,7 +232,7 @@ static func switch_scripts(from_path: String, to_path: String) -> Dictionary:
 	# с устаревшим исходником тут не годится.
 	var to := ResourceLoader.load(to_path, "Script", ResourceLoader.CACHE_MODE_REPLACE) as Script
 	if to == null:
-		return {"changed": changed, "errors": ["не загружается %s" % to_path]}
+		return {"changed": changed, "errors": [GdeI18n.t("не загружается %s") % to_path]}
 	for scene: String in scenes_using(from_path):
 		var err: String = await GdeBehaviorInstaller.modify(scene, func(root: Node) -> String:
 			return "" if _swap(root, root, from_path, to) > 0 else "—")
@@ -308,10 +308,10 @@ static func history_path(entry: Dictionary) -> String:
 static func remember(entry: Dictionary, title: String) -> String:
 	var path := str(entry.get("path", ""))
 	if kind_of(entry) == "builtin":
-		return "встроенное поведение не правится — запоминать в нём нечего"
+		return GdeI18n.t("встроенное поведение не правится — запоминать в нём нечего")
 	var src := FileAccess.get_file_as_string(path)
 	if src.is_empty():
-		return "не читается %s" % path
+		return GdeI18n.t("не читается %s") % path
 	save_version(path, src, title)
 	return ""
 
@@ -323,15 +323,15 @@ static func restore_version(bname: String, reg: GdeRegistry, version_path: Strin
 		version_title: String) -> Dictionary:
 	var entry: Dictionary = reg.behaviors.get(bname, {})
 	if entry.is_empty():
-		return {"error": "поведения «%s» нет" % bname}
+		return {"error": GdeI18n.t("поведения «%s» нет") % bname}
 	var src := FileAccess.get_file_as_string(version_path)
 	if src.is_empty():
-		return {"error": "не читается версия %s" % version_path}
+		return {"error": GdeI18n.t("не читается версия %s") % version_path}
 	if kind_of(entry) != "builtin":
 		var path := str(entry["path"])
 		var cur := FileAccess.get_file_as_string(path)
 		if not cur.is_empty() and cur != src:
-			save_version(path, cur, "Перед восстановлением «%s»" % version_title)
+			save_version(path, cur, GdeI18n.t("Перед восстановлением «%s»") % version_title)
 		var err := _write(path, src)
 		if not err.is_empty():
 			return {"error": err}
@@ -402,7 +402,7 @@ static func _write(path: String, text: String) -> String:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
-		return "не записывается %s" % path
+		return GdeI18n.t("не записывается %s") % path
 	f.store_string(text)
 	f.close()
 	return ""

@@ -88,32 +88,32 @@ func _init() -> void:
 	actions.add_theme_constant_override("separation", 6)
 	state_box.add_child(actions)
 	_btn_copy = Button.new()
-	_btn_copy.text = "Изменить поведение…"
+	_btn_copy.text = GdeI18n.t("Изменить поведение…")
 	_btn_copy.icon = GdeIcons.get_icon("edit")
-	_btn_copy.tooltip_text = "Сделать свою копию: она заменит встроенное поведение у всех объектов, а встроенное останется нетронутым"
+	_btn_copy.tooltip_text = GdeI18n.t("Сделать свою копию: она заменит встроенное поведение у всех объектов, а встроенное останется нетронутым")
 	_btn_copy.pressed.connect(func() -> void: copy_requested.emit())
 	actions.add_child(_btn_copy)
 	_btn_reset = Button.new()
-	_btn_reset.text = "Вернуть встроенную…"
+	_btn_reset.text = GdeI18n.t("Вернуть встроенную…")
 	_btn_reset.icon = GdeIcons.get_icon("undo")
-	_btn_reset.tooltip_text = "Все объекты снова работают на встроенной версии; копия уйдёт в историю версий"
+	_btn_reset.tooltip_text = GdeI18n.t("Все объекты снова работают на встроенной версии; копия уйдёт в историю версий")
 	_btn_reset.pressed.connect(func() -> void: reset_requested.emit())
 	actions.add_child(_btn_reset)
 	_btn_derive = Button.new()
-	_btn_derive.text = "Новое на основе…"
+	_btn_derive.text = GdeI18n.t("Новое на основе…")
 	_btn_derive.icon = GdeIcons.get_icon("copy")
-	_btn_derive.tooltip_text = "Отдельное поведение с новым именем — например, «Выстрел врага» рядом с «Выстрелом игрока»"
+	_btn_derive.tooltip_text = GdeI18n.t("Отдельное поведение с новым именем — например, «Выстрел врага» рядом с «Выстрелом игрока»")
 	_btn_derive.pressed.connect(func() -> void: derive_requested.emit())
 	actions.add_child(_btn_derive)
 	_versions = MenuButton.new()
-	_versions.text = "Версии ▾"
+	_versions.text = GdeI18n.t("Версии ▾")
 	_versions.flat = false
-	_versions.tooltip_text = "Запомнить текущий код и вернуться к любой сохранённой версии"
+	_versions.tooltip_text = GdeI18n.t("Запомнить текущий код и вернуться к любой сохранённой версии")
 	_versions.get_popup().id_pressed.connect(_on_version_menu)
 	actions.add_child(_versions)
 	_btn_compare = Button.new()
-	_btn_compare.text = "Сравнить со встроенной"
-	_btn_compare.tooltip_text = "Что изменено в копии относительно встроенного поведения"
+	_btn_compare.text = GdeI18n.t("Сравнить со встроенной")
+	_btn_compare.tooltip_text = GdeI18n.t("Что изменено в копии относительно встроенного поведения")
 	_btn_compare.pressed.connect(show_compare)
 	actions.add_child(_btn_compare)
 
@@ -122,7 +122,7 @@ func _init() -> void:
 	_update_box.add_theme_constant_override("separation", 6)
 	state_box.add_child(_update_box)
 	var upd := Label.new()
-	upd.text = "Встроенная версия обновилась после того, как вы сделали копию — в копию обновление само не попало."
+	upd.text = GdeI18n.t("Встроенная версия обновилась после того, как вы сделали копию — в копию обновление само не попало.")
 	upd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	upd.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	upd.custom_minimum_size = Vector2(240, 0)
@@ -130,7 +130,7 @@ func _init() -> void:
 	upd.modulate = Color(1.0, 0.8, 0.45)
 	_update_box.add_child(upd)
 	var what := Button.new()
-	what.text = "Что изменилось"
+	what.text = GdeI18n.t("Что изменилось")
 	what.pressed.connect(show_builtin_update)
 	_update_box.add_child(what)
 
@@ -146,16 +146,16 @@ func _init() -> void:
 	_bar.add_child(_path)
 
 	_jump = MenuButton.new()
-	_jump.text = "Перейти к… ▾"
+	_jump.text = GdeI18n.t("Перейти к… ▾")
 	_jump.flat = false
-	_jump.tooltip_text = "Действия, условия и выражения поведения — как в листе событий"
+	_jump.tooltip_text = GdeI18n.t("Действия, условия и выражения поведения — как в листе событий")
 	_jump.get_popup().id_pressed.connect(_on_jump)
 	_bar.add_child(_jump)
 
 	_open = Button.new()
-	_open.text = "Открыть в редакторе скриптов"
+	_open.text = GdeI18n.t("Открыть в редакторе скриптов")
 	_open.icon = GdeIcons.get_icon("edit")
-	_open.tooltip_text = "Автодополнение, подсветка ошибок и отладчик — в редакторе скриптов Godot"
+	_open.tooltip_text = GdeI18n.t("Автодополнение, подсветка ошибок и отладчик — в редакторе скриптов Godot")
 	_open.pressed.connect(open_in_script_editor)
 	_bar.add_child(_open)
 
@@ -180,23 +180,23 @@ func _init() -> void:
 	vrow.add_theme_constant_override("separation", 6)
 	vbox.add_child(vrow)
 	_view_diff = Button.new()
-	_view_diff.text = "Отличия от текущего"
+	_view_diff.text = GdeI18n.t("Отличия от текущего")
 	_view_diff.toggle_mode = true
 	_view_diff.toggled.connect(func(_on: bool) -> void: _show_version_body())
 	vrow.add_child(_view_diff)
 	_view_restore = Button.new()
-	_view_restore.text = "Восстановить эту версию…"
+	_view_restore.text = GdeI18n.t("Восстановить эту версию…")
 	_view_restore.icon = GdeIcons.get_icon("undo")
 	_view_restore.pressed.connect(func() -> void:
 		restore_requested.emit(str(_shown_version.get("path", "")), str(_shown_version.get("title", ""))))
 	vrow.add_child(_view_restore)
 	_view_accept = Button.new()
-	_view_accept.text = "Учтено"
-	_view_accept.tooltip_text = "Считать новую встроенную версию точкой отсчёта — напоминание пропадёт"
+	_view_accept.text = GdeI18n.t("Учтено")
+	_view_accept.tooltip_text = GdeI18n.t("Считать новую встроенную версию точкой отсчёта — напоминание пропадёт")
 	_view_accept.pressed.connect(func() -> void: accept_builtin_requested.emit())
 	vrow.add_child(_view_accept)
 	var back := Button.new()
-	back.text = "К текущему коду"
+	back.text = GdeI18n.t("К текущему коду")
 	back.pressed.connect(show_current)
 	vrow.add_child(back)
 
@@ -236,20 +236,18 @@ func _update_state(entry: Dictionary, path: String, missing: bool) -> void:
 	var c := Color(0.55, 0.65, 0.8)
 	match kind:
 		"builtin":
-			_state_text.text = "Встроенное поведение. Его код не правится — чтобы что-то изменить или " + \
-					"добавить, сделайте свою копию. Встроенное останется нетронутым, к нему всегда можно вернуться."
+			_state_text.text = GdeI18n.t("Встроенное поведение. Его код не правится — чтобы что-то изменить или добавить, сделайте свою копию. Встроенное останется нетронутым, к нему всегда можно вернуться.")
 		"copy":
 			c = Color(0.45, 0.75, 0.55)
-			_state_text.text = "Своя копия встроенного поведения — у всех объектов проекта работает она. " + \
-					"Файл: %s" % path
+			_state_text.text = GdeI18n.t("Своя копия встроенного поведения — у всех объектов проекта работает она. Файл: %s") % path
 		_:
 			c = Color(0.45, 0.75, 0.55)
-			_state_text.text = "Своё поведение. Файл: %s" % path
+			_state_text.text = GdeI18n.t("Своё поведение. Файл: %s") % path
 	if broken:
 		c = Color(0.93, 0.36, 0.36)
-		_state_text.text = "Скрипт не собирается — объекты с этим поведением в игре не работают. " + \
-				"Откройте его в редакторе скриптов: там видна строка с ошибкой." + \
-				(" Или верните встроенную версию." if kind == "copy" else "")
+		_state_text.text = GdeI18n.t("Скрипт не собирается — объекты с этим поведением в игре не работают. Откройте его в редакторе скриптов: там видна строка с ошибкой.") \
+				if kind != "copy" else \
+				GdeI18n.t("Скрипт не собирается — объекты с этим поведением в игре не работают. Откройте его в редакторе скриптов: там видна строка с ошибкой. Или верните встроенную версию.")
 	_state_style.bg_color = Color(c.r, c.g, c.b, 0.08)
 	_state_style.border_color = Color(c.r, c.g, c.b, 0.8)
 	_btn_copy.visible = kind == "builtin"
@@ -269,12 +267,12 @@ func _fill_versions() -> void:
 	_version_list = GdeBehaviorLibrary.list_versions(GdeBehaviorLibrary.history_path(_entry)) \
 			if not _entry.is_empty() else []
 	if kind != "builtin":
-		pop.add_item("Запомнить текущую версию…", 100000)
+		pop.add_item(GdeI18n.t("Запомнить текущую версию…"), 100000)
 	if _version_list.is_empty():
-		pop.add_item("Сохранённых версий пока нет", 100001)
+		pop.add_item(GdeI18n.t("Сохранённых версий пока нет"), 100001)
 		pop.set_item_disabled(pop.item_count - 1, true)
 	else:
-		pop.add_separator("Прошлые копии" if kind == "builtin" else "История")
+		pop.add_separator(GdeI18n.t("Прошлые копии") if kind == "builtin" else GdeI18n.t("История"))
 		for i in range(_version_list.size()):
 			var v: Dictionary = _version_list[i]
 			pop.add_item("%s — %s" % [str(v.get("title", "")), nice_time(str(v.get("time", "")))], i)
@@ -313,8 +311,8 @@ func show_compare() -> void:
 	var ops := GdeDiff.lines(builtin, _src)
 	var st := GdeDiff.stats(ops)
 	mode = "compare"
-	_show_banner("Своя копия против встроенной: добавлено строк %d, убрано %d" % [st["added"], st["removed"]]
-			if st["added"] + st["removed"] > 0 else "Копия пока ничем не отличается от встроенной",
+	_show_banner(GdeI18n.t("Своя копия против встроенной: добавлено строк %d, убрано %d") % [st["added"], st["removed"]]
+			if st["added"] + st["removed"] > 0 else GdeI18n.t("Копия пока ничем не отличается от встроенной"),
 			false, false, false)
 	_show_ops(GdeDiff.hunks(ops))
 
@@ -325,7 +323,7 @@ func show_builtin_update() -> void:
 	var now := FileAccess.get_file_as_string(str(_entry.get("builtin_path", "")))
 	mode = "update"
 	var st := GdeDiff.stats(GdeDiff.lines(base, now))
-	_show_banner("Что изменилось во встроенной после вашей копии: добавлено %d, убрано %d — перенесите нужное в копию"
+	_show_banner(GdeI18n.t("Что изменилось во встроенной после вашей копии: добавлено %d, убрано %d — перенесите нужное в копию")
 			% [st["added"], st["removed"]], false, false, true)
 	_show_ops(GdeDiff.hunks(GdeDiff.lines(base, now)))
 
@@ -334,7 +332,7 @@ func preview_version(v: Dictionary) -> void:
 	_shown_version = v
 	mode = "version"
 	_view_diff.set_pressed_no_signal(false)
-	_show_banner("Версия «%s» от %s" % [str(v.get("title", "")), nice_time(str(v.get("time", "")))],
+	_show_banner(GdeI18n.t("Версия «%s» от %s") % [str(v.get("title", "")), nice_time(str(v.get("time", "")))],
 			true, true, false)
 	_show_version_body()
 
@@ -418,8 +416,8 @@ func _fill_jump(src: String, entry: Dictionary) -> void:
 	pop.clear()
 	_jump_lines.clear()
 	var sections := [
-		["Действия", "actions"],
-		["Условия", "conditions"],
+		[GdeI18n.t("Действия"), "actions"],
+		[GdeI18n.t("Условия"), "conditions"],
 	]
 	for sec: Array in sections:
 		var table: Dictionary = entry.get(sec[1], {})
@@ -443,7 +441,7 @@ func _fill_jump(src: String, entry: Dictionary) -> void:
 		if line2 < 0:
 			continue
 		if first_expr:
-			pop.add_separator("Выражения")
+			pop.add_separator(GdeI18n.t("Выражения"))
 			first_expr = false
 		_add_jump("%s() — %s" % [ename, str((exprs[ename] as Dictionary).get("description", ""))], line2)
 	_jump.disabled = _jump_lines.is_empty()

@@ -9,6 +9,8 @@ extends RefCounted
 
 const BUILTIN_PATH := "res://addons/gdevents/registry/builtin.json"
 const BEHAVIOR_DIRS := ["res://addons/gdevents/behaviors", "res://behaviors"]
+## Расширения — свои условия, действия и выражения без поведения.
+const EXTENSION_DIRS := ["res://addons/gdevents/extensions", "res://extensions"]
 
 var conditions: Dictionary = {}
 var actions: Dictionary = {}
@@ -16,6 +18,12 @@ var expressions: Dictionary = {}
 var object_expressions: Dictionary = {}
 var operators: Dictionary = {}
 var behaviors: Dictionary = {}
+## имя расширения -> {"path", "title", "description", "icon", "untranslated",
+## "conditions", "actions", "expressions"}. Условия и действия расширений
+## лежат и в общих conditions/actions под именами «Расширение::функция».
+var extensions: Dictionary = {}
+## «Clock::Hour» -> описание выражения расширения.
+var ext_expressions: Dictionary = {}
 var errors: Array[String] = []
 
 
@@ -24,18 +32,20 @@ static func load_default() -> GdeRegistry:
 	r.load_builtin(BUILTIN_PATH)
 	for d: String in BEHAVIOR_DIRS:
 		r.scan_behaviors(d)
+	for d2: String in EXTENSION_DIRS:
+		r.scan_extensions(d2)
 	return r
 
 
 func load_builtin(path: String) -> void:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		errors.append("не открывается %s" % path)
+		errors.append(GdeI18n.t("не открывается %s") % path)
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
 	if not (parsed is Dictionary):
-		errors.append("%s — некорректный JSON" % path)
+		errors.append(GdeI18n.t("%s — некорректный JSON") % path)
 		return
 	var d: Dictionary = parsed
 	conditions = d.get("conditions", {})
@@ -43,6 +53,26 @@ func load_builtin(path: String) -> void:
 	expressions = d.get("expressions", {})
 	object_expressions = d.get("object_expressions", {})
 	operators = d.get("operators", {})
+	_localize_builtin()
+
+
+## Тексты встроенной библиотеки написаны по-русски и переводятся по общему
+## словарю i18n/<язык>.json — так же, как интерфейс. Шаблоны кода не трогаем.
+func _localize_builtin() -> void:
+	for table: Dictionary in [conditions, actions]:
+		for id: String in table:
+			var def: Dictionary = table[id]
+			for field: String in ["sentence", "description", "group"]:
+				if def.has(field):
+					def[field] = GdeI18n.t(str(def[field]))
+			for p: Variant in def.get("params", []):
+				if p is Dictionary and (p as Dictionary).has("label"):
+					(p as Dictionary)["label"] = GdeI18n.t(str((p as Dictionary)["label"]))
+	for table2: Dictionary in [expressions, object_expressions]:
+		for id2: String in table2:
+			var def2: Dictionary = table2[id2]
+			if def2.has("description"):
+				def2["description"] = GdeI18n.t(str(def2["description"]))
 
 
 # ----------------------------------------------------------------- запросы ---
@@ -73,6 +103,16 @@ func object_expr(name: String) -> Variant:
 		d["name"] = name
 		return d
 	return null
+
+
+## Выражение расширения: Clock::Hour().
+func ext_expr(ext: String, name: String) -> Variant:
+	var key := "%s::%s" % [ext, name]
+	if not ext_expressions.has(key):
+		return null
+	var d: Dictionary = (ext_expressions[key] as Dictionary).duplicate()
+	d["name"] = key
+	return d
 
 
 func behavior_expr(beh: String, name: String) -> Variant:
@@ -116,6 +156,13 @@ func scan_behaviors(dir_path: String) -> void:
 		_scan_behavior_file(f)
 
 
+func scan_extensions(dir_path: String) -> void:
+	if not DirAccess.dir_exists_absolute(dir_path):
+		return
+	for f: String in _gd_files(dir_path):
+		_scan_behavior_file(f, true)
+
+
 func _gd_files(root: String) -> Array[String]:
 	var out: Array[String] = []
 	var d := DirAccess.open(root)
@@ -142,20 +189,26 @@ func _gd_files(root: String) -> Array[String]:
 ## реестр просто перестал их выбрасывать. Из-за этого раньше в списке событий
 ## стояло «Свойство acceleration у Player (Platformer)» — строка, которая
 ## ничего не объясняет.
-func _scan_behavior_file(path: String) -> void:
+func _scan_behavior_file(path: String, extension: bool = false) -> void:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return
 	var src := f.get_as_text()
 	f.close()
-	if not src.contains("extends GdeBehavior"):
+	if not src.contains("extends GdeExtension" if extension else "extends GdeBehavior"):
 		return
 
 	var bname := _default_behavior_name(path)
+	# Любую метку можно продублировать на другом языке: @title.en, @action.en…
 	var re_note := RegEx.create_from_string(
-			"^\\s*##\\s*@(action|condition|expression|behavior|title|description|icon|target|needs|internal)\\b\\s*(.*)$")
+			"^\\s*##\\s*@(action|condition|expression|behavior|extension|title|description|icon|target|needs|internal|param|options|group)(?:\\.([a-z]{2}))?(?=\\s|$)\\s*(.*)$")
 	var re_doc := RegEx.create_from_string("^\\s*##\\s?(.*)$")
-	var re_func := RegEx.create_from_string("^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)")
+	# Строка описания на другом языке: «## @en Maximum speed.»
+	var re_doc_lang := RegEx.create_from_string("^@([a-z]{2})\\s+(.*)$")
+	# У расширений функции статические, а тип результата решает, число
+	# выражение или текст.
+	var re_func := RegEx.create_from_string(
+			"^\\s*(?:static\\s+)?func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*([\\w\\[\\]]+))?")
 	var re_export := RegEx.create_from_string(
 			"^\\s*@export\\w*(?:\\([^)]*\\))?\\s+var\\s+([A-Za-z_]\\w*)\\s*(?::\\s*([\\w\\[\\], ]+?))?\\s*(?:=|$)")
 	var re_group := RegEx.create_from_string("^\\s*@export_group\\s*\\(\\s*\"([^\"]*)\"")
@@ -169,14 +222,24 @@ func _scan_behavior_file(path: String) -> void:
 		"path": path, "actions": {}, "conditions": {}, "expressions": {},
 		"properties": {}, "description": "", "icon": "behavior",
 		"title": "", "target": "", "needs": [],
-		## имя настройки -> {"label", "doc", "group", "internal"} — для окна
-		## настроек поведения. В отличие от действий, тут все @export, и
-		## сложные тоже: сцена снаряда настраивается там же, где скорость.
+		## имя настройки -> {"label", "doc", "group", "internal", "options"} —
+		## для окна настроек поведения. В отличие от действий, тут все @export,
+		## и сложные тоже: сцена снаряда настраивается там же, где скорость.
 		"settings": {},
+		## @export_group как в коде -> название на выбранном языке.
+		"group_names": {},
+		## язык -> тексты без перевода на него (для i18n_test).
+		"untranslated": {},
 	}
+	var title := {}
+	var about := {}
+	var needs := {}
 	var pending_kind := ""
-	var pending_text := ""
-	var doc: Array[String] = []
+	var pending_text := {}
+	var params := {}
+	var options := {}
+	var group_title := {}
+	var doc := {}
 	var group := ""
 	var internal := false
 	var split_export := false
@@ -185,35 +248,63 @@ func _scan_behavior_file(path: String) -> void:
 		var m_note := re_note.search(raw_line)
 		if m_note != null:
 			var k := m_note.get_string(1)
-			var v := m_note.get_string(2).strip_edges()
+			var lang := m_note.get_string(2)
+			var v := m_note.get_string(3).strip_edges()
 			match k:
-				"behavior":
+				"behavior", "extension":
 					bname = v
 				"title":
-					entry["title"] = v
+					title[lang] = v
 				"description":
-					entry["description"] = v
+					about[lang] = v
 				"icon":
 					entry["icon"] = v
 				"target":
 					entry["target"] = v
 				"needs":
-					(entry["needs"] as Array).append(_parse_need(v))
+					if not needs.has(lang):
+						needs[lang] = []
+					(needs[lang] as Array).append(v)
 				"internal":
 					internal = true
+				"param":
+					# «@param force Сила толчка» — подпись параметра действия.
+					var sp := v.split(" ", false, 1)
+					if sp.size() == 2:
+						if not params.has(sp[0]):
+							params[sp[0]] = {}
+						(params[sp[0]] as Dictionary)[lang] = sp[1].strip_edges()
+				"options":
+					var items: Array[String] = []
+					for o: String in v.split(","):
+						items.append(o.strip_edges())
+					options[lang] = items
+				"group":
+					group_title[lang] = v
 				_:
 					pending_kind = k
-					pending_text = v
+					pending_text[lang] = v
 			continue
 
 		var m_doc := re_doc.search(raw_line)
 		if m_doc != null:
-			doc.append(m_doc.get_string(1).strip_edges())
+			var line := m_doc.get_string(1).strip_edges()
+			var lang2 := ""
+			var m_lang := re_doc_lang.search(line)
+			if m_lang != null and GdeI18n.LANGUAGES.has(m_lang.get_string(1)):
+				lang2 = m_lang.get_string(1)
+				line = m_lang.get_string(2).strip_edges()
+			if not doc.has(lang2):
+				doc[lang2] = []
+			(doc[lang2] as Array).append(line)
 			continue
 
 		var m_group := re_group.search(raw_line)
 		if m_group != null:
 			group = m_group.get_string(1).strip_edges()
+			group_title[""] = group
+			(entry["group_names"] as Dictionary)[group] = _pick(entry, "group " + group, group_title)
+			group_title = {}
 			doc.clear()
 			internal = false
 			continue
@@ -224,9 +315,11 @@ func _scan_behavior_file(path: String) -> void:
 			if m_var != null:
 				# Только в окно настроек: в библиотеку событий такие свойства
 				# не попадали и раньше — пресет без «применить» ничего не делает.
-				_add_setting(entry, m_var.get_string(1), _doc_text(doc), group, internal)
+				_add_setting(entry, m_var.get_string(1), _pick_doc(entry, m_var.get_string(1), doc),
+						group, internal, _pick_list(options))
 				pending_kind = ""
 				doc.clear()
+				options = {}
 				internal = false
 				continue
 
@@ -234,12 +327,15 @@ func _scan_behavior_file(path: String) -> void:
 		if m_exp != null:
 			var pname := m_exp.get_string(1)
 			var ptype := m_exp.get_string(2).strip_edges()
+			var pdoc := _pick_doc(entry, pname, doc)
 			entry["properties"][pname] = ptype
-			_add_setting(entry, pname, _doc_text(doc), group, internal)
+			_add_setting(entry, pname, pdoc, group, internal, _pick_list(options))
 			if not internal:
-				_add_property_members(entry, bname, pname, ptype, _doc_text(doc), group)
+				_add_property_members(entry, bname, pname, ptype, pdoc,
+						str((entry["group_names"] as Dictionary).get(group, group)))
 			pending_kind = ""
 			doc.clear()
+			options = {}
 			internal = false
 			continue
 
@@ -250,20 +346,44 @@ func _scan_behavior_file(path: String) -> void:
 		var m_fn := re_func.search(raw_line)
 		if m_fn != null:
 			if pending_kind != "":
-				_add_member(entry, bname, pending_kind, pending_text,
-						m_fn.get_string(1), m_fn.get_string(2), _doc_text(doc))
+				var labels := {}
+				for pn: String in params:
+					labels[pn] = _pick(entry, "@param " + pn, params[pn])
+				var sentence := _pick(entry, m_fn.get_string(1), pending_text)
+				var fdoc := _pick_doc(entry, m_fn.get_string(1), doc)
+				if extension:
+					_add_ext_member(entry, bname, pending_kind, sentence, m_fn.get_string(1),
+							m_fn.get_string(2), m_fn.get_string(3), fdoc, labels)
+				else:
+					_add_member(entry, bname, pending_kind, sentence,
+							m_fn.get_string(1), m_fn.get_string(2), fdoc, labels, m_fn.get_string(3))
 			pending_kind = ""
+			pending_text = {}
+			params = {}
 			doc.clear()
 			internal = false
 			continue
 
 		if not raw_line.strip_edges().is_empty():
 			pending_kind = ""
+			pending_text = {}
+			params = {}
+			options = {}
 			doc.clear()
 			internal = false
 
+	entry["title"] = _pick(entry, "@title", title) if not title.is_empty() else ""
+	entry["description"] = _pick(entry, "@description", about) if not about.is_empty() else ""
+	var lang_needs: Array = needs.get(GdeI18n.language(), needs.get("", []))
+	if lang_needs.size() != (needs.get("", []) as Array).size():
+		lang_needs = needs.get("", [])
+	for nd: String in lang_needs:
+		(entry["needs"] as Array).append(_parse_need(nd))
 	if str(entry["title"]).is_empty():
 		entry["title"] = bname
+	if extension:
+		_register_extension(entry, bname)
+		return
 	_retitle(entry, str(entry["title"]))
 
 	# Своя копия встроенного поведения в res://behaviors — не дубль, а замена:
@@ -274,18 +394,149 @@ func _scan_behavior_file(path: String) -> void:
 		if prev.begins_with(BEHAVIOR_DIRS[0] + "/") and path.begins_with(BEHAVIOR_DIRS[1] + "/"):
 			entry["builtin_path"] = prev
 		else:
-			errors.append("поведение «%s» объявлено дважды: %s и %s" % [bname, prev, path])
+			errors.append(GdeI18n.t("поведение «%s» объявлено дважды: %s и %s") % [bname, prev, path])
 	behaviors[bname] = entry
 
 
 static func _add_setting(entry: Dictionary, pname: String, doc: String, group: String,
-		internal: bool) -> void:
+		internal: bool, options: Array = []) -> void:
 	(entry["settings"] as Dictionary)[pname] = {
 		"label": _label_from_doc(doc, ""),
 		"doc": doc,
 		"group": group,
 		"internal": internal,
+		# Названия пунктов @export_enum на выбранном языке; пусто — как в коде.
+		"options": options,
 	}
+
+
+## Текст на выбранном языке из вариантов {"": основной, "en": …, "ru": …}.
+## Чего не хватает, записывается в entry["untranslated"] — i18n_test следит,
+## чтобы у встроенных поведений перевод был у всего, а check.tscn подсказывает
+## автору своего файла. Основной текст сам покрывает свой язык: кириллица —
+## русский, латиница — английский.
+static func _pick(entry: Dictionary, what: String, variants: Dictionary) -> String:
+	var miss: Dictionary = entry["untranslated"]
+	var base := _text_lang(str(variants.get("", "")))
+	for lang: String in GdeI18n.LANGUAGES:
+		if not variants.has(lang) and lang != base and base != "*":
+			if not miss.has(lang):
+				miss[lang] = []
+			(miss[lang] as Array).append(what)
+	return GdeI18n.pick(variants)
+
+
+## Язык основного текста: "ru", "en" или "*" — годится для всех: без букв
+## или одни заглавные латинские, как X, Y, HP, RGB.
+static func _text_lang(text: String) -> String:
+	for ch: int in text.to_utf32_buffer().to_int32_array():
+		if (ch >= 0x410 and ch <= 0x44F) or ch == 0x401 or ch == 0x451:
+			return "ru"
+	for ch2: int in text.to_utf32_buffer().to_int32_array():
+		if ch2 >= 0x61 and ch2 <= 0x7A:
+			return "en"
+	return "*"
+
+
+## Описание из ##-строк: основные строки и «## @en …» — отдельно.
+static func _pick_doc(entry: Dictionary, what: String, doc: Dictionary) -> String:
+	var variants := {}
+	for lang: String in doc:
+		variants[lang] = _doc_text(doc[lang])
+	if not variants.has("") or str(variants[""]).is_empty():
+		return str(GdeI18n.pick(variants))
+	return _pick(entry, what, variants)
+
+
+## Пункты @options на выбранном языке. Пусто — остаются как в @export_enum.
+static func _pick_list(options: Dictionary) -> Array:
+	return options.get(GdeI18n.language(), [])
+
+
+# ------------------------------------------------------------ расширения ---
+
+## Типы, которые делают параметр объектом листа: инструкция тогда работает
+## с отобранными экземплярами, а в функцию приходит сам экземпляр.
+static func _is_node_type(ty: String) -> bool:
+	return ty == "Node" or (ClassDB.class_exists(ty) and ClassDB.is_parent_class(ty, "Node"))
+
+
+## Условие, действие или выражение расширения из статической функции.
+func _add_ext_member(entry: Dictionary, ename: String, kind: String, sentence: String,
+		method: String, arglist: String, ret: String, doc: String, labels: Dictionary) -> void:
+	var params: Array = []
+	var call: Array[String] = []
+	var kinds: Array = []
+	var on_object := false
+	var i := 0
+	for a: String in arglist.split(",", false):
+		var s := a.strip_edges()
+		if s.is_empty():
+			continue
+		var nm := s.split(":")[0].split("=")[0].strip_edges()
+		var ty := s.split(":")[1].split("=")[0].strip_edges() if s.contains(":") else "float"
+		var label: String = labels.get(nm, nm)
+		if _is_node_type(ty):
+			if i != 0 or kind == "expression":
+				errors.append(GdeI18n.t("расширение «%s», %s(): объект может быть только первым параметром условия или действия")
+						% [ename, method])
+				return
+			on_object = true
+			params.append({"kind": "object", "label": labels.get(nm, GdeI18n.t("Объект"))})
+			call.append("{o}")
+		elif ty == "String" or ty == "StringName":
+			params.append({"kind": "string", "label": label})
+			kinds.append("string")
+			call.append("{%d}" % i)
+		else:
+			params.append({"kind": "number", "label": label})
+			kinds.append("number")
+			# Из листа приходят числа — к типу параметра приводим сами.
+			call.append(("bool({%d})" if ty == "bool" else ("int({%d})" if ty == "int" else "{%d}")) % i)
+		i += 1
+	var target := "preload(\"%s\").%s(%s)" % [str(entry["path"]), method, ", ".join(call)]
+	match kind:
+		"action":
+			entry["actions"][method] = {
+				"sentence": sentence, "description": doc, "params": params,
+				"kind": "object" if on_object else "global",
+				"code": target,
+			}
+		"condition":
+			var d := {
+				"sentence": sentence, "description": doc, "params": params,
+				"kind": "object" if on_object else "global",
+			}
+			d["pred" if on_object else "code"] = "bool(%s)" % target
+			entry["conditions"][method] = d
+		"expression":
+			var is_text := ret == "String" or ret == "StringName"
+			entry["expressions"][_pascal(method)] = {
+				"type": "string" if is_text else "number",
+				"params": kinds,
+				"description": sentence if doc.is_empty() else doc,
+				"template": ("str(%s)" if is_text else "float(%s)") % target,
+			}
+
+
+## Расширение — в общие таблицы: его условия и действия видны в окне выбора
+## и в генераторе так же, как встроенные, под именами «Расширение::функция».
+func _register_extension(entry: Dictionary, ename: String) -> void:
+	if extensions.has(ename) or behaviors.has(ename):
+		errors.append(GdeI18n.t("расширение «%s» объявлено дважды: %s и %s")
+				% [ename, str((extensions.get(ename, behaviors.get(ename, {})) as Dictionary).get("path", "")), entry["path"]])
+		return
+	extensions[ename] = entry
+	for table: String in ["conditions", "actions"]:
+		var target: Dictionary = conditions if table == "conditions" else actions
+		for m: String in (entry[table] as Dictionary):
+			var d: Dictionary = entry[table][m]
+			d["group"] = entry["title"]
+			d["icon"] = entry["icon"]
+			d["extension"] = ename
+			target["%s::%s" % [ename, m]] = d
+	for e: String in (entry["expressions"] as Dictionary):
+		ext_expressions["%s::%s" % [ename, e]] = entry["expressions"][e]
 
 
 ## Английское имя поведения нужно только коду. В глаза пользователю должно
@@ -303,7 +554,7 @@ func _retitle(entry: Dictionary, title: String) -> void:
 				d["description"] = str(d["description"]).replace(TITLE_MARK, title)
 
 
-static func _doc_text(doc: Array[String]) -> String:
+static func _doc_text(doc: Array) -> String:
 	var parts: Array[String] = []
 	for line: String in doc:
 		if not line.is_empty():
@@ -361,15 +612,20 @@ func _kind_of(gdtype: String) -> String:
 
 
 func _add_member(entry: Dictionary, bname: String, kind: String, sentence: String,
-		method: String, arglist: String, doc: String = "") -> void:
-	var params: Array = [{"kind": "object", "label": "Объект"}]
-	params.append_array(_parse_params(arglist))
+		method: String, arglist: String, doc: String = "", labels: Dictionary = {},
+		ret: String = "") -> void:
+	var params: Array = [{"kind": "object", "label": GdeI18n.t("Объект")}]
+	for p: Dictionary in _parse_params(arglist):
+		# Подпись из @param вместо имени аргумента: «Сила», а не ‹force›.
+		if labels.has(p["label"]):
+			p["label"] = labels[p["label"]]
+		params.append(p)
 	var call_args: Array[String] = []
 	for i in range(1, params.size()):
 		call_args.append("{%d}" % i)
 	var argstr := ", ".join(call_args)
 	var about := doc if not doc.is_empty() \
-			else "Из поведения «%s»." % TITLE_MARK
+			else GdeI18n.t("Из поведения «%s».") % TITLE_MARK
 
 	match kind:
 		"action":
@@ -399,11 +655,15 @@ func _add_member(entry: Dictionary, bname: String, kind: String, sentence: Strin
 			var ex_args: Array[String] = []
 			for i in range(ex_params.size()):
 				ex_args.append("{%d}" % i)
+			# Тип результата решает, число это или текст — как у расширений.
+			# Текстовому нужен запасной "", если поведения на объекте нет.
+			var is_text := ret == "String" or ret == "StringName"
 			entry["expressions"][_pascal(method)] = {
-				"type": "number",
+				"type": "string" if is_text else "number",
 				"params": ex_params,
 				"description": sentence if doc.is_empty() else doc,
-				"template": "float(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s]))"
+				"template": ("str(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s], \"\"))" if is_text
+						else "float(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s]))")
 						% [method, ", ".join(ex_args)],
 			}
 
@@ -434,28 +694,28 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 
 	entry["actions"]["set_" + pname] = {
 		"group": bname,
-		"sentence": "Изменить «%s» у _PARAM0_ (%s): _PARAM1_ _PARAM2_" % [label, TITLE_MARK],
+		"sentence": GdeI18n.t("Изменить «%s» у _PARAM0_ (%s): _PARAM1_ _PARAM2_") % [label, TITLE_MARK],
 		"description": about,
 		"weight": 1,
 		"kind": "object",
 		"params": [
-			{"kind": "object", "label": "Объект"},
-			{"kind": "modop", "label": "Знак"},
-			{"kind": kind, "label": "Значение"},
+			{"kind": "object", "label": GdeI18n.t("Объект")},
+			{"kind": "modop", "label": GdeI18n.t("Знак")},
+			{"kind": kind, "label": GdeI18n.t("Значение")},
 		],
 		"code": "Gde.beh_set({o}, \"%s\", \"%s\", %s {1~} {2})" % [bname, pname, read],
 		"code_assign": "Gde.beh_set({o}, \"%s\", \"%s\", {2})" % [bname, pname],
 	}
 	entry["conditions"]["is_" + pname] = {
 		"group": bname,
-		"sentence": "«%s» у _PARAM0_ (%s) _PARAM1_ _PARAM2_" % [label, TITLE_MARK],
+		"sentence": GdeI18n.t("«%s» у _PARAM0_ (%s) _PARAM1_ _PARAM2_") % [label, TITLE_MARK],
 		"description": about,
 		"weight": 1,
 		"kind": "object",
 		"params": [
-			{"kind": "object", "label": "Объект"},
-			{"kind": "cmpop", "label": "Знак"},
-			{"kind": kind, "label": "Значение"},
+			{"kind": "object", "label": GdeI18n.t("Объект")},
+			{"kind": "cmpop", "label": GdeI18n.t("Знак")},
+			{"kind": kind, "label": GdeI18n.t("Значение")},
 		],
 		"pred": "%s {1} {2}" % read,
 	}
@@ -464,7 +724,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 	entry["expressions"][_pascal(pname)] = {
 		"type": kind,
 		"params": [],
-		"description": "%s — настройка поведения." % label if doc.is_empty() else doc,
+		"description": GdeI18n.t("%s — настройка поведения.") % label if doc.is_empty() else doc,
 		"template": ("str(%s)" if kind == "string" else "float(%s)") % getter,
 	}
 
@@ -490,9 +750,9 @@ static func _label_from_doc(doc: String, fallback: String) -> String:
 
 
 static func _property_about(doc: String, group: String) -> String:
-	var head := "Настройка поведения «%s»" % TITLE_MARK
+	var head := GdeI18n.t("Настройка поведения «%s»") % TITLE_MARK
 	if not group.is_empty():
-		head += ", раздел «%s»" % group
+		head += GdeI18n.t(", раздел «%s»") % group
 	if doc.is_empty():
 		return head + "."
 	return "%s. %s" % [head, doc]

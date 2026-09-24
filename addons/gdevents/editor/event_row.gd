@@ -115,11 +115,11 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 	cols.add_theme_constant_override("separation", COL_SEPARATION)
 	content.add_child(cols)
 
-	cols.add_child(_build_column(e, "conditions", "Условие", 0.45, accent))
+	cols.add_child(_build_column(e, "conditions", GdeI18n.t("Условие"), 0.45, accent))
 	var sep := VSeparator.new()
 	sep.modulate = Color(1, 1, 1, 0.25)
 	cols.add_child(sep)
-	cols.add_child(_build_column(e, "actions", "Действие", 0.55, accent))
+	cols.add_child(_build_column(e, "actions", GdeI18n.t("Действие"), 0.55, accent))
 	return card
 
 
@@ -127,7 +127,7 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 	match _type:
 		"foreach":
-			row.add_child(_caption("Для каждого объекта"))
+			row.add_child(_caption(GdeI18n.t("Для каждого объекта")))
 			var ob := OptionButton.new()
 			# Тип указан явно: panel объявлен как Control, чтобы не делать
 			# циклическую ссылку между классами панели и строки.
@@ -139,11 +139,11 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 				if str(names[i]) == cur:
 					sel = i
 			if sel < 0 and not cur.is_empty():
-				ob.add_item("%s (нет в листе)" % cur, ob.item_count)
+				ob.add_item(GdeI18n.t("%s (нет в листе)") % cur, ob.item_count)
 				ob.set_item_metadata(ob.item_count - 1, cur)
 				sel = ob.item_count - 1
 			if ob.item_count == 0:
-				ob.add_item("— нет объектов —", 0)
+				ob.add_item(GdeI18n.t("— нет объектов —"), 0)
 				ob.set_item_metadata(0, "")
 				sel = 0
 			ob.selected = maxi(sel, 0)
@@ -153,7 +153,7 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 						str(meta) if meta != null else ob.get_item_text(i)))
 			row.add_child(ob)
 		"repeat":
-			row.add_child(_caption("Повторить"))
+			row.add_child(_caption(GdeI18n.t("Повторить")))
 			var le := LineEdit.new()
 			le.text = str(e.get("count", "1"))
 			le.custom_minimum_size = Vector2(160, 0)
@@ -162,11 +162,11 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 					panel.set_event_field(path, "count", le.text))
 			le.text_submitted.connect(func(t: String): panel.set_event_field(path, "count", t))
 			row.add_child(le)
-			row.add_child(_caption("раз"))
+			row.add_child(_caption(GdeI18n.t("раз")))
 		"group":
-			row.add_child(_caption("Группа"))
+			row.add_child(_caption(GdeI18n.t("Группа")))
 			var ne := LineEdit.new()
-			ne.text = str(e.get("name", "Группа"))
+			ne.text = str(e.get("name", GdeI18n.t("Группа")))
 			ne.custom_minimum_size = Vector2(240, 0)
 			ne.focus_exited.connect(func():
 				if ne.text != str(e.get("name", "")):
@@ -174,7 +174,7 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 			ne.text_submitted.connect(func(t: String): panel.set_event_field(path, "name", t))
 			row.add_child(ne)
 		"while":
-			row.add_child(_caption("Пока выполняется"))
+			row.add_child(_caption(GdeI18n.t("Пока выполняется")))
 
 
 func _build_column(e: Dictionary, kind: String, add_label: String,
@@ -224,7 +224,7 @@ func _add_row(kind: String, add_label: String) -> Control:
 	row.add_child(add)
 
 	var paste := Button.new()
-	paste.text = "Вставить %s" % ("условие" if kind == "conditions" else "действие")
+	paste.text = GdeI18n.t("Вставить %s") % (GdeI18n.t("условие") if kind == "conditions" else GdeI18n.t("действие"))
 	paste.flat = true
 	paste.focus_mode = Control.FOCUS_NONE
 	paste.icon = GdeIcons.get_icon("paste")
@@ -247,7 +247,7 @@ func _add_row(kind: String, add_label: String) -> Control:
 		var clip: String = panel.clipboard_kind()
 		var show := over and clip == kind
 		if show:
-			paste.tooltip_text = "Вставить в это событие:\n%s" % panel.clipboard_text()
+			paste.tooltip_text = GdeI18n.t("Вставить в это событие:\n%s") % panel.clipboard_text()
 		paste.visible = show
 	var mark := func(key: String, v: bool):
 		state[key] = v
@@ -273,13 +273,13 @@ func _row_tools(e: Dictionary) -> Control:
 	# Полупрозрачны, пока на них не навелись: видно, что они есть,
 	# но они не перетягивают внимание с самого события.
 	_tools.modulate = Color(1, 1, 1, 0.3)
-	_tools.add_child(_tool_button("copy", "Дублировать (Ctrl+D)",
+	_tools.add_child(_tool_button("copy", GdeI18n.t("Дублировать (Ctrl+D)"),
 			func(): panel.duplicate_event(path)))
 	var off: bool = e.get("disabled", false)
 	_tools.add_child(_tool_button("disabled",
-			"Включить" if off else "Выключить",
+			GdeI18n.t("Включить") if off else GdeI18n.t("Выключить"),
 			func(): panel.toggle_event_disabled(path)))
-	_tools.add_child(_tool_button("trash", "Удалить событие (Delete)",
+	_tools.add_child(_tool_button("trash", GdeI18n.t("Удалить событие (Delete)"),
 			func(): panel.remove_event(path)))
 	# Та же ловушка, что у строк: при переходе на кнопку ряд получает
 	# mouse_exited и тускнел прямо под курсором. Считаем «над рядом или над

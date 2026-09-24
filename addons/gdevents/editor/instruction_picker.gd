@@ -43,9 +43,9 @@ var _quiet: bool = false
 
 
 func _init() -> void:
-	title = "Добавить"
-	ok_button_text = "Добавить"
-	cancel_button_text = "Отмена"
+	title = GdeI18n.t("Добавить")
+	ok_button_text = GdeI18n.t("Добавить")
+	cancel_button_text = GdeI18n.t("Отмена")
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
@@ -63,7 +63,7 @@ func _init() -> void:
 	search_row.add_child(mag)
 
 	_search = LineEdit.new()
-	_search.placeholder_text = "Поиск по всем объектам…  Enter — выбрать первое найденное"
+	_search.placeholder_text = GdeI18n.t("Поиск по всем объектам…  Enter — выбрать первое найденное")
 	_search.clear_button_enabled = true
 	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_search.text_changed.connect(func(_t): _rebuild_tree(true))
@@ -80,7 +80,7 @@ func _init() -> void:
 	left.add_theme_constant_override("separation", 4)
 	left.custom_minimum_size = Vector2(180, 0)
 	outer.add_child(left)
-	left.add_child(_caption("ОБЪЕКТЫ"))
+	left.add_child(_caption(GdeI18n.t("ОБЪЕКТЫ")))
 
 	_objects = ItemList.new()
 	_objects.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -142,8 +142,8 @@ func _caption(text: String) -> Label:
 func open_add(reg: GdeRegistry, doc: GdeSheetDocument, kind: String,
 		prefer_object: String = "", accent: Color = Color(1, 0.78, 0.42)) -> void:
 	_edit_inst = {}
-	title = "Добавить условие" if kind == "conditions" else "Добавить действие"
-	ok_button_text = "Добавить"
+	title = GdeI18n.t("Добавить условие") if kind == "conditions" else GdeI18n.t("Добавить действие")
+	ok_button_text = GdeI18n.t("Добавить")
 	_open(reg, doc, kind, prefer_object, accent)
 	_editor.clear_editor()
 	get_ok_button().disabled = true
@@ -154,8 +154,8 @@ func open_add(reg: GdeRegistry, doc: GdeSheetDocument, kind: String,
 func open_edit(reg: GdeRegistry, doc: GdeSheetDocument, kind: String,
 		inst: Dictionary, accent: Color = Color(1, 0.78, 0.42)) -> void:
 	_edit_inst = inst.duplicate(true)
-	title = "Условие" if kind == "conditions" else "Действие"
-	ok_button_text = "Применить"
+	title = GdeI18n.t("Условие") if kind == "conditions" else GdeI18n.t("Действие")
+	ok_button_text = GdeI18n.t("Применить")
 	var id := str(inst.get("id", ""))
 	# Список инструкций нужен раньше, чем откроется окно: по нему узнаём,
 	# какой параметр строки — объект, и на нём открываемся.
@@ -229,9 +229,9 @@ func _collect() -> Array:
 
 func _fill_objects(prefer: String) -> void:
 	_objects.clear()
-	_objects.add_item("Общие", GdeIcons.get_icon("system"))
+	_objects.add_item(GdeI18n.t("Общие"), GdeIcons.get_icon("system"))
 	_objects.set_item_metadata(0, GENERAL)
-	_objects.set_item_tooltip(0, "Клавиатура, мышь, переменные, таймеры, сцена")
+	_objects.set_item_tooltip(0, GdeI18n.t("Клавиатура, мышь, переменные, таймеры, сцена"))
 
 	var select := 0
 	if _doc != null:
@@ -328,7 +328,7 @@ func _rebuild_tree(select_first: bool) -> void:
 				continue
 			if recent_group == null:
 				recent_group = _tree.create_item(root)
-				recent_group.set_text(0, "Недавние")
+				recent_group.set_text(0, GdeI18n.t("Недавние"))
 				recent_group.set_icon(0, GdeIcons.get_icon("timer"))
 				recent_group.set_icon_max_width(0, 16)
 				recent_group.set_selectable(0, false)
@@ -362,11 +362,13 @@ func _rebuild_tree(select_first: bool) -> void:
 		if searching and not text.to_lower().contains(needle) \
 				and not str(entry["id"]).to_lower().contains(needle):
 			continue
-		var gname := str(def.get("group", "Прочее"))
+		var gname := str(def.get("group", GdeI18n.t("Прочее")))
 		if not groups.has(gname):
 			var gi := _tree.create_item(root)
 			gi.set_text(0, gname)
-			gi.set_icon(0, GdeIcons.for_group(gname))
+			# У расширения своя иконка — ей и помечаем его группу.
+			gi.set_icon(0, GdeIcons.get_icon(str(def["icon"])) if def.has("extension") and def.has("icon")
+					else GdeIcons.for_group(gname))
 			gi.set_icon_max_width(0, 16)
 			gi.set_selectable(0, false)
 			gi.set_custom_color(0, Color(0.62, 0.72, 0.88))
@@ -380,7 +382,7 @@ func _rebuild_tree(select_first: bool) -> void:
 	if searching and select_first and first != null:
 		_select_item(first)
 	elif first == null:
-		_beh_note.text = "НИЧЕГО НЕ НАЙДЕНО"
+		_beh_note.text = GdeI18n.t("НИЧЕГО НЕ НАЙДЕНО")
 
 
 func _fill_item(item: TreeItem, entry: Dictionary) -> void:
@@ -400,18 +402,18 @@ func _shown_object() -> String:
 
 func _update_behavior_note() -> void:
 	if _current_object == GENERAL:
-		_beh_note.text = "ОБЩИЕ — НЕ ПРИВЯЗАНЫ К ОБЪЕКТУ"
+		_beh_note.text = GdeI18n.t("ОБЩИЕ — НЕ ПРИВЯЗАНЫ К ОБЪЕКТУ")
 		return
 	var list: Array = _installed.get(_current_object, [])
 	if list.is_empty():
-		_beh_note.text = "%s — поведений нет. Добавить: кнопка «Объекты» в панели." % _current_object.to_upper()
+		_beh_note.text = GdeI18n.t("%s — поведений нет. Добавить: кнопка «Объекты» в панели.") % _current_object.to_upper()
 		return
 	# В списке — русские названия: английские имена нужны только коду.
 	var titles: Array[String] = []
 	for b: Variant in list:
 		var d: Variant = _reg.behaviors.get(str(b)) if _reg != null else null
 		titles.append(str((d as Dictionary).get("title", b)) if d != null else str(b))
-	_beh_note.text = "%s — поведения: %s" % [_current_object.to_upper(), ", ".join(titles)]
+	_beh_note.text = GdeI18n.t("%s — поведения: %s") % [_current_object.to_upper(), ", ".join(titles)]
 
 
 # --------------------------------------------------------------- выбор ---

@@ -28,7 +28,7 @@ static func with_labels(def: Dictionary, object_name: String = "") -> String:
 static func with_values(def: Variant, inst: Dictionary, param_color: Color) -> String:
 	var id := str(inst.get("id", ""))
 	if def == null:
-		return "[color=#e05555]неизвестная инструкция «%s»[/color]" % _esc(id)
+		return GdeI18n.t("[color=#e05555]неизвестная инструкция «%s»[/color]") % _esc(id)
 	var d: Dictionary = def
 	var s := _esc(str(d.get("sentence", id)))
 	var raw: Array = inst.get("params", [])
@@ -46,14 +46,14 @@ static func with_values(def: Variant, inst: Dictionary, param_color: Color) -> S
 static func event_title(e: Dictionary) -> String:
 	match str(e.get("type", "standard")):
 		"group":
-			return str(e.get("name", "Группа"))
+			return str(e.get("name", GdeI18n.t("Группа")))
 		"foreach":
 			var o := str(e.get("object", ""))
-			return "Для каждого объекта %s" % (o if not o.is_empty() else "‹не выбран›")
+			return GdeI18n.t("Для каждого объекта %s") % (o if not o.is_empty() else GdeI18n.t("‹не выбран›"))
 		"repeat":
-			return "Повторить %s раз" % str(e.get("count", "1"))
+			return GdeI18n.t("Повторить %s раз") % str(e.get("count", "1"))
 		"while":
-			return "Пока выполняется"
+			return GdeI18n.t("Пока выполняется")
 		_:
 			return ""
 

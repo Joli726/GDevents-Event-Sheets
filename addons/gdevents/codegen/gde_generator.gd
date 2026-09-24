@@ -69,9 +69,9 @@ func _run(sheet: Dictionary, source_path: String) -> Dictionary:
 func _emit_header(sheet: Dictionary, source_path: String) -> void:
 	var base: String = str(sheet.get("extends", "Node2D"))
 	_line(0, "# =============================================================")
-	_line(0, "#  СГЕНЕРИРОВАНО GDevents. Правки здесь будут перезаписаны —")
-	_line(0, "#  меняйте лист событий, а не этот файл.")
-	_line(0, "#  Источник: %s" % source_path)
+	_line(0, GdeI18n.t("#  СГЕНЕРИРОВАНО GDevents. Правки здесь будут перезаписаны —"))
+	_line(0, GdeI18n.t("#  меняйте лист событий, а не этот файл."))
+	_line(0, GdeI18n.t("#  Источник: %s") % source_path)
 	_line(0, "# =============================================================")
 	_line(0, "extends %s" % base)
 	_line(0, "")
@@ -84,7 +84,7 @@ func _emit_ready(sheet: Dictionary) -> void:
 	_line(0, "func _ready() -> void:")
 	var objects: Array = sheet.get("objects", [])
 	if objects.is_empty():
-		_warnings.append("в листе не объявлено ни одного объекта")
+		_warnings.append(GdeI18n.t("в листе не объявлено ни одного объекта"))
 		_line(1, "Gde.register_objects([])")
 	else:
 		_line(1, "Gde.register_objects([")
@@ -158,7 +158,7 @@ func _gen_comment(e: Dictionary, indent: int) -> void:
 
 func _gen_group(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "")
-	_line(indent, "# ┌─ %s" % str(e.get("name", "Группа")))
+	_line(indent, "# ┌─ %s" % str(e.get("name", GdeI18n.t("Группа"))))
 	_gen_events(e.get("children", []), indent, parent_ctx)
 	_line(indent, "# └─")
 
@@ -197,11 +197,11 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var obj := str(e.get("object", ""))
 	if not _objects.has(obj):
-		_err("«Для каждого»: объект «%s» не объявлен в листе" % obj)
+		_err(GdeI18n.t("«Для каждого»: объект «%s» не объявлен в листе") % obj)
 		return
 	_event_n += 1
 	var outer := _new_ctx()
-	_emit_event_comment(e, indent, "Для каждого объекта %s" % obj)
+	_emit_event_comment(e, indent, GdeI18n.t("Для каждого объекта %s") % obj)
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
 	var it := _tmp("_each")
 	_line(indent, "for %s in %s.pick(%s):" % [it, outer, _quote(obj)])
@@ -232,10 +232,10 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_event_n += 1
 	var outer := _new_ctx()
-	_emit_event_comment(e, indent, "Повторить %s раз" % str(e.get("count", "1")))
+	_emit_event_comment(e, indent, GdeI18n.t("Повторить %s раз") % str(e.get("count", "1")))
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
 	var n := GdeExpr.compile_as(str(e.get("count", "1")), "number", outer, _reg)
-	_collect(n, "«Повторить»: количество")
+	_collect(n, GdeI18n.t("«Повторить»: количество"))
 	var it := _tmp("_rep")
 	_line(indent, "for %s in range(int(%s)):" % [it, n["code"]])
 	var inner := _new_ctx()
@@ -254,7 +254,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 
 func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_event_n += 1
-	_emit_event_comment(e, indent, "Пока выполняется")
+	_emit_event_comment(e, indent, GdeI18n.t("Пока выполняется"))
 	var guard := _tmp("_guard")
 	_line(indent, "var %s := 0" % guard)
 	var outer := _new_ctx()
@@ -268,12 +268,12 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	for c: Dictionary in e.get("conditions", []):
 		conds.append(_gen_condition(c, inner))
 	if conds.is_empty():
-		_err("событие «Пока» без условий — это вечный цикл")
+		_err(GdeI18n.t("событие «Пока» без условий — это вечный цикл"))
 		conds.append("false")
 	_line(indent + 1, "if not (%s): break" % _join_conds(conds, indent + 1))
 	_line(indent + 1, "%s += 1" % guard)
 	_line(indent + 1, "if %s > %d:" % [guard, MAX_WHILE_ITERATIONS])
-	_line(indent + 2, "push_error(\"GDevents: событие «Пока» превысило %d итераций\")" % MAX_WHILE_ITERATIONS)
+	_line(indent + 2, "push_error(%s)" % _quote(GdeI18n.t("GDevents: событие «Пока» превысило %d итераций") % MAX_WHILE_ITERATIONS))
 	_line(indent + 2, "break")
 	for a: Dictionary in e.get("actions", []):
 		_gen_action(a, inner, indent + 1)
@@ -291,7 +291,7 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 	var id := str(c.get("id", ""))
 	var def: Variant = _reg.condition(id)
 	if def == null:
-		_err("неизвестное условие «%s»" % id)
+		_err(GdeI18n.t("неизвестное условие «%s»") % id)
 		return "false"
 	var d: Dictionary = def
 	var inverted: bool = c.get("inverted", false)
@@ -344,7 +344,7 @@ func _gen_action(a: Dictionary, ctx: String, indent: int) -> bool:
 	var id := str(a.get("id", ""))
 	var def: Variant = _reg.action(id)
 	if def == null:
-		_err("неизвестное действие «%s»" % id)
+		_err(GdeI18n.t("неизвестное действие «%s»") % id)
 		return false
 	var d: Dictionary = def
 	var raw: Array = a.get("params", [])
@@ -380,7 +380,7 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 	var out: Array = []
 	var bare: Array = []
 	if raw.size() < defs.size():
-		_err("«%s»: не заполнено параметров (%d из %d)" % [id, raw.size(), defs.size()])
+		_err(GdeI18n.t("«%s»: не заполнено параметров (%d из %d)") % [id, raw.size(), defs.size()])
 	for i in range(defs.size()):
 		var pd: Dictionary = defs[i]
 		var kind := str(pd.get("kind", "number"))
@@ -388,7 +388,7 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 		match kind:
 			"object", "objname":
 				if not _objects.has(val):
-					_err("«%s»: объект «%s» не объявлен в листе" % [id, val])
+					_err(GdeI18n.t("«%s»: объект «%s» не объявлен в листе") % [id, val])
 				out.append(val)
 				bare.append(val)
 			"raw", "varname":
@@ -396,33 +396,33 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 				# или обратная косая в имени закрыли бы строку раньше времени,
 				# и собранный скрипт не компилировался бы — экранируем.
 				if kind == "varname" and not _is_var_path(val):
-					_err("«%s»: %s" % [id, "не указано имя переменной" if val.strip_edges().is_empty()
-							else "имя переменной «%s» — пустая часть между точками" % val])
+					_err("«%s»: %s" % [id, GdeI18n.t("не указано имя переменной") if val.strip_edges().is_empty()
+							else GdeI18n.t("имя переменной «%s» — пустая часть между точками") % val])
 				var safe := _escape(val)
 				out.append(safe)
 				bare.append(safe)
 			"cmpop":
 				var cop := _reg.resolve_op("cmpop", val)
 				if cop == "":
-					_err("«%s»: непонятный знак «%s»" % [id, val])
+					_err(GdeI18n.t("«%s»: непонятный знак «%s»") % [id, val])
 					cop = "=="
 				out.append(cop)
 				bare.append(cop)
 			"modop":
 				var mop := _reg.resolve_op("modop", val)
 				if mop == "":
-					_err("«%s»: непонятный знак «%s»" % [id, val])
+					_err(GdeI18n.t("«%s»: непонятный знак «%s»") % [id, val])
 					mop = "="
 				out.append(mop)
 				bare.append(val)
 			"string":
 				var r := GdeExpr.compile_as(val, "string", ctx, _reg)
-				_collect(r, "«%s», параметр %d" % [id, i + 1])
+				_collect(r, GdeI18n.t("«%s», параметр %d") % [id, i + 1])
 				out.append(r["code"])
 				bare.append(r["code"])
 			_:
 				var r2 := GdeExpr.compile_as(val, "number", ctx, _reg)
-				_collect(r2, "«%s», параметр %d" % [id, i + 1])
+				_collect(r2, GdeI18n.t("«%s», параметр %d") % [id, i + 1])
 				out.append(r2["code"])
 				bare.append(r2["code"])
 	# Строку можно заменить или дописать, но не вычесть и не умножить:
@@ -431,7 +431,7 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 		if str((defs[i] as Dictionary).get("kind", "")) == "modop" \
 				and str((defs[i + 1] as Dictionary).get("kind", "")) == "string" \
 				and not (str(raw[i]) in ["=", "+"]):
-			_err("«%s»: строку можно только заменить (=) или дописать (+), а не «%s»" % [id, str(raw[i])])
+			_err(GdeI18n.t("«%s»: строку можно только заменить (=) или дописать (+), а не «%s»") % [id, str(raw[i])])
 	return {"args": out, "bare": bare}
 
 
@@ -439,7 +439,7 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 ## событие просто никогда не срабатывало — теперь это ошибка сборки.
 func _template(d: Dictionary, key: String, id: String) -> String:
 	if not d.has(key):
-		_err("«%s»: в библиотеке у условия нет шаблона «%s»" % [id, key])
+		_err(GdeI18n.t("«%s»: в библиотеке у условия нет шаблона «%s»") % [id, key])
 		return "false"
 	return str(d[key])
 
@@ -461,7 +461,7 @@ func _object_arg(d: Dictionary, args: Array, which: int, id: String) -> String:
 			if seen == which:
 				return str(args[i]) if i < args.size() else ""
 			seen += 1
-	_err("«%s»: в описании инструкции не хватает параметра-объекта" % id)
+	_err(GdeI18n.t("«%s»: в описании инструкции не хватает параметра-объекта") % id)
 	return ""
 
 
@@ -469,17 +469,17 @@ func _object_arg(d: Dictionary, args: Array, which: int, id: String) -> String:
 
 func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void:
 	_line(indent, "")
-	_line(indent, "# ── Событие %d ─%s" % [_event_n, (" " + title) if title != "" else ""])
+	_line(indent, GdeI18n.t("# ── Событие %d ─%s") % [_event_n, (" " + title) if title != "" else ""])
 	var conds: Array = e.get("conditions", [])
 	var acts: Array = e.get("actions", [])
 	for i in range(conds.size()):
 		var c: Dictionary = conds[i]
-		var prefix := "ЕСЛИ:  " if i == 0 else "  И:   "
-		var neg := "НЕ " if c.get("inverted", false) else ""
+		var prefix := GdeI18n.t("ЕСЛИ:  ") if i == 0 else GdeI18n.t("  И:   ")
+		var neg := GdeI18n.t("НЕ ") if c.get("inverted", false) else ""
 		_line(indent, "# %s%s%s" % [prefix, neg, _sentence(_reg.condition(str(c.get("id", ""))), c)])
 	for i in range(acts.size()):
 		var a: Dictionary = acts[i]
-		_line(indent, "# %s%s" % ["ТО:    " if i == 0 else "       ", _sentence(_reg.action(str(a.get("id", ""))), a)])
+		_line(indent, "# %s%s" % [GdeI18n.t("ТО:    ") if i == 0 else "       ", _sentence(_reg.action(str(a.get("id", ""))), a)])
 
 
 ## Человеческая фраза инструкции с подставленными параметрами.

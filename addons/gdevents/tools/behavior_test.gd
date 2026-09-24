@@ -39,6 +39,8 @@ var _sprite: AnimatedSprite2D
 
 
 func _ready() -> void:
+	# Тест сверяет русские надписи — язык плагина здесь русский.
+	GdeI18n.set_language("ru", false)
 	# Объекты «как из листа»: поведениям урона, подбора и появления нужны имена.
 	Gde.register_objects([
 		{"name": "Victim", "scene": "res://addons/gdevents/tests/victim_virtual.tscn"},
