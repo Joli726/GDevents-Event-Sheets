@@ -1114,5 +1114,7 @@
 	"  ✗ справочник отстал от библиотеки: %s — пересоберите: godot --headless --script res://addons/gdevents/tools/make_reference.gd": "  ✗ the reference is behind the library: %s — rebuild it: godot --headless --script res://addons/gdevents/tools/make_reference.gd",
 	"—— проверок: 1, провалено: %d": "—— checks: 1, failed: %d",
 	"Поведение снято. Вместе с ним удалено то, что оно создало само: %s": "The behavior is removed, together with what it had created itself: %s",
-	"Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт. Камеры в сцене нет — она появится сама.": "The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably. If the scene has no camera, one appears by itself."
+	"Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт. Камеры в сцене нет — она появится сама.": "The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably. If the scene has no camera, one appears by itself.",
+	"Добавить событие": "Add event",
+	"Новое пустое событие в конце листа (Ctrl+N)": "A new empty event at the end of the sheet (Ctrl+N)"
 }

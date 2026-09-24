@@ -17,6 +17,9 @@ every such change comes with an automatic upgrade of old sheets.
   physics steps, and the character shook and left a trail. With Godot's
   physics interpolation on, the camera follows the smoothed position every
   frame. · **Камера больше не дрожит** за движущимся персонажем.
+- **"Add event" under the last event**, as in GDevelop: a new empty event
+  at the end of the sheet, selected and scrolled into view (also Ctrl+N).
+  · **«Добавить событие» под последним событием**, как в GDevelop.
 
 ## 0.9.1
 

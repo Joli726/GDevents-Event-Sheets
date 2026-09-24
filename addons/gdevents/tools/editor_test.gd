@@ -171,6 +171,17 @@ func _test_panel() -> void:
 	_ok(_count_rows(_panel) > rows, "после добавления события дерево перестроилось")
 	_panel.doc.undo()
 
+	# «+ Добавить событие» под последним событием, как в GDevelop.
+	var footer := _panel._rows.get_child(_panel._rows.get_child_count() - 1) as Button
+	_ok(footer != null and footer.name == "AddEventFooter", "под последним событием — «Добавить событие»")
+	var n_before: int = (_panel.doc.data["events"] as Array).size()
+	if footer != null:
+		footer.pressed.emit()
+	var evs_now: Array = _panel.doc.data["events"]
+	_ok(evs_now.size() == n_before + 1 and str((evs_now[evs_now.size() - 1] as Dictionary).get("type", "")) == "standard"
+			and _panel.is_event_selected([n_before]), "по нажатию — пустое событие в конце, и оно выделено")
+	_panel.doc.undo()
+
 	# «Любое из условий»: ключ появляется, подпись видна, выключение убирает ключ.
 	_panel.toggle_event_any([0])
 	var ev0: Dictionary = _panel.doc.event_at([0])

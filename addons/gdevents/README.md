@@ -18,6 +18,8 @@ next to "2D / 3D / Script".
   found.
 - Click a row to select it, double-click to open its parameters, right-click
   for the menu. On hover, buttons appear on the right: invert, copy, delete.
+- **"Add event" under the last event** — a new empty event at the end of
+  the sheet, as in GDevelop (or Ctrl+N).
 - The narrow strip on the left of an event card is both the event menu and a
   handle: **drag it to move the event**. Where it will land is shown in
   advance: a bar above — before, below — after, the whole card highlighted —

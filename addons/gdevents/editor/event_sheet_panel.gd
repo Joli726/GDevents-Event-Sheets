@@ -621,6 +621,7 @@ func _rebuild(recheck: bool = true) -> void:
 		row.setup(self, [i], events[i], accent)
 	if events.is_empty():
 		_rows.add_child(_empty_state())
+	_rows.add_child(_add_event_footer())
 	_refresh_buttons()
 	await get_tree().process_frame
 	_scroll.scroll_vertical = scroll_y
@@ -684,6 +685,35 @@ func _empty_state() -> Control:
 	s.modulate = Color(1, 1, 1, 0.5)
 	box.add_child(s)
 	return m
+
+
+## «+ Добавить событие» под последним событием, как в GDevelop: новое
+## событие встаёт в конец листа, сразу выделено и видно.
+func _add_event_footer() -> Control:
+	var b := Button.new()
+	b.name = "AddEventFooter"
+	b.text = GdeI18n.t("Добавить событие")
+	b.icon = GdeIcons.get_icon("plus")
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.modulate = Color(1, 1, 1, 0.55)
+	b.tooltip_text = GdeI18n.t("Новое пустое событие в конце листа (Ctrl+N)")
+	b.mouse_entered.connect(func(): b.modulate = Color(1, 1, 1, 1))
+	b.mouse_exited.connect(func(): b.modulate = Color(1, 1, 1, 0.55))
+	b.pressed.connect(add_event_at_end)
+	return b
+
+
+func add_event_at_end() -> void:
+	if doc == null:
+		return
+	var p := doc.add_event([], 9999, "standard")
+	select_event(p)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _scroll != null:
+		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
 
 
 func _refresh_buttons() -> void:
@@ -1292,7 +1322,7 @@ func _shortcut_input(event: InputEvent) -> void:
 					duplicate_event(_sel_path)
 			KEY_N:
 				accept_event()
-				doc.add_event([], 9999, "standard")
+				add_event_at_end()
 			KEY_F:
 				accept_event()
 				toggle_search(true)
