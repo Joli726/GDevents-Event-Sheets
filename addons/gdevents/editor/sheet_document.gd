@@ -349,6 +349,18 @@ func erase_event_field(p: Array, key: String) -> void:
 	_commit()
 
 
+## Заменить текст во всех значениях и текстах листа одним шагом отмены.
+func replace_text(what: String, with: String) -> int:
+	var probe := data.duplicate(true)
+	var n := GdeSearch.replace_all(probe.get("events", []), what, with)
+	if n == 0:
+		return 0
+	_snapshot()
+	data["events"] = probe["events"]
+	_commit()
+	return n
+
+
 func toggle_disabled(p: Array) -> void:
 	var e: Variant = event_at(p)
 	if e == null:

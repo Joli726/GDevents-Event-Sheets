@@ -68,6 +68,15 @@ static var _clip_event: Dictionary = {}
 ## значение — [{"text", "inst"}]. Считаются при каждой перерисовке,
 ## поэтому сломанная строка краснеет сразу, а не при запуске игры.
 var _live_errors: Dictionary = {}
+## Поиск: панель, найденные пути по порядку, текущий номер и те же пути
+## множеством — для подсветки карточек при построении.
+var _search_bar: PanelContainer
+var _find_edit: LineEdit
+var _replace_edit: LineEdit
+var _found_label: Label
+var _found: Array = []
+var _found_i: int = -1
+var _found_set: Dictionary = {}
 var _live_error_count: int = 0
 
 
@@ -161,6 +170,8 @@ func _build_ui() -> void:
 	_problems_btn.visible = false
 	bar.add_child(_problems_btn)
 
+	bar.add_child(_icon_button("search", GdeI18n.t("Найти и заменить (Ctrl+F)"), func(): toggle_search(true)))
+
 	bar.add_child(_sep())
 
 	_undo_btn = _icon_button("undo", GdeI18n.t("Отменить"), func():
@@ -239,6 +250,8 @@ func _build_ui() -> void:
 	bind_btn.icon = GdeIcons.get_icon("scene")
 	bind_btn.pressed.connect(func(): GdeUi.popup_fit(_bind_file, Vector2i(900, 620)))
 	warn_row.add_child(bind_btn)
+
+	_build_search_bar()
 
 	# Шапка колонок — чтобы сразу было видно, где что.
 	var head := HBoxContainer.new()
@@ -587,6 +600,15 @@ func _rebuild(recheck: bool = true) -> void:
 		if _autosave != null and autosave_enabled:
 			_autosave.start()
 		_live_check()
+		# Лист изменился — найденное тоже: пересчитать, не прыгая по листу.
+		if _search_bar != null and _search_bar.visible:
+			var keep := _found_i
+			_found = GdeSearch.find(doc.data.get("events", []), registry, _find_edit.text)
+			_found_set.clear()
+			for fp: Array in _found:
+				_found_set[str(fp)] = true
+			_found_i = mini(keep, _found.size() - 1)
+			_update_found_label()
 	var events: Array = doc.data.get("events", [])
 	for i in range(events.size()):
 		var row := GdeEventRow.new()
@@ -1186,6 +1208,17 @@ func _shortcut_input(event: InputEvent) -> void:
 			KEY_N:
 				accept_event()
 				doc.add_event([], 9999, "standard")
+			KEY_F:
+				accept_event()
+				toggle_search(true)
+		return
+
+	if k.keycode == KEY_F3:
+		accept_event()
+		if _search_bar != null and _search_bar.visible:
+			find_next(-1 if k.shift_pressed else 1)
+		else:
+			toggle_search(true)
 		return
 
 	if k.alt_pressed and (k.keycode == KEY_UP or k.keycode == KEY_DOWN):
@@ -1365,3 +1398,172 @@ func _on_add_root_event(id: int) -> void:
 	if id < 0 or id >= types.size():
 		return
 	doc.add_event([], 9999, types[id])
+
+
+# ------------------------------------------------------------------ поиск ---
+
+func _build_search_bar() -> void:
+	_search_bar = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, 0.04)
+	sb.set_content_margin_all(6)
+	sb.content_margin_left = 10
+	_search_bar.add_theme_stylebox_override("panel", sb)
+	_search_bar.visible = false
+	add_child(_search_bar)
+
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 4)
+	_search_bar.add_child(row)
+
+	_find_edit = LineEdit.new()
+	_find_edit.placeholder_text = GdeI18n.t("Найти в листе…")
+	_find_edit.custom_minimum_size = Vector2(220, 0)
+	_find_edit.clear_button_enabled = true
+	_find_edit.right_icon = GdeIcons.get_icon("search")
+	_find_edit.text_changed.connect(func(_t: String): _run_search(true))
+	_find_edit.text_submitted.connect(func(_t: String):
+		find_next(-1 if Input.is_key_pressed(KEY_SHIFT) else 1))
+	_find_edit.gui_input.connect(_search_key)
+	row.add_child(_find_edit)
+
+	_found_label = Label.new()
+	_found_label.custom_minimum_size = Vector2(90, 0)
+	_found_label.modulate = Color(1, 1, 1, 0.7)
+	row.add_child(_found_label)
+
+	var prev := _icon_button("up", GdeI18n.t("Предыдущее (Shift+Enter)"), func(): find_next(-1))
+	row.add_child(prev)
+	var next := _icon_button("down", GdeI18n.t("Следующее (Enter, F3)"), func(): find_next(1))
+	row.add_child(next)
+
+	_replace_edit = LineEdit.new()
+	_replace_edit.placeholder_text = GdeI18n.t("Заменить на…")
+	_replace_edit.custom_minimum_size = Vector2(200, 0)
+	_replace_edit.gui_input.connect(_search_key)
+	_replace_edit.text_submitted.connect(func(_t: String): replace_all_found())
+	row.add_child(_replace_edit)
+	row.add_child(_icon_button("replace",
+			GdeI18n.t("Заменить во всём листе: в значениях параметров, комментариях и именах групп. С учётом регистра. Отменяется Ctrl+Z"),
+			replace_all_found, GdeI18n.t("Заменить всё")))
+	row.add_child(_icon_button("close", GdeI18n.t("Закрыть поиск (Escape)"), func(): toggle_search(false)))
+
+
+func _search_key(ev: InputEvent) -> void:
+	var k := ev as InputEventKey
+	if k != null and k.pressed and k.keycode == KEY_ESCAPE:
+		toggle_search(false)
+		accept_event()
+
+
+func toggle_search(on: bool) -> void:
+	if _search_bar == null:
+		return
+	_search_bar.visible = on
+	if on:
+		_find_edit.grab_focus()
+		_find_edit.select_all()
+		_run_search(false)
+	else:
+		_found.clear()
+		_found_set.clear()
+		_found_i = -1
+		_rebuild(false)
+		grab_focus()
+
+
+## Найти заново. first — сразу перейти к первому найденному (при наборе).
+func _run_search(first: bool) -> void:
+	_found.clear()
+	_found_set.clear()
+	_found_i = -1
+	if doc != null and _search_bar != null and _search_bar.visible:
+		_found = GdeSearch.find(doc.data.get("events", []), registry, _find_edit.text)
+		for p: Array in _found:
+			_found_set[str(p)] = true
+	_update_found_label()
+	if first and not _found.is_empty():
+		find_next(1)
+	else:
+		_rebuild(false)
+
+
+func _update_found_label() -> void:
+	if _found_label == null:
+		return
+	if _find_edit.text.strip_edges().is_empty():
+		_found_label.text = ""
+	elif _found.is_empty():
+		_found_label.text = GdeI18n.t("не найдено")
+	elif _found_i < 0:
+		_found_label.text = GdeI18n.t("найдено: %d") % _found.size()
+	else:
+		_found_label.text = GdeI18n.t("%d из %d") % [_found_i + 1, _found.size()]
+
+
+## Перейти к следующему (dir = 1) или предыдущему (-1) найденному событию.
+## Свёрнутые родители разворачиваются — иначе найденное было бы не видно.
+func find_next(dir: int) -> void:
+	if _found.is_empty():
+		_update_found_label()
+		return
+	_found_i = posmod(_found_i + dir, _found.size()) if _found_i >= 0 else (0 if dir > 0 else _found.size() - 1)
+	var p: Array = _found[_found_i]
+	_unfold_to(p)
+	_sel_what = "event"
+	_sel_path = p.duplicate()
+	_sel_kind = ""
+	_sel_index = -1
+	_update_found_label()
+	await _rebuild(false)
+	_scroll_to_event(p)
+
+
+func _unfold_to(p: Array) -> void:
+	for n in range(1, p.size()):
+		var parent: Variant = doc.event_at(p.slice(0, n))
+		if parent is Dictionary and (parent as Dictionary).get("folded", false):
+			(parent as Dictionary).erase("folded")
+
+
+func _scroll_to_event(p: Array) -> void:
+	var card := _find_card(_rows, p)
+	if card != null:
+		_scroll.ensure_control_visible(card)
+
+
+func _find_card(n: Node, p: Array) -> GdeEventCard:
+	for c: Node in n.get_children():
+		if c is GdeEventCard and (c as GdeEventCard).path == p:
+			return c
+		var deep := _find_card(c, p)
+		if deep != null:
+			return deep
+	return null
+
+
+func is_event_found(p: Array) -> bool:
+	return _found_set.has(str(p))
+
+
+func replace_all_found() -> void:
+	if doc == null or _find_edit.text.is_empty():
+		return
+	var n := doc.replace_text(_find_edit.text, _replace_edit.text)
+	if n == 0:
+		_set_status(GdeI18n.t("Заменять нечего: «%s» в значениях и текстах листа нет") % _find_edit.text, true)
+	else:
+		_set_status(GdeI18n.t("Заменено: %d. Отменить — Ctrl+Z") % n, false)
+	_run_search(false)
+
+
+# ------------------------------------------------------------ сворачивание ---
+
+func toggle_event_folded(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	if (doc.event_at(p) as Dictionary).get("folded", false):
+		doc.erase_event_field(p, "folded")
+	else:
+		doc.set_event_field(p, "folded", true)

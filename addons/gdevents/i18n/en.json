@@ -988,5 +988,20 @@
 	"листа %s нет": "there is no sheet %s",
 	"— выберите лист —": "— choose a sheet —",
 	"%s (нет такого листа)": "%s (no such sheet)",
-	"Открыть подключённый лист": "Open the included sheet"
+	"Открыть подключённый лист": "Open the included sheet",
+	"Найти и заменить (Ctrl+F)": "Find and replace (Ctrl+F)",
+	"Найти в листе…": "Find in the sheet…",
+	"Предыдущее (Shift+Enter)": "Previous (Shift+Enter)",
+	"Следующее (Enter, F3)": "Next (Enter, F3)",
+	"Заменить на…": "Replace with…",
+	"Заменить во всём листе: в значениях параметров, комментариях и именах групп. С учётом регистра. Отменяется Ctrl+Z": "Replace in the whole sheet: in parameter values, comments and group names. Case-sensitive. Undo with Ctrl+Z",
+	"Заменить всё": "Replace all",
+	"Закрыть поиск (Escape)": "Close search (Escape)",
+	"найдено: %d": "found: %d",
+	"%d из %d": "%d of %d",
+	"Заменять нечего: «%s» в значениях и текстах листа нет": "Nothing to replace: «%s» is not in the sheet's values and texts",
+	"Заменено: %d. Отменить — Ctrl+Z": "Replaced: %d. Undo — Ctrl+Z",
+	"Развернуть подсобытия": "Expand sub-events",
+	"Свернуть подсобытия": "Collapse sub-events",
+	"свёрнуто подсобытий: %d": "collapsed sub-events: %d"
 }

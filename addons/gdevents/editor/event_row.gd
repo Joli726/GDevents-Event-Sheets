@@ -36,7 +36,9 @@ func setup(p: Control, event_path: Array, e: Dictionary, accent: Color) -> void:
 		add_child(card)
 
 	var children: Array = e.get("children", [])
-	if not children.is_empty():
+	if not children.is_empty() and e.get("folded", false):
+		add_child(_folded_note(children.size()))
+	elif not children.is_empty():
 		var wrap := HBoxContainer.new()
 		wrap.add_theme_constant_override("separation", 0)
 		var spacer := Control.new()
@@ -62,6 +64,7 @@ func _build_comment(e: Dictionary) -> Control:
 	var pc := GdeEventCard.new()
 	pc.comment = true
 	pc.setup(panel, path, _accent, panel.is_event_selected(path))
+	pc.set_found(panel.is_event_found(path))
 
 	var row := HBoxContainer.new()
 	pc.add_child(row)
@@ -87,6 +90,7 @@ func _build_comment(e: Dictionary) -> Control:
 func _build_card(e: Dictionary, accent: Color) -> Control:
 	var card := GdeEventCard.new()
 	card.setup(panel, path, accent, panel.is_event_selected(path))
+	card.set_found(panel.is_event_found(path))
 	var errs: Array[String] = panel.event_errors(path)
 	if not errs.is_empty():
 		card.set_errors(errs)
@@ -104,6 +108,13 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	content.add_child(header)
+	if not (e.get("children", []) as Array).is_empty():
+		var folded: bool = e.get("folded", false)
+		var fb := _tool_button("fold_closed" if folded else "fold_open",
+				GdeI18n.t("Развернуть подсобытия") if folded else GdeI18n.t("Свернуть подсобытия"),
+				func(): panel.toggle_event_folded(path))
+		fb.custom_minimum_size = Vector2(20, 18)
+		header.add_child(fb)
 	_fill_header(header, e)
 	var pad := Control.new()
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -217,7 +228,10 @@ func _fill_type_header(row: HBoxContainer, e: Dictionary) -> void:
 				if sheets[i] == cur:
 					sel = i
 			if sel < 0:
-				ob.add_item(GdeI18n.t("— выберите лист —") if cur.is_empty() else GdeI18n.t("%s (нет такого листа)") % cur, ob.item_count)
+				var label := GdeI18n.t("— выберите лист —")
+				if not cur.is_empty():
+					label = cur.replace("res://", "") if FileAccess.file_exists(cur) else GdeI18n.t("%s (нет такого листа)") % cur
+				ob.add_item(label, ob.item_count)
 				ob.set_item_metadata(ob.item_count - 1, cur)
 				sel = ob.item_count - 1
 			ob.selected = sel
@@ -321,6 +335,26 @@ func _add_row(kind: String, add_label: String) -> Control:
 
 
 # ------------------------------------------------------------------ мелочи ---
+
+## Вместо свёрнутых подсобытий — строка «скрыто: N», по нажатию разворачивает.
+func _folded_note(n: int) -> Control:
+	var wrap := HBoxContainer.new()
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(INDENT, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(spacer)
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.icon = GdeIcons.get_icon("fold_closed")
+	b.text = GdeI18n.t("свёрнуто подсобытий: %d") % n
+	b.tooltip_text = GdeI18n.t("Развернуть подсобытия")
+	b.modulate = Color(1, 1, 1, 0.55)
+	b.add_theme_font_size_override("font_size", 11)
+	b.pressed.connect(func(): panel.toggle_event_folded(path))
+	wrap.add_child(b)
+	return wrap
+
 
 ## Кнопки события. Показываются при наведении на карточку: постоянно висящий
 ## ряд иконок шумит, а прятать удаление в правую кнопку — неудобно.

@@ -21,10 +21,13 @@ var _where: int = Where.NONE
 var _accent: Color = Color(1, 0.78, 0.42)
 var _selected: bool = false
 var _has_errors: bool = false
+## Событие нашлось поиском.
+var _found: bool = false
 ## Карточка комментария: своя окраска, и бросить событие «внутрь» нельзя.
 var comment: bool = false
 
 const ERROR_COLOR := Color(0.93, 0.36, 0.36)
+const FOUND_COLOR := Color(0.45, 0.75, 1.0)
 
 
 func setup(p: Control, event_path: Array, accent: Color, selected: bool) -> void:
@@ -44,6 +47,13 @@ func set_selected(v: bool) -> void:
 	add_theme_stylebox_override("panel", _style())
 
 
+func set_found(v: bool) -> void:
+	if _found == v:
+		return
+	_found = v
+	add_theme_stylebox_override("panel", _style())
+
+
 ## Ошибки сборки этого события: красная рамка и текст в подсказке.
 func set_errors(errors: Array[String]) -> void:
 	_has_errors = not errors.is_empty()
@@ -55,7 +65,7 @@ func set_errors(errors: Array[String]) -> void:
 func _style() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	if comment:
-		sb.bg_color = Color(0.85, 0.75, 0.35, 0.16)
+		sb.bg_color = Color(0.85, 0.75, 0.35, 0.16) if not _found else Color(FOUND_COLOR.r, FOUND_COLOR.g, FOUND_COLOR.b, 0.16)
 		sb.border_color = Color(_accent.r, _accent.g, _accent.b, 0.55) if _selected \
 				else Color(0.85, 0.75, 0.35, 0.5)
 		sb.border_width_left = 3
@@ -77,6 +87,10 @@ func _style() -> StyleBoxFlat:
 	else:
 		sb.border_color = Color(1, 1, 1, 0.09)
 	sb.set_border_width_all(1)
+	if _found:
+		sb.bg_color = Color(FOUND_COLOR.r, FOUND_COLOR.g, FOUND_COLOR.b, 0.12)
+		if not _has_errors and not _selected:
+			sb.border_color = Color(FOUND_COLOR.r, FOUND_COLOR.g, FOUND_COLOR.b, 0.6)
 	sb.content_margin_left = 2
 	sb.content_margin_right = 6
 	sb.content_margin_top = 4
