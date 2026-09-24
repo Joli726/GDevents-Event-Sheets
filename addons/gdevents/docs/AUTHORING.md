@@ -576,7 +576,13 @@ The most useful calls:
 | `Gde.overlaps(a, b) -> bool`, `Gde.distance(a, b)`, `Gde.aabb(n)` | collisions and geometry |
 | `Gde.play_animation(n, "Run")`, `Gde.set_flip_h(n, true)` | visuals |
 | `Gde.play_sound(path, db, pitch)`, `Gde.shake_camera(strength, seconds)` | effects |
-| `Gde.key_pressed("Space")`, `Gde.mouse_world() -> Vector2` | input |
+| `Gde.key_pressed("Space")`, `Gde.key_held_time("Space")`, `Gde.mouse_world() -> Vector2` | input |
+| `Gde.pad_pressed("A")`, `Gde.stick(JOY_AXIS_LEFT_X)`, `Gde.vibrate(weak, strong, s)` | gamepad |
+| `Gde.otimer(n, "shot")` / `Gde.otimer_reset(n, "shot")` | a timer of one instance |
+| `Gde.effect("explosion", x, y, size)`, `Gde.float_text(n, "-3", "red")`, `Gde.hitstop(0.08)`, `Gde.screen_flash("white", 0.2, 0.6)` | effects |
+| `Gde.list_add(name, v)`, `Gde.list_contains(name, "key")`, `Gde.list_count(name)` | lists in scene variables |
+| `Gde.show_value("hp", str(hp))`, `Gde.screen_log("text")` | debugging on screen |
+| `GdeDebris.shatter(n, level, cols, rows, speed, gravity, life, spin)` | burst an object's picture into shards |
 
 The full list is in `addons/gdevents/runtime/gde_runtime.gd`; functions not
 starting with `_` are public.
@@ -670,4 +676,13 @@ godot --headless --script res://addons/gdevents/tools/editor_test.gd
 godot --headless --quit-after 5000 res://addons/gdevents/tools/library_test.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/runtime_test.tscn
 godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
+godot --headless --quit-after 60000 res://addons/gdevents/tools/behavior_scenarios_test.tscn
+godot --headless --quit-after 20000 res://addons/gdevents/tools/events_test.tscn
 ```
+
+A new built-in behavior gets a scenario in `behavior_scenarios_test.gd`
+(its own small world: build, run physics, check, free); a new built-in
+event gets a check in `events_test.gd` on a generated sheet. Timing that
+depends on the draw frame or real seconds must wait real time
+(`_wait_ms`), because frames run much faster than 60 per second without
+a screen.

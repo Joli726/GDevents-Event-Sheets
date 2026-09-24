@@ -5,9 +5,9 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.1.0**: the event sheet editor, 14 ready-made behaviors, your own
-behaviors and extensions, scene and file checks, an English and Russian
-interface.
+**Version 0.2.0**: the event sheet editor, 34 ready-made behaviors, 244
+instructions, your own behaviors and extensions, scene and file checks, an
+English and Russian interface.
 
 ## Editor
 
@@ -246,6 +246,8 @@ godot --headless --quit-after 600 res://addons/gdevents/tools/runtime_test.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/library_test.tscn
 godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
 godot --headless --script res://addons/gdevents/tools/i18n_test.gd
+godot --headless --quit-after 60000 res://addons/gdevents/tools/behavior_scenarios_test.tscn
+godot --headless --quit-after 20000 res://addons/gdevents/tools/events_test.tscn
 ```
 
 The first covers the document model, the clipboard, finding behaviors in a
@@ -293,6 +295,15 @@ about its update, the English interface without Russian leftovers.
 The ninth — translations: every interface string and the whole built-in
 library, behaviors and extensions have English text with the same
 placeholders, and no Russian strings bypass `GdeI18n.t()` in the code.
+The tenth runs every newer behavior in its own small physics world, one
+scenario after another: the patrolling enemy turns at edges and walls and
+walks home after losing the player, pathfinding goes around a wall, a
+platform carries whoever stands on it, a crate is pushed, a checkpoint
+respawns, the dialogue types and takes answers, and so on (one scenario:
+`GDE_SCENARIO=ladder godot --headless …`).
+The eleventh runs the newer events on generated sheets with frames ticked
+by hand: "has just collided" fires once, "wait" keeps the picking, object
+timers are independent, lists, effects, key hold and double tap.
 
 There are also `tools/editor_shot.gd` and `tools/dialog_shot.tscn`: they put
 screenshots of the panel and the dialogs into `user://` — a quick way to see
@@ -386,10 +397,10 @@ GDevelop, and not `1`, as in plain GDScript.
 
 ## Library
 
-`registry/builtin.json` holds **54 conditions, 67 actions and 64
-expressions** in 18 groups: Movement, Picking, Collisions, Objects,
-Variables, Animation, Appearance, Tweens, Text, Keyboard, Mouse, Timers,
-Sound, Camera, Physics, Saving, Scene, System.
+`registry/builtin.json` holds **77 conditions, 92 actions and 75
+expressions** in 21 groups: Movement, Picking, Collisions, Objects,
+Variables, Lists, Animation, Appearance, Tweens, Effects, Text, Keyboard,
+Mouse, Gamepad, Timers, Sound, Camera, Physics, Saving, Scene, System.
 It is a curated layer: edited as text, its sentences are written in Russian
 and translated into English through `i18n/en.json`.
 **Every instruction has a description** — it is shown in the picker and as a
@@ -398,6 +409,28 @@ tooltip in the sheet.
 The `icon` field of an instruction or the group map in `editor/gde_icons.gd`
 sets its icon. The set is [Tabler Icons](https://tabler.io/icons) (MIT), see
 `icons/LICENSE.txt`.
+
+### What is there besides the basics
+
+- **Touches**: "has just collided" and "the touch has ended" fire once;
+  "touches from above / below / from the side" for a Mario-style stomp.
+  Objects that only touch at the edges count as colliding.
+- **Wait N seconds**: everything below in the event and its sub-events
+  runs later, with the same picked objects.
+- **Object timers**: every instance has its own ("timer shot of Enemy >
+  2"), so enemies do not shoot in chorus; `Enemy.Timer(shot)`.
+- **Compare two values** (any expressions, numbers or texts) and **pick
+  all within a radius** of a point or of an object — explosions.
+- **Input**: gamepad buttons and sticks (`StickX()`, `StickY()`),
+  vibration, "held longer than N seconds", "released after holding" for
+  charged shots, `KeyHeldTime()`, double taps.
+- **Objects**: attach to an object (with an offset or where it is) and
+  detach; duplicate with the object variables.
+- **Effects**: ready-made particles (explosion, sparks, dust, smoke,
+  magic, confetti), floating text above an object, hit stop, screen flash,
+  going to a scene with a fade.
+- **Lists** in scene variables and **values on screen** instead of the
+  console.
 
 ### The "Picking" group — the very GDevelop mechanic
 
@@ -535,7 +568,7 @@ your edits every time the scene loads.
 
 | Name | What it gives |
 |---|---|
-| **Platformer** | Coyote time, jump buffer, variable height, faster falling, turning with acceleration, air control, double jump, wall slide and wall jump, automatic animations. Presets: Classic, Icy, Moon, Responsive. Needs a `CharacterBody2D` |
+| **Platformer** | Coyote time, jump buffer, variable height, faster falling, turning with acceleration, air control, double jump, wall slide and wall jump, ladders, dropping through one-way platforms, automatic animations. Presets: Classic, Icy, Moon, Responsive. Needs a `CharacterBody2D` |
 | **Shoot** | Spread, shotgun pellets, bursts, magazine and reload, recoil, sound, inheriting the shooter's velocity, shooting at the nearest object. Presets: Pistol, Shotgun, Machine gun, Burst |
 | **TopDown** | 4/8/free movement, dash with cooldown, smooth turning, pushing, animations. Presets: Classic, Slippery, Tank, Snappy |
 | **Health** | Flat and percentage armor, invulnerability with blinking, regeneration with a delay, death delay, a scene on death, damage through invulnerability |
@@ -549,6 +582,26 @@ your edits every time the scene loads.
 | **Damage** | Damage to whoever it touches: a cooldown per victim, knockback, piercing several targets, self-destruction, damage through invulnerability. Presets: Spikes, Bullet, Piercing projectile, Poison |
 | **Pickup** | Coins, crystals, medkits, ammo: bobbing, a magnet to the collector, adding to a variable, healing or ammo — without a single event. Presets: Coin, Crystal, Medkit, Ammo |
 | **Spawner** | A spawn point: an interval with randomness, batches, a total limit and a limit of living ones, a random place in a circle. Presets: Enemy wave, Coin rain, Boss, Fountain |
+| **PatrolEnemy** | A ready-made platformer enemy without events: walks its beat, turns at edges and walls, spots the player with a ray that walls block, chases, searches, returns home |
+| **Pathfinder** | Goes to a target around walls: the level is split into cells by itself, A* with smoothing, recomputes for a moving target, "cannot reach" |
+| **Homing** | A missile turning to the target with a limited turn speed; it can miss and lose the target outside its field of view. Launched by Shoot in the firing direction |
+| **Orbit** | Circles around another object; several spread evenly by themselves, follow the center and can disappear with it — shields, satellites, saws |
+| **Flock** | Bees, birds, fish: stay together, fly the same way, do not bump into each other, go around walls, follow or flee a leader |
+| **Car** | A top-down car: throttle, brake and reverse, speed-dependent steering, grip, drifting on the handbrake, "crashed". Presets: Arcade, Drift, Truck, Kart |
+| **GridStep** | Movement by cells for puzzles, roguelikes and sokoban: walls stop it, grid objects block each other, pushable ones are pushed |
+| **Platform** | One-way (jump up through it, drop down with down + jump), moving and carrying riders, a conveyor belt, crumbling and coming back, a trampoline |
+| **Ladder** | A zone the platformer climbs up and down in; jump to get off, centering on the ladder |
+| **Pushable** | A crate a character moves by leaning into its side; falls off edges, stops at walls, top-down too |
+| **Checkpoint** | A touch remembers the respawn point; after Health runs out the player appears there with full health, even after a scene restart |
+| **Destructible** | Bursts into shards of its own picture and drops items by a chance table — on Health death, on a touch or by an action |
+| **Melee** | A strike with a hit zone on the right animation frames, once per target per swing, knockback, combos of up to three, cooldown |
+| **Ability** | A dash, a shield or healing on a key with charges and a cooldown, without events; readiness for a bar |
+| **StateMachine** | States like patrol / chase / attack / stunned: time in a state, "has just entered / left", timed switches |
+| **StickTo** | Stays at another object with an offset and flips with it: a health bar above an enemy, a weapon in a hand |
+| **ValueBar** | A bar of health or of a variable that draws itself, shrinks smoothly with a catching-up trail; above an object or on screen |
+| **Juice** | Squash and stretch, dust on landing, a flash and a shake on hits, a trail on dashes — picked up from other behaviors' signals by itself |
+| **MenuButton** | A menu button: hover, press, sound, zoom, arrow keys and Enter, works on pause; can go to a scene, restart, unpause or quit |
+| **Dialogue** | A speech bubble (or a box at the bottom): typed letter by letter, a queue of lines, answers to choose from, pausing the game |
 
 Every behavior has signals (`jumped`, `landed`, `died`, `fired`…) — they can
 be connected from ordinary GDScript, bypassing the event sheet.
