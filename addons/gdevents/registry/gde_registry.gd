@@ -356,7 +356,7 @@ func _scan_behavior_file(path: String, extension: bool = false) -> void:
 							m_fn.get_string(2), m_fn.get_string(3), fdoc, labels)
 				else:
 					_add_member(entry, bname, pending_kind, sentence,
-							m_fn.get_string(1), m_fn.get_string(2), fdoc, labels)
+							m_fn.get_string(1), m_fn.get_string(2), fdoc, labels, m_fn.get_string(3))
 			pending_kind = ""
 			pending_text = {}
 			params = {}
@@ -412,15 +412,29 @@ static func _add_setting(entry: Dictionary, pname: String, doc: String, group: S
 
 ## Текст на выбранном языке из вариантов {"": основной, "en": …, "ru": …}.
 ## Чего не хватает, записывается в entry["untranslated"] — i18n_test следит,
-## чтобы у встроенных поведений перевод был у всего.
+## чтобы у встроенных поведений перевод был у всего, а check.tscn подсказывает
+## автору своего файла. Основной текст сам покрывает свой язык: кириллица —
+## русский, латиница — английский.
 static func _pick(entry: Dictionary, what: String, variants: Dictionary) -> String:
 	var miss: Dictionary = entry["untranslated"]
+	var base := _text_lang(str(variants.get("", "")))
 	for lang: String in GdeI18n.LANGUAGES:
-		if not variants.has(lang):
+		if not variants.has(lang) and lang != base and base != "*":
 			if not miss.has(lang):
 				miss[lang] = []
 			(miss[lang] as Array).append(what)
 	return GdeI18n.pick(variants)
+
+
+## Язык основного текста: "ru", "en" или "*" — без букв, годится для всех.
+static func _text_lang(text: String) -> String:
+	for ch: int in text.to_utf32_buffer().to_int32_array():
+		if (ch >= 0x410 and ch <= 0x44F) or ch == 0x401 or ch == 0x451:
+			return "ru"
+	for ch2: int in text.to_utf32_buffer().to_int32_array():
+		if (ch2 >= 0x41 and ch2 <= 0x5A) or (ch2 >= 0x61 and ch2 <= 0x7A):
+			return "en"
+	return "*"
 
 
 ## Описание из ##-строк: основные строки и «## @en …» — отдельно.
@@ -597,7 +611,8 @@ func _kind_of(gdtype: String) -> String:
 
 
 func _add_member(entry: Dictionary, bname: String, kind: String, sentence: String,
-		method: String, arglist: String, doc: String = "", labels: Dictionary = {}) -> void:
+		method: String, arglist: String, doc: String = "", labels: Dictionary = {},
+		ret: String = "") -> void:
 	var params: Array = [{"kind": "object", "label": GdeI18n.t("Объект")}]
 	for p: Dictionary in _parse_params(arglist):
 		# Подпись из @param вместо имени аргумента: «Сила», а не ‹force›.
@@ -639,11 +654,15 @@ func _add_member(entry: Dictionary, bname: String, kind: String, sentence: Strin
 			var ex_args: Array[String] = []
 			for i in range(ex_params.size()):
 				ex_args.append("{%d}" % i)
+			# Тип результата решает, число это или текст — как у расширений.
+			# Текстовому нужен запасной "", если поведения на объекте нет.
+			var is_text := ret == "String" or ret == "StringName"
 			entry["expressions"][_pascal(method)] = {
-				"type": "number",
+				"type": "string" if is_text else "number",
 				"params": ex_params,
 				"description": sentence if doc.is_empty() else doc,
-				"template": "float(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s]))"
+				"template": ("str(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s], \"\"))" if is_text
+						else "float(Gde.beh_val({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\", [%s]))")
 						% [method, ", ".join(ex_args)],
 			}
 
