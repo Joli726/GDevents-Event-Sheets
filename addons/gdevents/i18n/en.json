@@ -955,5 +955,10 @@
 	"Написать на экране: _PARAM0_": "Write on screen: _PARAM0_",
 	"Строка в журнал поверх игры: последние восемь строк держатся несколько секунд. Удобно, чтобы увидеть, что событие сработало.": "A line into a log on top of the game: the last eight lines stay for a few seconds. Handy to see that an event fired.",
 	"Убрать надписи с экрана": "Remove the lines from the screen",
-	"Стирает показанные значения и журнал.": "Erases the shown values and the log."
+	"Стирает показанные значения и журнал.": "Erases the shown values and the log.",
+	"«format» должен быть целым числом от 1, а не %s": "«format» must be a whole number from 1, not %s",
+	"лист сделан в более новой версии GDevents (формат %d, этот плагин понимает до %d) — обновите плагин": "the sheet was made with a newer GDevents (format %d, this plugin understands up to %d) — update the plugin",
+	"нет шага обновления листа из формата %d": "no upgrade step for sheet format %d",
+	"GDevents: листы событий не собираются (%d шт.) — в экспортированной игре останется их старый код. Подробности выше.": "GDevents: event sheets do not build (%d) — the exported game keeps their old code. Details above.",
+	"GDevents: листы собраны перед экспортом — %d": "GDevents: sheets built before export — %d"
 }

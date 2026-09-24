@@ -206,7 +206,11 @@ func _check_sheet(path: String) -> void:
 	if not (parsed is Dictionary):
 		_err(GdeI18n.t("некорректный JSON"))
 		return
-	var sheet: Dictionary = parsed
+	var m := GdeSheetFormat.migrate(parsed)
+	if str(m["error"]) != "":
+		_err(str(m["error"]))
+		return
+	var sheet: Dictionary = m["data"]
 	_check_structure(sheet)
 	var names: Array = []
 	for o: Variant in sheet.get("objects", []):

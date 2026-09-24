@@ -24,7 +24,7 @@ var _dirty: bool = false
 static func create_empty(name: String) -> GdeSheetDocument:
 	var doc := GdeSheetDocument.new()
 	doc.data = {
-		"format": 1,
+		"format": GdeSheetFormat.CURRENT,
 		"name": name,
 		"extends": "Node2D",
 		"objects": [],
@@ -43,11 +43,16 @@ func load_from(p: String) -> String:
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return GdeI18n.t("некорректный JSON в %s") % p
+	var m := GdeSheetFormat.migrate(parsed)
+	if str(m["error"]) != "":
+		return "%s: %s" % [p, m["error"]]
 	path = p
-	data = parsed
+	data = m["data"]
 	_undo.clear()
 	_redo.clear()
-	_set_dirty(false)
+	# Лист старого формата обновлён в памяти — пусть автосохранение запишет
+	# его уже новым, иначе обновление повторялось бы при каждом открытии.
+	_set_dirty(int(m["from"]) < GdeSheetFormat.CURRENT)
 	changed.emit()
 	return ""
 

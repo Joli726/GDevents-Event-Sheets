@@ -34,6 +34,8 @@ func _ready() -> void:
 	_test_missing_template()
 	_test_free_expr_subs()
 	_test_compile_check()
+	print("—— формат листа ——")
+	_test_sheet_format()
 	print("—— расширения ——")
 	await _test_extensions()
 	_finish()
@@ -209,6 +211,32 @@ const PROBE_DIR := "res://addons/gdevents/tests/extensions"
 
 ## Расширение по-настоящему: лист с его действиями, условием и выражениями
 ## собирается, выполняется на живых объектах и оставляет следы.
+## Старые листы обновляются, новые не трогаются: иначе обновление плагина
+## ломало бы игры, а старый плагин портил бы лист из новой версии.
+func _test_sheet_format() -> void:
+	var cur := GdeSheetFormat.CURRENT
+	var m := GdeSheetFormat.migrate({"events": []})
+	_eq(m["error"], "", "лист без «format» читается")
+	_eq(int((m["data"] as Dictionary)["format"]), cur, "лист без «format» получает номер")
+	m = GdeSheetFormat.migrate({"format": cur + 1, "events": []})
+	_ok(str(m["error"]).contains("новой версии"), "лист из новой версии не открывается: %s" % m["error"])
+	m = GdeSheetFormat.migrate({"format": "два"})
+	_ok(str(m["error"]) != "", "мусор в «format» — ошибка")
+	# Шаг обновления на выдуманном формате 2: переименование ключа.
+	var steps := {1: func(d: Dictionary) -> Dictionary:
+		d["title"] = d.get("name", "")
+		d.erase("name")
+		return d}
+	var old := {"format": 1, "name": "Уровень"}
+	m = GdeSheetFormat.migrate(old, steps, 2)
+	var d: Dictionary = m["data"]
+	_eq(d.get("format"), 2, "шаг поднял номер формата")
+	_eq(d.get("title"), "Уровень", "шаг обновил лист")
+	_ok(m["changed"] and old.has("name"), "исходный лист не тронут")
+	m = GdeSheetFormat.migrate({"format": 1}, {}, 3)
+	_ok(str(m["error"]).contains("нет шага"), "пропущенный шаг — ошибка, а не молча")
+
+
 func _test_extensions() -> void:
 	var reg := GdeRegistry.load_default()
 	reg.scan_extensions(PROBE_DIR)

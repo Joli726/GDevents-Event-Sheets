@@ -45,7 +45,11 @@ static func build_one(sheet_path: String, reg: GdeRegistry) -> Dictionary:
 	if not (parsed is Dictionary):
 		return {"ok": false, "log": [GdeI18n.t("✗ %s: некорректный JSON") % sheet_path]}
 
-	var res := GdeGenerator.generate(parsed, reg, sheet_path)
+	var m := GdeSheetFormat.migrate(parsed)
+	if str(m["error"]) != "":
+		return {"ok": false, "log": ["✗ %s: %s" % [sheet_path, m["error"]]]}
+
+	var res := GdeGenerator.generate(m["data"], reg, sheet_path)
 	var errors: Array = res["errors"]
 	var warnings: Array = res["warnings"]
 

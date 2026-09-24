@@ -9,6 +9,7 @@ var _panel: GdeEventSheetPanel
 ## Пункт меню «Проект → Инструменты» — на языке, выбранном при его создании.
 var _menu_item: String = ""
 var _language_dialog: GdeLanguageDialog
+var _export_plugin: GdeExportPlugin
 
 
 ## Автозагрузка — часть настроек проекта, а не сеанса редактора. Её ставят
@@ -35,6 +36,9 @@ func _enter_tree() -> void:
 	_ensure_autoload()
 	_add_menu()
 	_create_panel()
+	_export_plugin = GdeExportPlugin.new()
+	_export_plugin.panel = _panel
+	add_export_plugin(_export_plugin)
 
 	# Язык плагина: при первом запуске спросим, дальше — переключатель на
 	# панели или «Настройки редактора → GDevents».
@@ -47,6 +51,9 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	_remove_menu()
+	if _export_plugin != null:
+		remove_export_plugin(_export_plugin)
+		_export_plugin = null
 	var es := EditorInterface.get_editor_settings()
 	if es.settings_changed.is_connected(_on_editor_settings_changed):
 		es.settings_changed.disconnect(_on_editor_settings_changed)
