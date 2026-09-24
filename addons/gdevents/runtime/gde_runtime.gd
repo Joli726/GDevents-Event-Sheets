@@ -40,6 +40,9 @@ var _dbg_clock: float = 0.0
 
 func _ready() -> void:
 	process_priority = -100
+	# В физике Gde ходит последним: камера — после того, как все сдвинулись.
+	process_physics_priority = 100
+	RenderingServer.frame_pre_draw.connect(_on_frame_pre_draw)
 	get_tree().node_added.connect(_on_node_added)
 	if _error_logger == null:
 		_error_logger = GdeErrorLogger.new()
@@ -48,6 +51,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if RenderingServer.frame_pre_draw.is_connected(_on_frame_pre_draw):
+		RenderingServer.frame_pre_draw.disconnect(_on_frame_pre_draw)
 	if _error_logger != null:
 		OS.remove_logger(_error_logger)
 		_error_logger = null
@@ -1503,7 +1508,9 @@ func _process(delta: float) -> void:
 	_mouse_moved = _mouse_moved_acc
 	_mouse_moved_acc = false
 	_clock += delta
-	_update_camera(delta)
+	var cam := _camera()
+	if cam != null:
+		_update_shake(cam, delta)
 	_update_watch()
 	if debugging:
 		_dbg_clock += delta
@@ -2786,6 +2793,15 @@ var _shake_left: float = 0.0
 var _shake_strength: float = 0.0
 var _follow: Node = null
 var _follow_smooth: float = 0.0
+## В каком ритме двигается тот, за кем следим: на шаге физики (платформер,
+## 60 раз в секунду) или каждый кадр отрисовки. Камера ходит в том же ритме.
+## Если камера едет каждый кадр 144-герцового монитора, а персонаж — только
+## 60 раз в секунду, между его шагами камера успевает сдвинуться ещё раз-два,
+## и на экране он дрожит и оставляет «шлейф».
+enum FollowBeat { FRAME, PHYSICS }
+var _follow_beat: int = FollowBeat.FRAME
+var _follow_seen: Vector2 = Vector2.INF
+var _frame_usec: int = 0
 
 
 func shake_camera(strength: float, seconds: float) -> void:
@@ -2808,21 +2824,73 @@ func camera_stop_follow() -> void:
 	_follow = null
 
 
-## Тряска и слежение крутятся здесь, чтобы работать независимо от листа событий.
+## Слежение и тряска за один шаг — для тестов и там, где ритм не важен.
 func _update_camera(delta: float) -> void:
 	var cam := _camera()
 	if cam == null:
 		return
 	if _follow != null and is_instance_valid(_follow):
-		var target := pos_of(_follow)
-		if _follow_smooth <= 0.0:
-			cam.global_position = target
-		else:
-			# За кадр при 60 FPS камера проходит 1/(1+плавность) пути до цели;
-			# степень от delta — чтобы при любом FPS было одинаково.
-			var keep := 1.0 - 1.0 / (1.0 + _follow_smooth)
-			var t := 1.0 - pow(keep, delta * 60.0)
-			cam.global_position = cam.global_position.lerp(target, clampf(t, 0.0, 1.0))
+		_follow_step(cam, pos_of(_follow), delta)
+	_update_shake(cam, delta)
+
+
+## Шаг физики: после того как платформер сдвинул персонажа (приоритет у
+## Gde в физике поздний). Если сдвинулся здесь — камера ходит тут же.
+func _physics_process(delta: float) -> void:
+	if _follow == null or not is_instance_valid(_follow) or _interpolated():
+		return
+	var p := pos_of(_follow)
+	if p != _follow_seen:
+		_follow_seen = p
+		_follow_beat = FollowBeat.PHYSICS
+	if _follow_beat == FollowBeat.PHYSICS:
+		var cam := _camera()
+		if cam != null:
+			_follow_step(cam, p, delta)
+
+
+## Перед отрисовкой кадра — когда все _process уже отработали и персонаж,
+## который ходит в _process, уже на новом месте.
+func _on_frame_pre_draw() -> void:
+	var now := Time.get_ticks_usec()
+	var delta := clampf(float(now - _frame_usec) / 1000000.0, 0.0, 0.1) if _frame_usec > 0 else 0.0
+	_frame_usec = now
+	if _follow == null or not is_instance_valid(_follow) or get_tree() == null or get_tree().paused:
+		return
+	var cam := _camera()
+	if cam == null:
+		return
+	# Включено сглаживание физики Godot: берём сглаженное положение и едем
+	# каждый кадр — так плавнее всего.
+	if _interpolated():
+		var m := main(_follow)
+		if m != null:
+			_follow_step(cam, m.get_global_transform_interpolated().origin, delta)
+		return
+	var p := pos_of(_follow)
+	if p != _follow_seen:
+		_follow_seen = p
+		_follow_beat = FollowBeat.FRAME
+	if _follow_beat == FollowBeat.FRAME:
+		_follow_step(cam, p, delta)
+
+
+static func _interpolated() -> bool:
+	return bool(ProjectSettings.get_setting("physics/common/physics_interpolation", false))
+
+
+func _follow_step(cam: Camera2D, target: Vector2, delta: float) -> void:
+	if _follow_smooth <= 0.0:
+		cam.global_position = target
+		return
+	# За кадр при 60 FPS камера проходит 1/(1+плавность) пути до цели;
+	# степень от delta — чтобы при любом FPS было одинаково.
+	var keep := 1.0 - 1.0 / (1.0 + _follow_smooth)
+	var t := 1.0 - pow(keep, delta * 60.0)
+	cam.global_position = cam.global_position.lerp(target, clampf(t, 0.0, 1.0))
+
+
+func _update_shake(cam: Camera2D, delta: float) -> void:
 	if _shake_left > 0.0:
 		_shake_left = maxf(0.0, _shake_left - delta)
 		var k := _shake_strength * (_shake_left if _shake_left < 1.0 else 1.0)

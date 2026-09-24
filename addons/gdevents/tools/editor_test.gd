@@ -171,6 +171,19 @@ func _test_panel() -> void:
 	_ok(_count_rows(_panel) > rows, "после добавления события дерево перестроилось")
 	_panel.doc.undo()
 
+	_test_inline_edit()
+
+	# «+ Добавить событие» под последним событием, как в GDevelop.
+	var footer := _panel._rows.get_child(_panel._rows.get_child_count() - 1) as Button
+	_ok(footer != null and footer.name == "AddEventFooter", "под последним событием — «Добавить событие»")
+	var n_before: int = (_panel.doc.data["events"] as Array).size()
+	if footer != null:
+		footer.pressed.emit()
+	var evs_now: Array = _panel.doc.data["events"]
+	_ok(evs_now.size() == n_before + 1 and str((evs_now[evs_now.size() - 1] as Dictionary).get("type", "")) == "standard"
+			and _panel.is_event_selected([n_before]), "по нажатию — пустое событие в конце, и оно выделено")
+	_panel.doc.undo()
+
 	# «Любое из условий»: ключ появляется, подпись видна, выключение убирает ключ.
 	_panel.toggle_event_any([0])
 	var ev0: Dictionary = _panel.doc.event_at([0])
@@ -830,6 +843,51 @@ func _test_debug_view() -> void:
 	_ok(hits_item.get_child_count() == 2 and hits_item.get_child(1).get_text(1) == "6"
 			or hits_item.get_child(0).get_text(1) == "6", "вкладка отладчика: срабатывания складываются")
 	view.free()
+
+
+## Правка значений прямо в строке листа, как в GDevelop.
+func _test_inline_edit() -> void:
+	var def: Dictionary = _panel.instruction_def("actions", "object.x")
+	_ok(GdeText.with_values(def, {"id": "object.x", "params": ["Player", "+", "5"]}, Color.WHITE, true).contains("[url=2]"),
+			"правка на месте: значения в строке — ссылки")
+	# Объект — из списка объектов листа.
+	_panel.edit_param_inline([0], "actions", 0, 0, Vector2(100, 100))
+	var menu := _panel._inline as PopupMenu
+	_ok(menu != null and menu.item_count >= 2, "правка на месте: у объекта — список объектов листа")
+	if menu != null:
+		for i in range(menu.item_count):
+			if menu.get_item_text(i) == "Enemy":
+				menu.index_pressed.emit(i)
+	_eq(str(_panel.doc.instructions_of([0], "actions")[0]["params"][0]), "Enemy", "правка на месте: объект выбран из списка")
+	# Знак — из списка знаков.
+	_panel.edit_param_inline([0], "actions", 0, 1, Vector2(100, 100))
+	var signs := _panel._inline as PopupMenu
+	_ok(signs != null and signs.item_count == 5, "правка на месте: у знака изменения — список = + - * /")
+	if signs != null:
+		signs.index_pressed.emit(3)
+	_eq(str(_panel.doc.instructions_of([0], "actions")[0]["params"][1]), "*", "правка на месте: знак выбран")
+	# Число — полем ввода; Enter применяет, Escape отменяет.
+	_panel.edit_param_inline([0], "actions", 0, 2, Vector2(100, 100))
+	var box := _panel._inline as PopupPanel
+	var le: LineEdit = box.get_child(0) as LineEdit if box != null else null
+	_ok(le != null and le.text == "5", "правка на месте: у числа — поле со значением")
+	if le != null:
+		le.text = "Variable(speed) * 2"
+		le.text_submitted.emit(le.text)
+	_eq(str(_panel.doc.instructions_of([0], "actions")[0]["params"][2]), "Variable(speed) * 2", "правка на месте: Enter — значение записано")
+	_panel.edit_param_inline([0], "actions", 0, 2, Vector2(100, 100))
+	box = _panel._inline as PopupPanel
+	le = box.get_child(0) as LineEdit if box != null else null
+	if le != null:
+		le.text = "999"
+		var esc := InputEventKey.new()
+		esc.keycode = KEY_ESCAPE
+		esc.pressed = true
+		le.gui_input.emit(esc)
+	_eq(str(_panel.doc.instructions_of([0], "actions")[0]["params"][2]), "Variable(speed) * 2", "правка на месте: Escape — без изменений")
+	for i in range(3):
+		_panel.doc.undo()
+	_eq(str(_panel.doc.instructions_of([0], "actions")[0]["params"]), str(["Player", "+", "5"]), "правка на месте отменяется Ctrl+Z")
 
 
 func _find_label(n: Node, text: String) -> bool:

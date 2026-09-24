@@ -8,6 +8,23 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.9.2
+
+- **Camera no longer jitters behind a moving character**: it moves in the
+  same rhythm as the one it follows — on the physics step for a platformer
+  character, every frame for one that moves every frame. Before, on a
+  monitor faster than 60 Hz the camera moved between the character's
+  physics steps, and the character shook and left a trail. With Godot's
+  physics interpolation on, the camera follows the smoothed position every
+  frame. · **Камера больше не дрожит** за движущимся персонажем.
+- **"Add event" under the last event**, as in GDevelop: a new empty event
+  at the end of the sheet, selected and scrolled into view (also Ctrl+N).
+  · **«Добавить событие» под последним событием**, как в GDevelop.
+- **Edit values right in the sheet**, as in GDevelop: click a highlighted
+  value — an object or a sign is picked from a list, a number or text is
+  typed in a field under the cursor (Enter — done, Escape — cancel, Ctrl+Z
+  undoes). · **Правка значений прямо в листе**: щелчок по значению.
+
 ## 0.9.1
 
 - **Removing a behavior removes the nodes it created itself** (body, shape,

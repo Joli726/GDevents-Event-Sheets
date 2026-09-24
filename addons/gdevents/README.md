@@ -5,7 +5,7 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.9.1** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
+**Version 0.9.2** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
 instructions, your own behaviors and extensions, scene and file checks, an
 English and Russian interface.
 
@@ -18,6 +18,11 @@ next to "2D / 3D / Script".
   found.
 - Click a row to select it, double-click to open its parameters, right-click
   for the menu. On hover, buttons appear on the right: invert, copy, delete.
+- **Values are edited right in the sheet**, as in GDevelop: click a
+  highlighted value — an object or a sign is picked from a list, a number or
+  text is typed in a field under the cursor (Enter — done, Escape — cancel).
+- **"Add event" under the last event** — a new empty event at the end of
+  the sheet, as in GDevelop (or Ctrl+N).
 - The narrow strip on the left of an event card is both the event menu and a
   handle: **drag it to move the event**. Where it will land is shown in
   advance: a bar above — before, below — after, the whole card highlighted —

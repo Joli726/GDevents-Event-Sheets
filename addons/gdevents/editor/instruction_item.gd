@@ -47,6 +47,8 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 		var desc := str((def as Dictionary).get("description", ""))
 		tooltip_text = desc if not desc.is_empty() \
 				else GdeText.with_labels(def as Dictionary)
+		if not ((def as Dictionary).get("params", []) as Array).is_empty():
+			tooltip_text += GdeI18n.t("\n\nЩёлкните по значению, чтобы изменить его прямо здесь.")
 	var err: String = panel.instruction_error(path, k, i)
 	if not err.is_empty():
 		tooltip_text = GdeI18n.t("Ошибка: %s\n\n%s") % [err, tooltip_text]
@@ -92,9 +94,20 @@ func setup(p: Control, event_path: Array, k: String, i: int, inst: Dictionary,
 	_text.bbcode_enabled = true
 	_text.fit_content = true
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_text.text = GdeText.with_values(def, inst, accent)
+	# Значения — ссылки: щелчок по значению правит его прямо в листе, как в
+	# GDevelop; щелчок мимо — как раньше, уходит строке (выделить, открыть,
+	# перетащить).
+	_text.mouse_filter = Control.MOUSE_FILTER_PASS
+	_text.meta_underlined = false
+	_text.tooltip_text = tooltip_text
+	_text.text = GdeText.with_values(def, inst, accent, def is Dictionary)
+	_text.meta_clicked.connect(func(meta: Variant):
+		panel.edit_param_inline(path, kind, index, int(str(meta)),
+				_text.get_screen_position() + _text.get_local_mouse_position()))
+	_text.meta_hover_started.connect(func(_m: Variant): _text.mouse_default_cursor_shape = Control.CURSOR_IBEAM)
+	_text.meta_hover_ended.connect(func(_m: Variant): _text.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND)
+	_text.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	row.add_child(_text)
 
 	# Кнопки всегда занимают своё место и только проявляются при наведении.
