@@ -8,6 +8,10 @@
 ## нами — встроенное, своя копия или своё, — и не сломан ли скрипт.
 ## «Перейти к…» перечисляет действия, условия и выражения поведения теми же
 ## фразами, что и в листе событий, и ставит курсор на их функцию.
+##
+## Здесь же версии: «Запомнить текущую версию», просмотр и восстановление
+## любой из них, сравнение своей копии со встроенной и напоминание, если
+## встроенная обновилась после того, как сделали копию.
 @tool
 class_name GdeBehaviorCode
 extends VBoxContainer
@@ -17,6 +21,9 @@ signal opened_in_editor
 signal copy_requested
 signal reset_requested
 signal derive_requested
+signal remember_requested
+signal restore_requested(version_path: String, version_title: String)
+signal accept_builtin_requested
 
 var script_path: String = ""
 var kind: String = ""
@@ -28,6 +35,23 @@ var _state_text: Label
 var _btn_copy: Button
 var _btn_reset: Button
 var _btn_derive: Button
+var _versions: MenuButton
+var _btn_compare: Button
+var _update_box: HBoxContainer
+
+## Что показано в поле кода: "code" — текущий код, "compare" — отличия от
+## встроенной, "version" — сохранённая версия, "update" — что изменилось
+## во встроенной после копии.
+var mode: String = "code"
+var _entry: Dictionary = {}
+var _src: String = ""
+var _version_list: Array = []
+var _shown_version: Dictionary = {}
+var _view: PanelContainer
+var _view_text: Label
+var _view_diff: Button
+var _view_restore: Button
+var _view_accept: Button
 
 var _bar: HBoxContainer
 var _path: Label
@@ -81,6 +105,34 @@ func _init() -> void:
 	_btn_derive.tooltip_text = "Отдельное поведение с новым именем — например, «Выстрел врага» рядом с «Выстрелом игрока»"
 	_btn_derive.pressed.connect(func() -> void: derive_requested.emit())
 	actions.add_child(_btn_derive)
+	_versions = MenuButton.new()
+	_versions.text = "Версии ▾"
+	_versions.flat = false
+	_versions.tooltip_text = "Запомнить текущий код и вернуться к любой сохранённой версии"
+	_versions.get_popup().id_pressed.connect(_on_version_menu)
+	actions.add_child(_versions)
+	_btn_compare = Button.new()
+	_btn_compare.text = "Сравнить со встроенной"
+	_btn_compare.tooltip_text = "Что изменено в копии относительно встроенного поведения"
+	_btn_compare.pressed.connect(show_compare)
+	actions.add_child(_btn_compare)
+
+	# Плагин обновился, а копия живёт старым кодом встроенного.
+	_update_box = HBoxContainer.new()
+	_update_box.add_theme_constant_override("separation", 6)
+	state_box.add_child(_update_box)
+	var upd := Label.new()
+	upd.text = "Встроенная версия обновилась после того, как вы сделали копию — в копию обновление само не попало."
+	upd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	upd.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	upd.custom_minimum_size = Vector2(240, 0)
+	upd.add_theme_font_size_override("font_size", 12)
+	upd.modulate = Color(1.0, 0.8, 0.45)
+	_update_box.add_child(upd)
+	var what := Button.new()
+	what.text = "Что изменилось"
+	what.pressed.connect(show_builtin_update)
+	_update_box.add_child(what)
 
 	_bar = HBoxContainer.new()
 	_bar.add_theme_constant_override("separation", 6)
@@ -107,6 +159,47 @@ func _init() -> void:
 	_open.pressed.connect(open_in_script_editor)
 	_bar.add_child(_open)
 
+	# Над кодом — что именно показано, если это не текущий код.
+	_view = PanelContainer.new()
+	var vs := StyleBoxFlat.new()
+	vs.bg_color = Color(0.4, 0.55, 0.9, 0.12)
+	vs.set_content_margin_all(6)
+	vs.set_corner_radius_all(4)
+	_view.add_theme_stylebox_override("panel", vs)
+	add_child(_view)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_view.add_child(vbox)
+	# Надпись — отдельной строкой: рядом с кнопками название версии обрезалось.
+	_view_text = Label.new()
+	_view_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_view_text.clip_text = true
+	_view_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	vbox.add_child(_view_text)
+	var vrow := HBoxContainer.new()
+	vrow.add_theme_constant_override("separation", 6)
+	vbox.add_child(vrow)
+	_view_diff = Button.new()
+	_view_diff.text = "Отличия от текущего"
+	_view_diff.toggle_mode = true
+	_view_diff.toggled.connect(func(_on: bool) -> void: _show_version_body())
+	vrow.add_child(_view_diff)
+	_view_restore = Button.new()
+	_view_restore.text = "Восстановить эту версию…"
+	_view_restore.icon = GdeIcons.get_icon("undo")
+	_view_restore.pressed.connect(func() -> void:
+		restore_requested.emit(str(_shown_version.get("path", "")), str(_shown_version.get("title", ""))))
+	vrow.add_child(_view_restore)
+	_view_accept = Button.new()
+	_view_accept.text = "Учтено"
+	_view_accept.tooltip_text = "Считать новую встроенную версию точкой отсчёта — напоминание пропадёт"
+	_view_accept.pressed.connect(func() -> void: accept_builtin_requested.emit())
+	vrow.add_child(_view_accept)
+	var back := Button.new()
+	back.text = "К текущему коду"
+	back.pressed.connect(show_current)
+	vrow.add_child(back)
+
 	_code = CodeEdit.new()
 	_code.editable = false
 	_code.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -126,12 +219,15 @@ func show_script(path: String, entry: Dictionary = {}) -> void:
 	var src := ""
 	if not path.is_empty() and FileAccess.file_exists(path):
 		src = FileAccess.get_file_as_string(path)
-	_code.text = src if not src.is_empty() else "# Скрипт поведения не найден: %s" % path
+	_entry = entry
+	_src = src
+	show_current()
 	_code.set_caret_line(0)
 	_code.scroll_vertical = 0
 	_open.disabled = not Engine.is_editor_hint() or src.is_empty()
 	_fill_jump(src, entry)
 	_update_state(entry, path, src.is_empty())
+	_fill_versions()
 
 
 func _update_state(entry: Dictionary, path: String, missing: bool) -> void:
@@ -159,12 +255,148 @@ func _update_state(entry: Dictionary, path: String, missing: bool) -> void:
 	_btn_copy.visible = kind == "builtin"
 	_btn_reset.visible = kind == "copy"
 	_btn_derive.visible = not missing
+	_btn_compare.visible = kind == "copy"
+	_update_box.visible = GdeBehaviorLibrary.builtin_changed(entry)
 	# Встроенное в редакторе скриптов открылось бы на правку — а его не правят.
 	_open.visible = kind != "builtin"
 
 
+# ------------------------------------------------------------------ версии ---
+
+func _fill_versions() -> void:
+	var pop := _versions.get_popup()
+	pop.clear()
+	_version_list = GdeBehaviorLibrary.list_versions(GdeBehaviorLibrary.history_path(_entry)) \
+			if not _entry.is_empty() else []
+	if kind != "builtin":
+		pop.add_item("Запомнить текущую версию…", 100000)
+	if _version_list.is_empty():
+		pop.add_item("Сохранённых версий пока нет", 100001)
+		pop.set_item_disabled(pop.item_count - 1, true)
+	else:
+		pop.add_separator("Прошлые копии" if kind == "builtin" else "История")
+		for i in range(_version_list.size()):
+			var v: Dictionary = _version_list[i]
+			pop.add_item("%s — %s" % [str(v.get("title", "")), nice_time(str(v.get("time", "")))], i)
+	# У встроенного без истории версий показывать нечего.
+	_versions.visible = kind != "builtin" or not _version_list.is_empty()
+
+
+func _on_version_menu(id: int) -> void:
+	if id == 100000:
+		remember_requested.emit()
+	elif id >= 0 and id < _version_list.size():
+		preview_version(_version_list[id])
+
+
+## «2026-09-24 13:05:41» -> «24.09 13:05»
+static func nice_time(t: String) -> String:
+	var parts := t.replace("T", " ").split(" ")
+	if parts.size() < 2:
+		return t
+	var d := parts[0].split("-")
+	var hm := parts[1].substr(0, 5)
+	return "%s.%s %s" % [d[2], d[1], hm] if d.size() == 3 else t
+
+
+# ------------------------------------------------------------ что показано ---
+
+func show_current() -> void:
+	mode = "code"
+	_view.visible = false
+	_set_lines(_src.split("\n"), [])
+
+
+## Отличия своей копии от встроенной версии.
+func show_compare() -> void:
+	var builtin := FileAccess.get_file_as_string(str(_entry.get("builtin_path", "")))
+	var ops := GdeDiff.lines(builtin, _src)
+	var st := GdeDiff.stats(ops)
+	mode = "compare"
+	_show_banner("Своя копия против встроенной: добавлено строк %d, убрано %d" % [st["added"], st["removed"]]
+			if st["added"] + st["removed"] > 0 else "Копия пока ничем не отличается от встроенной",
+			false, false, false)
+	_show_ops(GdeDiff.hunks(ops))
+
+
+## Что изменилось во встроенной с тех пор, как сделали копию.
+func show_builtin_update() -> void:
+	var base := GdeBehaviorLibrary.base_source(_entry)
+	var now := FileAccess.get_file_as_string(str(_entry.get("builtin_path", "")))
+	mode = "update"
+	var st := GdeDiff.stats(GdeDiff.lines(base, now))
+	_show_banner("Что изменилось во встроенной после вашей копии: добавлено %d, убрано %d — перенесите нужное в копию"
+			% [st["added"], st["removed"]], false, false, true)
+	_show_ops(GdeDiff.hunks(GdeDiff.lines(base, now)))
+
+
+func preview_version(v: Dictionary) -> void:
+	_shown_version = v
+	mode = "version"
+	_view_diff.set_pressed_no_signal(false)
+	_show_banner("Версия «%s» от %s" % [str(v.get("title", "")), nice_time(str(v.get("time", "")))],
+			true, true, false)
+	_show_version_body()
+
+
+func _show_version_body() -> void:
+	var text := FileAccess.get_file_as_string(str(_shown_version.get("path", "")))
+	if _view_diff.button_pressed:
+		# Что поменяет восстановление: из текущего кода — в эту версию.
+		_show_ops(GdeDiff.hunks(GdeDiff.lines(_src, text)))
+	else:
+		_set_lines(text.split("\n"), [])
+
+
+func _show_banner(text: String, with_diff: bool, with_restore: bool, with_accept: bool) -> void:
+	_view.visible = true
+	_view_text.text = text
+	_view_text.tooltip_text = text
+	_view_diff.visible = with_diff
+	_view_restore.visible = with_restore
+	_view_accept.visible = with_accept
+
+
+## Показать отличия: добавленное — зелёным, убранное — красным.
+func _show_ops(ops: Array) -> void:
+	var lines: Array[String] = []
+	var marks: Array[String] = []
+	for op: Array in ops:
+		var k := str(op[0])
+		var prefix: String = {"+": "+ ", "-": "− ", "…": "  ⋯ "}.get(k, "  ")
+		lines.append(prefix + str(op[1]))
+		marks.append(k)
+	_set_lines(PackedStringArray(lines), marks)
+
+
+func _set_lines(lines: PackedStringArray, marks: Array) -> void:
+	_code.text = "\n".join(lines)
+	for i in range(_code.get_line_count()):
+		var k := str(marks[i]) if i < marks.size() else " "
+		var c := Color(0, 0, 0, 0)
+		match k:
+			"+":
+				c = Color(0.3, 0.8, 0.4, 0.18)
+			"-":
+				c = Color(0.9, 0.3, 0.3, 0.2)
+			"…":
+				c = Color(1, 1, 1, 0.05)
+		_code.set_line_background_color(i, c)
+
+
+## Строки, помеченные как добавленные/убранные — для тестов.
+func marked_lines(kind_mark: String) -> Array[String]:
+	var out: Array[String] = []
+	for i in range(_code.get_line_count()):
+		var c := _code.get_line_background_color(i)
+		if (kind_mark == "+" and c.g > c.r and c.a > 0.1) or (kind_mark == "-" and c.r > c.g and c.a > 0.1):
+			out.append(_code.get_line(i))
+	return out
+
+
+## Код поведения — даже если сейчас на экране сравнение или версия.
 func source() -> String:
-	return _code.text
+	return _src
 
 
 func caret_line() -> int:
@@ -226,6 +458,8 @@ func _add_jump(text: String, line: int) -> void:
 func _on_jump(id: int) -> void:
 	if id < 0 or id >= _jump_lines.size():
 		return
+	if mode != "code":
+		show_current()
 	jump_to_line(_jump_lines[id])
 
 
@@ -243,6 +477,8 @@ func open_in_script_editor() -> void:
 	var scr: Script = load(script_path)
 	if scr == null:
 		return
+	if mode != "code":
+		show_current()
 	var ei: Object = Engine.get_singleton("EditorInterface")
 	ei.call("edit_script", scr, _code.get_caret_line() + 1)
 	ei.call("set_main_screen_editor", "Script")

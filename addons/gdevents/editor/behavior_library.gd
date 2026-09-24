@@ -297,6 +297,105 @@ static func list_versions(behavior_path: String) -> Array:
 	return out
 
 
+## Где история версий поведения. У встроенного — история его прошлых
+## копий: после «Вернуть встроенную» к своей версии можно вернуться.
+static func history_path(entry: Dictionary) -> String:
+	var path := str(entry.get("path", ""))
+	return copy_path_for(path) if kind_of(entry) == "builtin" else path
+
+
+## Запомнить текущий код своего поведения под названием.
+static func remember(entry: Dictionary, title: String) -> String:
+	var path := str(entry.get("path", ""))
+	if kind_of(entry) == "builtin":
+		return "встроенное поведение не правится — запоминать в нём нечего"
+	var src := FileAccess.get_file_as_string(path)
+	if src.is_empty():
+		return "не читается %s" % path
+	save_version(path, src, title)
+	return ""
+
+
+## Восстановить версию. Своя копия или своё поведение перезаписываются
+## (текущий код перед этим сам уходит в историю). У встроенного копия
+## создаётся заново из этой версии, и сцены переключаются на неё.
+static func restore_version(bname: String, reg: GdeRegistry, version_path: String,
+		version_title: String) -> Dictionary:
+	var entry: Dictionary = reg.behaviors.get(bname, {})
+	if entry.is_empty():
+		return {"error": "поведения «%s» нет" % bname}
+	var src := FileAccess.get_file_as_string(version_path)
+	if src.is_empty():
+		return {"error": "не читается версия %s" % version_path}
+	if kind_of(entry) != "builtin":
+		var path := str(entry["path"])
+		var cur := FileAccess.get_file_as_string(path)
+		if not cur.is_empty() and cur != src:
+			save_version(path, cur, "Перед восстановлением «%s»" % version_title)
+		var err := _write(path, src)
+		if not err.is_empty():
+			return {"error": err}
+		_reload_script(path, src)
+		_editor_scan()
+		return {"error": "", "path": path, "scenes": []}
+
+	var builtin := str(entry["path"])
+	var dst := copy_path_for(builtin)
+	var err2 := _write(dst, src)
+	if not err2.is_empty():
+		return {"error": err2}
+	var meta := meta_dir_for(dst)
+	if not FileAccess.file_exists(meta.path_join("copy.json")):
+		var base := FileAccess.get_file_as_string(builtin)
+		_write(meta.path_join("base.gd.txt"), base)
+		_write_json(meta.path_join("copy.json"), {"behavior": bname, "builtin": builtin,
+				"base_md5": base.md5_text(), "created": Time.get_datetime_string_from_system(false, true)})
+	await _editor_register(dst)
+	var sw := await switch_scripts(builtin, dst)
+	return {"error": "; ".join(sw["errors"]), "path": dst, "scenes": sw["changed"]}
+
+
+## Встроенная версия на момент, когда сделали копию.
+static func base_source(entry: Dictionary) -> String:
+	return FileAccess.get_file_as_string(meta_dir_for(str(entry.get("path", ""))).path_join("base.gd.txt"))
+
+
+## Встроенное поведение изменилось после того, как сделали копию: плагин
+## обновился, а копия живёт старым кодом. Правки из обновления в неё сами
+## не попадут — об этом надо сказать.
+static func builtin_changed(entry: Dictionary) -> bool:
+	if kind_of(entry) != "copy":
+		return false
+	var info: Dictionary = _read_json(meta_dir_for(str(entry["path"])).path_join("copy.json"), {})
+	var now := FileAccess.get_file_as_string(str(entry.get("builtin_path", "")))
+	if info.is_empty() or now.is_empty():
+		return false
+	return str(info.get("base_md5", "")) != now.md5_text()
+
+
+## «Я посмотрел, что изменилось» — встроенная версия становится новой точкой
+## отсчёта, и напоминание пропадает.
+static func accept_builtin(entry: Dictionary) -> void:
+	var meta := meta_dir_for(str(entry["path"]))
+	var now := FileAccess.get_file_as_string(str(entry.get("builtin_path", "")))
+	_write(meta.path_join("base.gd.txt"), now)
+	var info: Dictionary = _read_json(meta.path_join("copy.json"), {})
+	info["base_md5"] = now.md5_text()
+	_write_json(meta.path_join("copy.json"), info)
+
+
+## Скрипт уже загружен и стоит на узлах — обновить его на месте, чтобы
+## не пришлось перезапускать редактор.
+static func _reload_script(path: String, src: String) -> void:
+	if not ResourceLoader.has_cached(path):
+		return
+	var s := load(path) as GDScript
+	if s == null:
+		return
+	s.source_code = src
+	s.reload(true)
+
+
 # ---------------------------------------------------------------- файлы ---
 
 static func _write(path: String, text: String) -> String:

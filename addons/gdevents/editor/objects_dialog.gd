@@ -47,6 +47,9 @@ var _derive_from: String = ""
 var _derive_name: LineEdit
 var _derive_title: LineEdit
 var _derive_error: Label
+var _remember: ConfirmationDialog
+var _remember_for: String = ""
+var _remember_title: LineEdit
 
 var _beh_picker: GdeBehaviorPicker
 var _confirm_delete: ConfirmationDialog
@@ -166,6 +169,9 @@ func _init() -> void:
 	_beh_panel.copy_requested.connect(_ask_make_copy)
 	_beh_panel.reset_requested.connect(_ask_reset)
 	_beh_panel.derive_requested.connect(_ask_derive)
+	_beh_panel.remember_requested.connect(_ask_remember)
+	_beh_panel.restore_requested.connect(_ask_restore)
+	_beh_panel.accept_builtin_requested.connect(_accept_builtin)
 	beh_right.add_child(_beh_panel)
 
 	var checks_tab := VBoxContainer.new()
@@ -264,6 +270,7 @@ func _init() -> void:
 			_lib_action.call())
 	add_child(_confirm_lib)
 	_build_derive_dialog()
+	_build_remember_dialog()
 
 	# Окно закрыли, пока правка настройки ждала записи, — записать сейчас.
 	visibility_changed.connect(func() -> void:
@@ -834,6 +841,83 @@ func _do_derive() -> void:
 	_reload_library()
 	_set_note("Поведение «%s» создано: %s. Добавьте его объектам кнопкой «Добавить поведение»." \
 			% [nm, res["path"]])
+
+
+func _build_remember_dialog() -> void:
+	_remember = ConfirmationDialog.new()
+	_remember.title = "Запомнить версию"
+	_remember.ok_button_text = "Запомнить"
+	_remember.cancel_button_text = "Отмена"
+	_remember.confirmed.connect(_do_remember)
+	add_child(_remember)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_remember.add_child(box)
+	box.add_child(_note("Название версии — чтобы потом узнать её в списке: «стабильная», «до рывка»."))
+	_remember_title = LineEdit.new()
+	_remember_title.custom_minimum_size = Vector2(420, 0)
+	_remember_title.text_submitted.connect(func(_t: String) -> void:
+		_remember.hide()
+		_do_remember())
+	box.add_child(_remember_title)
+
+
+func _ask_remember(bname: String) -> void:
+	_remember_for = bname
+	_remember_title.text = "Версия от %s" % GdeBehaviorCode.nice_time(Time.get_datetime_string_from_system(false, true))
+	GdeUi.popup_fit(_remember, Vector2i(480, 180))
+	_remember_title.grab_focus()
+	_remember_title.select_all()
+
+
+func _do_remember() -> void:
+	var entry: Dictionary = _reg.behaviors.get(_remember_for, {})
+	var title := _remember_title.text.strip_edges()
+	var err := GdeBehaviorLibrary.remember(entry, title if not title.is_empty() else "Без названия")
+	if not err.is_empty():
+		_set_error(err)
+		return
+	_set_note("Версия «%s» запомнена" % title)
+	_select_behavior(_selected_behavior)
+	_tabs.current_tab = 0
+	_beh_panel.show_code_tab()
+
+
+func _ask_restore(bname: String, version_path: String, version_title: String) -> void:
+	var entry: Dictionary = _reg.behaviors.get(bname, {})
+	var builtin := GdeBehaviorLibrary.kind_of(entry) == "builtin"
+	_confirm_lib.title = "Восстановить версию"
+	_confirm_lib.ok_button_text = "Восстановить"
+	if builtin:
+		var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
+		_confirm_lib.dialog_text = ("Восстановить версию «%s»?\n\n" +
+				"Из неё снова появится своя копия поведения, и все объекты (сцен: %d) " +
+				"переключатся на неё. Настройки объектов сохранятся.") % [version_title, n]
+	else:
+		_confirm_lib.dialog_text = ("Восстановить версию «%s»?\n\n" +
+				"Текущий код поведения заменится этой версией. Он не пропадёт — " +
+				"сначала сам уйдёт в историю.") % version_title
+	_lib_action = _restore.bind(bname, version_path, version_title)
+	GdeUi.popup_fit(_confirm_lib, Vector2i(520, 240))
+
+
+func _restore(bname: String, version_path: String, version_title: String) -> void:
+	await _beh_panel.settings.flush()
+	var res: Dictionary = await GdeBehaviorLibrary.restore_version(bname, _reg, version_path, version_title)
+	_reload_library()
+	var err := str(res.get("error", ""))
+	if not err.is_empty():
+		_set_error(err)
+		return
+	_set_note("Версия «%s» восстановлена: %s" % [version_title, res.get("path", "")])
+	_beh_panel.show_code_tab()
+
+
+func _accept_builtin(bname: String) -> void:
+	GdeBehaviorLibrary.accept_builtin(_reg.behaviors.get(bname, {}))
+	_set_note("Новая встроенная версия — теперь точка отсчёта для вашей копии")
+	_select_behavior(_selected_behavior)
+	_beh_panel.show_code_tab()
 
 
 ## Реестр заново: своя копия подменила встроенное или появилось новое.

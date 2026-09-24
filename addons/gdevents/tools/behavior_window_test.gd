@@ -1,5 +1,5 @@
 ## Безголовый тест окна поведения — настроек и всего, что рядом:
-##   godot --headless --quit-after 1500 res://addons/gdevents/tools/behavior_window_test.tscn
+##   godot --headless --quit-after 2000 res://addons/gdevents/tools/behavior_window_test.tscn
 ##
 ## Окно пишет в сцену объекта, и ошибиться тут легко незаметно: форма
 ## показывает одно, а в файле другое. Поэтому каждая проверка правки
@@ -36,6 +36,8 @@ func _ready() -> void:
 	_test_code()
 	print("—— окно объектов ——")
 	await _test_dialog()
+	print("—— сравнение текстов ——")
+	_test_diff()
 	print("—— своя копия и возврат к встроенной ——")
 	await _test_library()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCENE))
@@ -320,6 +322,8 @@ func _test_library() -> void:
 	dlg.hide()
 	dlg.queue_free()
 
+	await _test_versions(copy, LIB_SCENE)
+
 	# «Выстрел» выдаёт пуле «Прямолинейное движение» — своё, если есть копия.
 	var lm := "res://addons/gdevents/behaviors/linear_move/linear_move.gd"
 	_eq(GdeBehavior.resolve(lm).resource_path, lm, "без копии пуля получает встроенное движение")
@@ -332,6 +336,80 @@ func _test_library() -> void:
 		_rmdir(d)
 	if not had_user_dir:
 		_rmdir("res://behaviors")
+
+
+func _test_diff() -> void:
+	var ops := GdeDiff.lines("a\nb\nc", "a\nx\nc")
+	_eq(ops, [[" ", "a"], ["-", "b"], ["+", "x"], [" ", "c"]], "замена строки — одна убрана, одна добавлена")
+	_eq(GdeDiff.stats(ops), {"added": 1, "removed": 1}, "и счёт сходится")
+	_eq(GdeDiff.lines("a\nb", "a\nb"), [[" ", "a"], [" ", "b"]], "одинаковые тексты — без отличий")
+	var long_a := "\n".join(range(40).map(func(i: int) -> String: return "строка %d" % i))
+	var long_b := long_a.replace("строка 20", "строка 20!")
+	var h := GdeDiff.hunks(GdeDiff.lines(long_a, long_b), 2)
+	_eq(h.size(), 8, "длинный файл свёрнут до правки и пары строк вокруг")
+	_eq(str((h[0] as Array)[0]), "…", "а начало без изменений — одной строкой-заглушкой")
+
+
+## Версии своей копии: запомнить, восстановить, сравнить со встроенной,
+## заметить обновление встроенной, вернуть копию после возврата к встроенной.
+func _test_versions(copy: String, scene: String) -> void:
+	var reg := GdeRegistry.load_default()
+	await GdeBehaviorLibrary.make_copy("Rotate", reg)
+	reg = GdeRegistry.load_default()
+	var entry: Dictionary = reg.behaviors["Rotate"]
+	var before := GdeBehaviorLibrary.list_versions(copy).size()
+	_eq(GdeBehaviorLibrary.remember(entry, "стабильная"), "", "версия «стабильная» запомнена")
+	var stable := FileAccess.get_file_as_string(copy)
+	var vs := GdeBehaviorLibrary.list_versions(copy)
+	_eq(vs.size(), before + 1, "и появилась в истории")
+	_eq(str((vs[0] as Dictionary).get("title", "")), "стабильная", "новые версии — сверху")
+
+	GdeBehaviorLibrary._write(copy, stable + "\n## моя правка\n")
+	var res: Dictionary = await GdeBehaviorLibrary.restore_version("Rotate", reg, str(vs[0]["path"]), "стабильная")
+	_eq(str(res.get("error", "")), "", "восстановление без ошибок")
+	_eq(FileAccess.get_file_as_string(copy), stable, "в копии снова стабильная версия")
+	vs = GdeBehaviorLibrary.list_versions(copy)
+	_ok(str((vs[0] as Dictionary).get("title", "")).begins_with("Перед восстановлением"),
+			"а правка перед этим сама ушла в историю, не пропала")
+
+	GdeBehaviorLibrary._write(copy, stable + "\n## моя правка\n")
+	var code := GdeBehaviorCode.new()
+	add_child(code)
+	code.show_script(copy, entry)
+	_ok(code._btn_compare.visible, "у копии есть «Сравнить со встроенной»")
+	code.show_compare()
+	_ok(code.marked_lines("+").has("+ ## моя правка"), "своя правка подсвечена как добавленная")
+	_eq(code.source(), stable + "\n## моя правка\n", "а код поведения не подменён сравнением")
+	code.show_current()
+	_eq(code.mode, "code", "«К текущему коду» возвращает код")
+
+	_ok(not GdeBehaviorLibrary.builtin_changed(entry), "пока встроенная не менялась — напоминания нет")
+	var info_path := GdeBehaviorLibrary.meta_dir_for(copy).path_join("copy.json")
+	var info: Dictionary = GdeBehaviorLibrary._read_json(info_path, {})
+	info["base_md5"] = "как будто плагин обновился"
+	GdeBehaviorLibrary._write_json(info_path, info)
+	_ok(GdeBehaviorLibrary.builtin_changed(entry), "обновление встроенной замечено")
+	code.show_script(copy, entry)
+	_ok(code._update_box.visible, "и о нём сказано на вкладке «Код»")
+	GdeBehaviorLibrary.accept_builtin(entry)
+	_ok(not GdeBehaviorLibrary.builtin_changed(entry), "«Учтено» убирает напоминание")
+	code.queue_free()
+
+	# Вернули встроенное — а потом захотели свою стабильную обратно.
+	await GdeBehaviorLibrary.reset_to_builtin("Rotate", reg)
+	reg = GdeRegistry.load_default()
+	var builtin_entry: Dictionary = reg.behaviors["Rotate"]
+	var old := GdeBehaviorLibrary.list_versions(GdeBehaviorLibrary.history_path(builtin_entry))
+	var stable_v: Dictionary = {}
+	for v: Dictionary in old:
+		if str(v.get("title", "")) == "стабильная":
+			stable_v = v
+	_ok(not stable_v.is_empty(), "у встроенного видны прошлые копии")
+	res = await GdeBehaviorLibrary.restore_version("Rotate", reg, str(stable_v.get("path", "")), "стабильная")
+	_eq(str(res.get("error", "")), "", "копия восстановлена из версии")
+	_eq(FileAccess.get_file_as_string(copy), stable, "с кодом стабильной версии")
+	_ok(FileAccess.get_file_as_string(scene).contains("path=\"%s\"" % copy), "и сцена снова на копии")
+	await GdeBehaviorLibrary.reset_to_builtin("Rotate", GdeRegistry.load_default())
 
 
 func _rmdir(path: String) -> void:

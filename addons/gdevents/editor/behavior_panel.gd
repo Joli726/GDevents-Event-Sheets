@@ -13,6 +13,9 @@ signal left_for_editor
 signal copy_requested(bname: String)
 signal reset_requested(bname: String)
 signal derive_requested(bname: String)
+signal remember_requested(bname: String)
+signal restore_requested(bname: String, version_path: String, version_title: String)
+signal accept_builtin_requested(bname: String)
 
 var settings: GdeBehaviorSettings
 var code: GdeBehaviorCode
@@ -93,6 +96,9 @@ func _init() -> void:
 	code.copy_requested.connect(func() -> void: copy_requested.emit(behavior))
 	code.reset_requested.connect(func() -> void: reset_requested.emit(behavior))
 	code.derive_requested.connect(func() -> void: derive_requested.emit(behavior))
+	code.remember_requested.connect(func() -> void: remember_requested.emit(behavior))
+	code.restore_requested.connect(func(p: String, t: String) -> void: restore_requested.emit(behavior, p, t))
+	code.accept_builtin_requested.connect(func() -> void: accept_builtin_requested.emit(behavior))
 	_tabs.add_child(code)
 
 	show_empty("")
@@ -120,6 +126,10 @@ func show_behavior(scene: String, bname: String, reg: GdeRegistry, object_names:
 	# Код — того скрипта, что реально стоит на объекте.
 	code.show_script(script_path if not script_path.is_empty() else str(entry.get("path", "")), entry)
 	settings.show_behavior(scene, bname, reg, object_names)
+
+
+func show_code_tab() -> void:
+	_tabs.current_tab = 1
 
 
 func show_empty(text: String) -> void:
