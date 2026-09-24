@@ -14,6 +14,9 @@ const PATHFINDER := preload("res://addons/gdevents/behaviors/pathfinder/pathfind
 const HOMING := preload("res://addons/gdevents/behaviors/homing/homing.gd")
 const ORBIT := preload("res://addons/gdevents/behaviors/orbit/orbit.gd")
 const SHOOT := preload("res://addons/gdevents/behaviors/shoot/shoot.gd")
+const FLOCK := preload("res://addons/gdevents/behaviors/flock/flock.gd")
+const CAR := preload("res://addons/gdevents/behaviors/car/car.gd")
+const GRID := preload("res://addons/gdevents/behaviors/grid_step/grid_step.gd")
 
 var _fails: int = 0
 var _checks: int = 0
@@ -32,6 +35,9 @@ func _ready() -> void:
 	await _pathfinder()
 	await _homing()
 	await _orbit()
+	await _flock()
+	await _car()
+	await _grid_step()
 	_report()
 
 
@@ -262,6 +268,146 @@ func _orbit() -> void:
 		if is_instance_valid(s) and s.is_inside_tree() and not s.is_queued_for_deletion():
 			gone = false
 	_ok(gone, "орбита: исчезли вместе с центром")
+	w.queue_free()
+	await _frames(2)
+
+
+func _flock() -> void:
+	print("— Стая")
+	seed(7)
+	var w := _world()
+	w.position = Vector2(0, 8000)
+	var fish: Array[Node2D] = []
+	var behs: Array[Node] = []
+	for i in 8:
+		var f := _node(w, Vector2(randf_range(-60, 60), randf_range(-60, 60)))
+		fish.append(f)
+		behs.append(_beh(f, FLOCK, {"max_speed": 100.0, "wander": 0.0, "avoid_walls": false}))
+	await _frames(240)
+	var min_d := INF
+	var center := Vector2.ZERO
+	var heading := Vector2.ZERO
+	for i in fish.size():
+		center += fish[i].global_position
+		heading += Vector2.RIGHT.rotated(deg_to_rad(float(behs[i].call("course"))))
+		for j in range(i + 1, fish.size()):
+			min_d = minf(min_d, fish[i].global_position.distance_to(fish[j].global_position))
+	center /= fish.size()
+	var spread := 0.0
+	for f: Node2D in fish:
+		spread = maxf(spread, f.global_position.distance_to(center))
+	_ok(min_d > 12.0, "стая: не налезают друг на друга (ближе всего %.0f px)" % min_d)
+	_ok(spread < 110.0, "стая: держатся вместе (дальше всех от центра %.0f px)" % spread)
+	_ok(heading.length() / fish.size() > 0.8, "стая: летят в одну сторону (согласие %.2f)" % (heading.length() / fish.size()))
+
+	# Вожак: стая тянется к нему.
+	var leader := _tagged(w, "Player", center - w.global_position + Vector2(600, 0))
+	for b: Node in behs:
+		b.call("follow", "Player")
+	var d0 := center.distance_to(leader.global_position)
+	await _frames(240)
+	var c1 := Vector2.ZERO
+	var h1 := Vector2.ZERO
+	for i in fish.size():
+		c1 += fish[i].global_position
+		h1 += Vector2.RIGHT.rotated(deg_to_rad(float(behs[i].call("course"))))
+	c1 /= fish.size()
+	var toward := h1.normalized().dot((leader.global_position - c1).normalized())
+	_ok(c1.distance_to(leader.global_position) < d0 - 200.0 and toward > 0.8,
+			"стая: летит за вожаком (было %.0f px, стало %.0f, курс на вожака %.2f)"
+			% [d0, c1.distance_to(leader.global_position), toward])
+	for f: Node2D in fish:
+		f.queue_free()
+
+	# Стена впереди: одиночка огибает её, а не пролетает насквозь.
+	_static(w, Vector2(3060, 0), Vector2(20, 400))
+	var lone := _node(w, Vector2(3000, 0))
+	var lb := _beh(lone, FLOCK, {"max_speed": 100.0, "wander": 0.0, "flock_name": "one"})
+	lb.call("push", 0.0, 100.0)
+	var crossed := false
+	for i in 120:
+		await get_tree().physics_frame
+		if lone.global_position.x - w.global_position.x > 3050.0:
+			crossed = true
+	_ok(not crossed, "стая: стену впереди облетает, а не проходит насквозь")
+	w.queue_free()
+	await _frames(2)
+
+
+func _car() -> void:
+	print("— Машина")
+	var w := _world()
+	w.position = Vector2(0, 10000)
+	var c := _character(w, Vector2(0, 0), Vector2(30, 16))
+	var b := _beh(c, CAR, {"default_controls": false})
+	for i in 60:
+		b.call("gas")
+		await get_tree().physics_frame
+	_ok(c.position.x > 150.0 and absf(c.position.y) < 1.0, "машина: газ — едет вперёд (x = %.0f)" % c.position.x)
+	_ok(float(b.call("forward_speed")) > 380.0, "машина: разогналась почти до предела (%.0f)" % float(b.call("forward_speed")))
+	for i in 30:
+		b.call("gas")
+		b.call("steer_right")
+		await get_tree().physics_frame
+	_ok(float(b.call("heading")) > 40.0, "машина: руль вправо — повернула (курс %.0f°)" % float(b.call("heading")))
+	var drifted: Array[bool] = [false]
+	b.connect("drift_started", func() -> void: drifted[0] = true)
+	for i in 30:
+		b.call("handbrake")
+		b.call("steer_right")
+		await get_tree().physics_frame
+	_ok(drifted[0], "машина: ручник с рулём — занос")
+	for i in 120:
+		b.call("brake")
+		await get_tree().physics_frame
+	_ok(bool(b.call("is_reversing")), "машина: тормоз до остановки, дальше — задний ход")
+	# Разгон в стену — «врезалась».
+	b.call("stop")
+	b.call("set_heading", 0.0)
+	c.position = Vector2(0, 600)
+	_static(w, Vector2(250, 600), Vector2(20, 200))
+	var crashed: Array[bool] = [false]
+	b.connect("crashed", func(_s: float) -> void: crashed[0] = true)
+	for i in 90:
+		b.call("gas")
+		await get_tree().physics_frame
+	_ok(crashed[0], "машина: врезалась в стену на скорости (x = %.0f, скорость %.0f)" % [c.position.x, float(b.call("forward_speed"))])
+	w.queue_free()
+	await _frames(2)
+
+
+func _grid_step() -> void:
+	print("— Шаг по сетке")
+	var w := _world()
+	w.position = Vector2(0, 12000)            # 12000 / 32 = 375 — ровно клетка
+	var hero := _node(w, Vector2(16, 16))      # клетка (0, 375)
+	var hb := _beh(hero, GRID, {"step_time": 0.1})
+	var crate := _node(w, Vector2(48, 16))     # клетка (1, 375)
+	var cb := _beh(crate, GRID, {"step_time": 0.1, "pushable": true})
+	_static(w, Vector2(112, 16), Vector2(32, 32))   # стена в клетке (3, 375)
+	await _frames(2)
+	hb.call("step_right")
+	await _frames(10)
+	_eq(hb.call("cell_x"), 1.0, "сетка: шагнул на одну клетку вправо")
+	_eq(cb.call("cell_x"), 2.0, "сетка: толкнул ящик на клетку дальше")
+	_ok(hero.position.distance_to(Vector2(48, 16)) < 0.5, "сетка: встал ровно в центр клетки")
+	var bumped: Array[bool] = [false]
+	hb.connect("bumped", func() -> void: bumped[0] = true)
+	_ok(not bool(hb.call("can_step", 0.0)), "сетка: за ящиком стена — толкнуть нельзя")
+	hb.call("step_right")
+	await _frames(10)
+	_ok(bumped[0], "сетка: упёрся, сигнал bumped")
+	_eq(hb.call("cell_x"), 1.0, "сетка: остался на месте")
+	_eq(cb.call("cell_x"), 2.0, "сетка: ящик у стены не сдвинулся")
+	# Непроходимый сосед снизу — войти нельзя.
+	var rock := _node(w, Vector2(48, 48))      # клетка (1, 376)
+	_beh(rock, GRID, {})
+	await _frames(2)
+	_ok(not bool(hb.call("can_step", 1.0)), "сетка: клетка занята другим — не войти")
+	hb.call("step_up")
+	await _frames(10)
+	_eq(hb.call("cell_y"), 374.0, "сетка: шагнул вверх")
+	_eq(hb.call("steps_taken"), 2.0, "сетка: шагов сделано два")
 	w.queue_free()
 	await _frames(2)
 
