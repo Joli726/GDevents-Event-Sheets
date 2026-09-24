@@ -414,7 +414,7 @@ Built from the library by `tools/make_reference.gd` — do not edit it by hand. 
   Parameters: Object (object)
 
 - **The camera follows ‹Whom to follow› with smoothing ‹Tweens›** — `camera.follow`
-  The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably.
+  The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably. If the scene has no camera, one appears by itself.
   Parameters: Whom to follow (object), Tweens (number)
 
 - **Put the camera at ‹X› ; ‹Y›** — `camera.move`

@@ -654,13 +654,17 @@ func _uninstall_behavior(bname: String) -> void:
 		return
 	# Недописанная правка настроек не должна прилететь в уже снятое поведение.
 	await _beh_panel.settings.flush()
-	var err := await GdeBehaviorInstaller.remove(scene, bname)
+	var res: Dictionary = await GdeBehaviorInstaller.remove_with_scaffold(scene, bname, _reg)
+	var err := str(res["error"])
 	if not err.is_empty():
 		_set_error(err)
 		return
 	_clear_error()
 	_refresh_behaviors()
 	_rescan_filesystem()
+	var removed: Array = res["removed"]
+	if not removed.is_empty():
+		_set_note(GdeI18n.t("Поведение снято. Вместе с ним удалено то, что оно создало само: %s") % ", ".join(removed))
 
 
 # ------------------------------------------------------------------ объекты ---

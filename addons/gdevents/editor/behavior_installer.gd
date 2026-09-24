@@ -17,6 +17,9 @@ extends RefCounted
 ## Метка на ноде поведения. Пишется в .tscn и переживает что угодно —
 ## перезагрузку плагина, ошибку в скрипте, переименование ноды.
 const META_KEY := "gde_behavior"
+## Узлы, которые поведение создало само при добавлении (пути от корня сцены).
+## По ним снятие поведения убирает и его каркас.
+const CREATED_KEY := "gde_created"
 
 ## Кэш разбора сцен: путь -> {"stamp": int, "list": Array}.
 static var _scan_cache: Dictionary = {}
@@ -153,28 +156,106 @@ static func add(scene_path: String, bname: String, script_path: String,
 	node.set_meta(META_KEY, bname)
 	host.add_child(node)
 	node.owner = root
+	var made: Array = built["nodes"]
+	if not made.is_empty():
+		var paths: Array[String] = []
+		for m: Node in made:
+			paths.append(String(root.get_path_to(m)))
+		node.set_meta(CREATED_KEY, paths)
 
 	var err := await _commit(session)
 	invalidate(scene_path)
 	return {"error": err, "created": built["created"]}
 
 
-static func remove(scene_path: String, bname: String) -> String:
+static func remove(scene_path: String, bname: String, reg: GdeRegistry = null) -> String:
+	return str((await remove_with_scaffold(scene_path, bname, reg))["error"])
+
+
+## Снять поведение вместе с узлами, которые оно само создало при добавлении.
+## Каркас уходит целиком или остаётся целиком: остаётся, если в него
+## положили что-то своё (узел вручную, другое поведение) или каким-то его
+## узлом пользуется другое поведение объекта — например, спрайтом
+## платформера пользуется «Сочность». Половина каркаса хуже любого из двух:
+## тело без формы падает сквозь пол. Поведения, поставленные до того,
+## как появилась эта запись, снимаются по-старому, без каркаса.
+## {"error": String, "removed": Array[String] — имена удалённых узлов}
+static func remove_with_scaffold(scene_path: String, bname: String, reg: GdeRegistry = null) -> Dictionary:
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
-		return str(session.get("error", GdeI18n.t("не открывается сцена")))
+		return {"error": str(session.get("error", GdeI18n.t("не открывается сцена"))), "removed": []}
 
 	var target: Node = _find_behavior(root, bname)
 	if target == null:
 		_abort(session)
-		return GdeI18n.t("поведения «%s» на объекте нет") % bname
-	target.get_parent().remove_child(target)
+		return {"error": GdeI18n.t("поведения «%s» на объекте нет") % bname, "removed": []}
+
+	var candidates: Array[Node] = []
+	for p: Variant in target.get_meta(CREATED_KEY, []):
+		var n := root.get_node_or_null(NodePath(str(p)))
+		if n != null and n != root and n != target and not candidates.has(n):
+			candidates.append(n)
+
+	var host := target.get_parent()
+	host.remove_child(target)
 	target.queue_free()
+
+	var removed: Array[String] = []
+	if not candidates.is_empty() and _scaffold_free(root, bname, candidates, reg):
+		# Удаляем верхние узлы каркаса — вложенные уходят вместе с ними.
+		for n2: Node in candidates:
+			if _has_ancestor_in(n2, candidates):
+				continue
+			removed.append(str(n2.name))
+		for n3: Node in candidates:
+			if not _has_ancestor_in(n3, candidates) and is_instance_valid(n3):
+				n3.get_parent().remove_child(n3)
+				n3.queue_free()
 
 	var err := await _commit(session)
 	invalidate(scene_path)
-	return err
+	return {"error": err, "removed": removed}
+
+
+## Можно ли убрать каркас: внутри только его узлы, и другим поведениям
+## объекта ни один из них не нужен.
+static func _scaffold_free(root: Node, bname: String, ours: Array[Node], reg: GdeRegistry) -> bool:
+	for n: Node in ours:
+		for c: Node in n.get_children():
+			if not ours.has(c):
+				return false
+	for e: Dictionary in _collect(root, root):
+		var other := str(e["name"])
+		if other == bname:
+			continue
+		var node := root.get_node_or_null(NodePath(str(e["node"])))
+		if node == null:
+			continue
+		var h := node.get_parent()
+		# Поведение живёт внутри каркаса (его тело — наше тело).
+		if ours.has(h) or _has_ancestor_in(h, ours):
+			return false
+		if reg == null or not reg.behaviors.has(other):
+			continue
+		var bd: Dictionary = reg.behaviors[other]
+		for nd: Variant in bd.get("needs", []):
+			if not (nd is Dictionary):
+				continue
+			for a: Variant in (nd as Dictionary).get("any", [(nd as Dictionary).get("type", "")]):
+				var used: Node = h if h.is_class(str(a)) else _find_class(h, str(a))
+				if used != null and (ours.has(used) or _has_ancestor_in(used, ours)):
+					return false
+	return true
+
+
+static func _has_ancestor_in(n: Node, set: Array[Node]) -> bool:
+	var p := n.get_parent()
+	while p != null:
+		if set.has(p):
+			return true
+		p = p.get_parent()
+	return false
 
 
 static func _find_behavior(n: Node, bname: String) -> Node:
@@ -202,6 +283,7 @@ static func _unique_name(parent: Node, want: String) -> String:
 ## Возвращает {"host": Node, "created": Array[String]}.
 static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
 	var created: Array[String] = []
+	var nodes: Array[Node] = []
 	var target := str(spec.get("target", ""))
 	var host := root
 
@@ -221,6 +303,7 @@ static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
 				root.add_child(host)
 				host.owner = root
 				created.append("%s (%s)" % [host.name, target])
+				nodes.append(host)
 
 	for need: Variant in spec.get("needs", []):
 		var nd: Dictionary = need
@@ -255,8 +338,9 @@ static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
 		parent.add_child(child)
 		child.owner = root
 		created.append("%s (%s)" % [child.name, cls])
+		nodes.append(child)
 
-	return {"host": host, "created": created}
+	return {"host": host, "created": created, "nodes": nodes}
 
 
 static func _has_child_of(n: Node, cls: String) -> bool:

@@ -315,9 +315,79 @@ func _test_scaffold() -> void:
 	var again: Dictionary = await GdeBehaviorInstaller.add(path, "Platformer", str(b["path"]), {})
 	_ok(not str(again.get("error", "")).is_empty(), "второй раз то же поведение не ставится")
 
-	var err: String = await GdeBehaviorInstaller.remove(path, "Platformer")
+	var err: String = await GdeBehaviorInstaller.remove(path, "Platformer", reg)
 	_eq(err, "", "поведение снимается")
 	_eq(GdeBehaviorInstaller.installed(path).size(), 0, "после снятия список пуст")
+	_eq(_scene_children(path), 0, "вместе с поведением ушёл и его каркас: тело, форма, спрайт")
+
+	# «Сочность» пользуется спрайтом, который создал платформер: снимаем
+	# платформер — его каркас остаётся целиком, иначе тело осталось бы без
+	# формы или «Сочности» нечего было бы сплющивать.
+	await GdeBehaviorInstaller.add(path, "Platformer", str(b["path"]), {"target": b["target"], "needs": b["needs"]})
+	var jb: Dictionary = reg.behaviors["Juice"]
+	await GdeBehaviorInstaller.add(path, "Juice", str(jb["path"]), {"target": jb.get("target", ""), "needs": jb.get("needs", [])})
+	var res2: Dictionary = await GdeBehaviorInstaller.remove_with_scaffold(path, "Platformer", reg)
+	_ok((res2["removed"] as Array).is_empty() and GdeBehaviorInstaller.installed(path) == ["Juice"],
+			"спрайт каркаса нужен другому поведению — каркас остаётся (удалено: %s)" % str(res2["removed"]))
+	_eq(_scene_children(path), 4, "тело, форма, спрайт на месте, и «Сочность» тоже")
+	await GdeBehaviorInstaller.remove(path, "Juice", reg)
+
+	# Платформер и «Здоровье» на корне: «Здоровью» каркас платформера не нужен.
+	var p5 := "user://gde_scaffold_health.tscn"
+	_save_empty(p5)
+	await GdeBehaviorInstaller.add(p5, "Platformer", str(b["path"]), {"target": b["target"], "needs": b["needs"]})
+	var hb: Dictionary = reg.behaviors["Health"]
+	await GdeBehaviorInstaller.add(p5, "Health", str(hb["path"]), {"target": hb.get("target", ""), "needs": hb.get("needs", [])})
+	var res5: Dictionary = await GdeBehaviorInstaller.remove_with_scaffold(p5, "Platformer", reg)
+	_ok(GdeBehaviorInstaller.installed(p5) == ["Health"] and (res5["removed"] as Array) == ["CharacterBody2D"],
+			"каркас не нужен оставшемуся поведению — удалён (%s)" % str(res5["removed"]))
+	# Случай из жизни: «Лестница» по ошибке на игроке с платформером и
+	# «Здоровьем». Снимаем её — уходит её зона, тело платформера цело.
+	await GdeBehaviorInstaller.add(p5, "Platformer", str(b["path"]), {"target": b["target"], "needs": b["needs"]})
+	var lb: Dictionary = reg.behaviors["Ladder"]
+	await GdeBehaviorInstaller.add(p5, "Ladder", str(lb["path"]), {"target": lb.get("target", ""), "needs": lb.get("needs", [])})
+	var before := _scene_children(p5)
+	var res6: Dictionary = await GdeBehaviorInstaller.remove_with_scaffold(p5, "Ladder", reg)
+	_ok((res6["removed"] as Array) == ["Area2D"] and _scene_children(p5) == before - 3,
+			"«Лестница» снята с игрока вместе со своей зоной, остальное цело (%s)" % str(res6["removed"]))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(p5))
+
+	# Узел, добавленный вручную внутрь тела, — каркас остаётся целиком.
+	var p4 := "user://gde_scaffold_manual.tscn"
+	_save_empty(p4)
+	await GdeBehaviorInstaller.add(p4, "Platformer", str(b["path"]), {"target": b["target"], "needs": b["needs"]})
+	await GdeBehaviorInstaller.modify(p4, func(rt: Node) -> String:
+		var body := rt.get_child(0)
+		var mine := Label.new()
+		mine.name = "Моя надпись"
+		body.add_child(mine)
+		mine.owner = rt
+		return "")
+	var res4: Dictionary = await GdeBehaviorInstaller.remove_with_scaffold(p4, "Platformer", reg)
+	var ps4: PackedScene = ResourceLoader.load(p4, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE)
+	var r4 := ps4.instantiate()
+	_ok(r4.find_child("Моя надпись", true, false) != null and _has_class(r4, "CollisionShape2D")
+			and (res4["removed"] as Array).is_empty(),
+			"внутри каркаса своя надпись — каркас остался целиком (удалено: %s)" % ", ".join(res4["removed"]))
+	r4.free()
+
+	# «Урон при касании»: область урона и её форма уходят вместе с ним.
+	var db: Dictionary = reg.behaviors["Damage"]
+	_save_empty(p4)
+	await GdeBehaviorInstaller.add(p4, "Damage", str(db["path"]), {"target": db.get("target", ""), "needs": db.get("needs", [])})
+	await GdeBehaviorInstaller.remove(p4, "Damage", reg)
+	_eq(_scene_children(p4), 0, "«Урон при касании» снят вместе с областью урона")
+
+	# Поведение, поставленное старой версией (без записи о каркасе), — только
+	# само поведение, чужого не трогаем.
+	_save_empty(p4)
+	await GdeBehaviorInstaller.add(p4, "Platformer", str(b["path"]), {"target": b["target"], "needs": b["needs"]})
+	await GdeBehaviorInstaller.edit_behavior(p4, "Platformer", func(node: Node) -> String:
+		node.remove_meta(GdeBehaviorInstaller.CREATED_KEY)
+		return "")
+	await GdeBehaviorInstaller.remove(p4, "Platformer", reg)
+	_eq(_scene_children(p4), 3, "поведение из старой версии снимается без каркаса")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(p4))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 	# Каждое встроенное поведение в пустой сцене: каркас без ошибок проверки.
@@ -344,6 +414,26 @@ func _test_scaffold() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(p2))
 	_ok(broken.is_empty(), "каждое поведение в пустой сцене — каркас без ошибок (%d поведений)%s"
 			% [reg.behaviors.size(), "" if broken.is_empty() else ": " + "; ".join(broken)])
+
+
+func _save_empty(p: String) -> void:
+	var r := Node2D.new()
+	r.name = "Пустая"
+	var pk := PackedScene.new()
+	pk.pack(r)
+	ResourceSaver.save(pk, p)
+	r.free()
+	GdeBehaviorInstaller.invalidate()
+
+
+## Сколько узлов в сцене под корнем (во всём поддереве).
+func _scene_children(p: String) -> int:
+	GdeBehaviorInstaller.invalidate()
+	var ps: PackedScene = ResourceLoader.load(p, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE)
+	var r := ps.instantiate()
+	var n := r.find_children("*", "", true, false).size()
+	r.free()
+	return n
 
 
 func _has_class(n: Node, cls: String) -> bool:

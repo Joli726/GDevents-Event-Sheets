@@ -8,6 +8,19 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.9.1
+
+- **Removing a behavior removes the nodes it created itself** (body, shape,
+  sprite, damage area…), unless something of yours is inside or another
+  behavior of the object uses them. · **Снятое поведение уносит свой
+  каркас** — узлы, которые оно создало само.
+- **Camera**: "Camera follows", "Center the camera", zoom, move and shake
+  create a camera when the scene has none — before, they silently did
+  nothing. Smoothing now means what the description says: 0 — glued,
+  10 — lags noticeably; before, anything from 1 up became almost still.
+  · **Камера** появляется сама, если её нет в сцене; плавность 10 — заметно
+  отстаёт, а не стоит на месте.
+
 ## 0.9.0
 
 - **Fast collisions**: "collides with", "has just collided", "touching from

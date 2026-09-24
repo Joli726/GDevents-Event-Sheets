@@ -2216,20 +2216,40 @@ func _camera() -> Camera2D:
 	return vp.get_camera_2d() if vp != null else null
 
 
-func camera_center(n: Node) -> void:
+## Камера для действий «Камера…». Нет её в сцене — создаётся: в GDevelop
+## камера есть всегда, и «Камера следует за игроком» в сцене без Camera2D
+## раньше молча ничего не делала.
+func _camera_or_new(at: Variant = null) -> Camera2D:
 	var cam := _camera()
+	if cam != null:
+		return cam
+	var tree := get_tree()
+	var scene := tree.current_scene if tree != null else null
+	if scene == null:
+		return null
+	cam = Camera2D.new()
+	cam.name = "GdeCamera"
+	if at is Vector2:
+		cam.global_position = at
+	scene.add_child(cam)
+	cam.make_current()
+	return cam
+
+
+func camera_center(n: Node) -> void:
+	var cam := _camera_or_new()
 	if cam != null and is_instance_valid(n) and n is Node2D:
 		cam.global_position = (n as Node2D).global_position
 
 
 func camera_move(x: float, y: float) -> void:
-	var cam := _camera()
+	var cam := _camera_or_new()
 	if cam != null:
 		cam.global_position = Vector2(x, y)
 
 
 func camera_zoom(z: float) -> void:
-	var cam := _camera()
+	var cam := _camera_or_new()
 	if cam != null and z > 0.0:
 		cam.zoom = Vector2(z, z)
 
@@ -2769,13 +2789,19 @@ var _follow_smooth: float = 0.0
 
 
 func shake_camera(strength: float, seconds: float) -> void:
+	_camera_or_new()
 	_shake_strength = maxf(_shake_strength, absf(strength))
 	_shake_left = maxf(_shake_left, absf(seconds))
 
 
+## Плавность: 0 — камера приклеена, 10 — заметно отстаёт, больше — ещё
+## мягче. Раньше число понималось как доля 0…0,99, и всё от 1 и выше
+## превращалось в 0,99: камера почти стояла на месте.
 func camera_follow(n: Node, smoothing: float) -> void:
 	_follow = n
-	_follow_smooth = clampf(smoothing, 0.0, 0.99)
+	_follow_smooth = maxf(0.0, smoothing)
+	if is_instance_valid(n):
+		_camera_or_new(pos_of(n))
 
 
 func camera_stop_follow() -> void:
@@ -2792,7 +2818,10 @@ func _update_camera(delta: float) -> void:
 		if _follow_smooth <= 0.0:
 			cam.global_position = target
 		else:
-			var t := 1.0 - pow(_follow_smooth, delta * 60.0)
+			# За кадр при 60 FPS камера проходит 1/(1+плавность) пути до цели;
+			# степень от delta — чтобы при любом FPS было одинаково.
+			var keep := 1.0 - 1.0 / (1.0 + _follow_smooth)
+			var t := 1.0 - pow(keep, delta * 60.0)
 			cam.global_position = cam.global_position.lerp(target, clampf(t, 0.0, 1.0))
 	if _shake_left > 0.0:
 		_shake_left = maxf(0.0, _shake_left - delta)
