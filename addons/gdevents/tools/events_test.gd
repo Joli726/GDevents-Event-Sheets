@@ -61,6 +61,8 @@ func _ready() -> void:
 	_test_functions()
 	print("—— быстрые столкновения ——")
 	await _test_fast_collision()
+	print("—— камера ——")
+	_test_camera_follow()
 	_finish()
 
 
@@ -769,6 +771,39 @@ func _same_set(a: Array, b: Array) -> bool:
 		if not b.has(x):
 			return false
 	return true
+
+
+# ------------------------------------------------------------------ камера ---
+
+func _test_camera_follow() -> void:
+	# Сцена без камеры — как у человека, который её не добавлял.
+	var old := get_viewport().get_camera_2d()
+	if old != null:
+		old.free()
+	var hero := _thing("Hero", Vector2(500, 300), Vector2(16, 16))
+	var r := _runner({}, [_event([], [_act("camera.follow", ["Hero", "0"])])])
+	_tick(r, 1)
+	Gde._update_camera(1.0 / 60.0)
+	var cam := get_viewport().get_camera_2d()
+	_ok(cam != null, "камеры в сцене не было — «Камера следует» создала её")
+	_ok(cam != null and cam.global_position.distance_to(hero.position) < 0.5, "плавность 0: камера сразу на объекте")
+	_free([r])
+	# Плавность 10: заметно отстаёт, но едет — раньше число больше 0,99
+	# превращалось в 0,99, и камера почти стояла.
+	var r2 := _runner({}, [_event([], [_act("camera.follow", ["Hero", "10"])])])
+	_tick(r2, 1)
+	hero.position = Vector2(1500, 300)
+	Gde._update_camera(1.0 / 60.0)
+	var step := cam.global_position.x - 500.0 if cam != null else 0.0
+	for i in 60:
+		Gde._update_camera(1.0 / 60.0)
+	var after := cam.global_position.x if cam != null else 0.0
+	_ok(step > 50.0 and step < 200.0, "плавность 10: за кадр треть пути не проходит, но движется (%.0f px)" % step)
+	_ok(after > 1490.0, "плавность 10: за секунду доехала (x = %.0f)" % after)
+	_free([r2, hero])
+	Gde.camera_stop_follow()
+	if cam != null:
+		cam.free()
 
 
 # ------------------------------------------------------------------ лист ---

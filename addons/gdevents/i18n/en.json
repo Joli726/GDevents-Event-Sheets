@@ -702,7 +702,6 @@
 	"Трясёт камеру с затуханием. Для взрывов и ударов.": "Shakes the camera with a fade-out. For explosions and hits.",
 	"Сила": "Strength",
 	"Камера следует за _PARAM0_ с плавностью _PARAM1_": "The camera follows _PARAM0_ with smoothing _PARAM1_",
-	"Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт.": "The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably.",
 	"За кем": "Whom to follow",
 	"Камера перестаёт за кем-либо следовать": "The camera stops following anyone",
 	"Отвязывает камеру от объекта.": "Detaches the camera from the object.",
@@ -1114,5 +1113,6 @@
 	"  ✓ справочник совпадает с библиотекой": "  ✓ the reference matches the library",
 	"  ✗ справочник отстал от библиотеки: %s — пересоберите: godot --headless --script res://addons/gdevents/tools/make_reference.gd": "  ✗ the reference is behind the library: %s — rebuild it: godot --headless --script res://addons/gdevents/tools/make_reference.gd",
 	"—— проверок: 1, провалено: %d": "—— checks: 1, failed: %d",
-	"Поведение снято. Вместе с ним удалено то, что оно создало само: %s": "The behavior is removed, together with what it had created itself: %s"
+	"Поведение снято. Вместе с ним удалено то, что оно создало само: %s": "The behavior is removed, together with what it had created itself: %s",
+	"Камера плавно едет за объектом. Плавность 0 — жёстко приклеена, 10 — заметно отстаёт. Камеры в сцене нет — она появится сама.": "The camera smoothly follows the object. Smoothing 0 — glued tight, 10 — lags noticeably. If the scene has no camera, one appears by itself."
 }
