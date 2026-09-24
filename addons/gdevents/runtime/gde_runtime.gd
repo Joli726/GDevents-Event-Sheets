@@ -131,6 +131,106 @@ func create_object(ctx: GdePickContext, obj: String, x: float, y: float, parent:
 	return n
 
 
+## Дублировать отобранные экземпляры вместе с переменными. В выборке
+## остаются копии — как после «Создать»: следующие действия трогают их.
+func duplicate_picked(ctx: GdePickContext, obj: String, dx: float, dy: float) -> void:
+	var copies: Array = []
+	for n: Node in ctx.pick(obj).duplicate():
+		if not is_instance_valid(n) or n.is_queued_for_deletion():
+			continue
+		var c := duplicate_object(n, dx, dy)
+		if c != null:
+			copies.append(c)
+	ctx.set_pick(obj, copies)
+
+
+func duplicate_object(n: Node, dx: float, dy: float) -> Node:
+	var parent := n.get_parent()
+	if parent == null:
+		return null
+	var c := n.duplicate()
+	_clean_meta(c)
+	# Переменные — свои, а не общие с оригиналом: иначе «−1 жизнь» у копии
+	# отнималась бы и у него.
+	if n.has_meta("__gde_vars"):
+		c.set_meta("__gde_vars", (n.get_meta("__gde_vars") as Dictionary).duplicate(true))
+	parent.add_child(c)
+	var from := main(n)
+	var to := main(c)
+	if from != null and to != null:
+		to.global_position = from.global_position + Vector2(dx, dy)
+	_try_tag(c)
+	return c
+
+
+## Служебные метаданные — кэши, указывающие на узлы оригинала, таймеры
+## и заказанные анимации — копии не нужны.
+func _clean_meta(n: Node) -> void:
+	for m: StringName in n.get_meta_list():
+		if String(m).begins_with("__gde_"):
+			n.remove_meta(m)
+	for ch: Node in n.get_children():
+		_clean_meta(ch)
+
+
+# ------------------------------------------------------------ прикрепление ---
+
+## Прикрепить экземпляр к ближайшему отобранному объекту: поднять предмет,
+## взять оружие в руку. Узел переносится внутрь того, что у объекта
+## двигается, и дальше едет вместе с ним. keep — остаться на своём месте,
+## иначе встать со сдвигом dx; dy от него.
+func attach(n: Node, ctx: GdePickContext, to_obj: String, dx: float, dy: float, keep: bool) -> void:
+	var n2 := n as Node2D
+	if n2 == null:
+		return
+	var best: Node = null
+	var best_d := INF
+	for b: Node in ctx.pick(to_obj):
+		if not is_instance_valid(b) or b == n or n.is_ancestor_of(b):
+			continue
+		var d := pos_of(b).distance_squared_to(pos_of(n))
+		if d < best_d:
+			best_d = d
+			best = b
+	var host := main(best) if best != null else null
+	if host == null or host == n or n.is_ancestor_of(host) or n.get_parent() == host:
+		return
+	var body := body_of(n)
+	if body is RigidBody2D and not n.has_meta("__gde_attach_freeze"):
+		# Прикреплённое тело не падает само по себе.
+		n.set_meta("__gde_attach_freeze", (body as RigidBody2D).freeze)
+		(body as RigidBody2D).freeze = true
+	n.reparent(host, true)
+	if not keep:
+		n2.position = Vector2(dx, dy)
+		n2.rotation = 0.0
+	n.set_meta("__gde_attached", true)
+
+
+func detach(n: Node) -> void:
+	if not is_instance_valid(n) or not n.has_meta("__gde_attached"):
+		return
+	var level := get_tree().current_scene
+	if level == null or level == n or n.is_ancestor_of(level):
+		level = get_tree().root
+	n.reparent(level, true)
+	n.remove_meta("__gde_attached")
+	var body := body_of(n)
+	if n.has_meta("__gde_attach_freeze"):
+		if body is RigidBody2D:
+			(body as RigidBody2D).freeze = bool(n.get_meta("__gde_attach_freeze"))
+		n.remove_meta("__gde_attach_freeze")
+
+
+func is_attached(n: Node) -> bool:
+	return is_instance_valid(n) and n.has_meta("__gde_attached")
+
+
+## Прикреплён ли a именно к b.
+func attached_to(a: Node, b: Node) -> bool:
+	return is_attached(a) and is_instance_valid(b) and b.is_ancestor_of(a)
+
+
 ## Удалить экземпляр. Из выборки убирается немедленно — queue_free()
 ## отложен до конца кадра, а GDevelop убирает объект сразу.
 func delete_object(n: Node) -> void:

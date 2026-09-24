@@ -1149,6 +1149,36 @@
       ],
       "code": "Gde.key_double_tap(\"{0}\", {1})",
       "description": "Двойное нажатие: истинно в момент второго нажатия, если оно пришло быстрее промежутка. Рывок двойным тапом, 0.3 секунды — привычный промежуток."
+    },
+    "object.attached": {
+      "group": "Объекты",
+      "sentence": "_PARAM0_ прикреплён",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "pred": "Gde.is_attached({o})",
+      "description": "Объект прикреплён к другому — предмет в руках."
+    },
+    "object.attached_to": {
+      "group": "Объекты",
+      "sentence": "_PARAM0_ прикреплён к _PARAM1_",
+      "kind": "pair",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Что"
+        },
+        {
+          "kind": "object",
+          "label": "К чему"
+        }
+      ],
+      "pred": "Gde.attached_to({a}, {b})",
+      "description": "Первый объект прикреплён именно ко второму. Оставляет в выборке такие пары."
     }
   },
   "actions": {
@@ -2425,6 +2455,82 @@
       "params": [],
       "code": "Gde.stop_vibration()",
       "description": "Сразу прекращает вибрацию."
+    },
+    "object.attach": {
+      "group": "Объекты",
+      "sentence": "Прикрепить _PARAM0_ к _PARAM1_ со сдвигом _PARAM2_ ; _PARAM3_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Что"
+        },
+        {
+          "kind": "object",
+          "label": "К чему"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг X"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг Y"
+        }
+      ],
+      "code": "Gde.attach({o}, {ctx}, \"{1}\", {2}, {3}, false)",
+      "description": "Поднять предмет, взять оружие в руку: объект встаёт со сдвигом от ближайшего отобранного второго объекта и дальше едет вместе с ним. Тело на время перестаёт падать."
+    },
+    "object.attach_here": {
+      "group": "Объекты",
+      "sentence": "Прикрепить _PARAM0_ к _PARAM1_ там, где он сейчас",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Что"
+        },
+        {
+          "kind": "object",
+          "label": "К чему"
+        }
+      ],
+      "code": "Gde.attach({o}, {ctx}, \"{1}\", 0.0, 0.0, true)",
+      "description": "Как стрела, воткнувшаяся во врага: остаётся на своём месте, но дальше едет вместе с объектом."
+    },
+    "object.detach": {
+      "group": "Объекты",
+      "sentence": "Открепить _PARAM0_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        }
+      ],
+      "code": "Gde.detach({o})",
+      "description": "Бросить предмет: объект остаётся там, где был, и снова живёт сам по себе."
+    },
+    "object.duplicate": {
+      "group": "Объекты",
+      "sentence": "Дублировать _PARAM0_ вместе с переменными со сдвигом _PARAM1_ ; _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг X"
+        },
+        {
+          "kind": "number",
+          "label": "Сдвиг Y"
+        }
+      ],
+      "code": "Gde.duplicate_picked({ctx}, \"{0}\", {1}, {2})",
+      "description": "Копия каждого отобранного экземпляра — с его переменными и настройками поведений. Переменные у копии свои. Дальше в выборке — копии."
     }
   },
   "expressions": {

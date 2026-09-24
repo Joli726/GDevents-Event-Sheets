@@ -880,5 +880,19 @@
 	"Двойное нажатие: истинно в момент второго нажатия, если оно пришло быстрее промежутка. Рывок двойным тапом, 0.3 секунды — привычный промежуток.": "A double press: true at the moment of the second press if it came faster than the gap. A dash on a double tap; 0.3 seconds is the usual gap.",
 	"Промежуток, сек": "Gap, s",
 	"Сколько секунд клавиша удерживается: KeyHeldTime(Space). Сила броска, заряд.": "How many seconds a key is held: KeyHeldTime(Space). Throw strength, a charge.",
-	"GDevents: неизвестная кнопка геймпада «%s». Есть: %s": "GDevents: unknown gamepad button “%s”. There are: %s"
+	"GDevents: неизвестная кнопка геймпада «%s». Есть: %s": "GDevents: unknown gamepad button “%s”. There are: %s",
+	"Прикрепить _PARAM0_ к _PARAM1_ со сдвигом _PARAM2_ ; _PARAM3_": "Attach _PARAM0_ to _PARAM1_ with an offset of _PARAM2_ ; _PARAM3_",
+	"Поднять предмет, взять оружие в руку: объект встаёт со сдвигом от ближайшего отобранного второго объекта и дальше едет вместе с ним. Тело на время перестаёт падать.": "Pick up an item, take a weapon in hand: the object stands at an offset from the nearest picked second object and then moves together with it. A body stops falling for that time.",
+	"Что": "What",
+	"К чему": "To what",
+	"Прикрепить _PARAM0_ к _PARAM1_ там, где он сейчас": "Attach _PARAM0_ to _PARAM1_ where it is now",
+	"Как стрела, воткнувшаяся во врага: остаётся на своём месте, но дальше едет вместе с объектом.": "Like an arrow stuck in an enemy: it stays where it is but then moves together with the object.",
+	"Открепить _PARAM0_": "Detach _PARAM0_",
+	"Бросить предмет: объект остаётся там, где был, и снова живёт сам по себе.": "Drop an item: the object stays where it was and lives on its own again.",
+	"_PARAM0_ прикреплён": "_PARAM0_ is attached",
+	"Объект прикреплён к другому — предмет в руках.": "The object is attached to another one — an item in hands.",
+	"_PARAM0_ прикреплён к _PARAM1_": "_PARAM0_ is attached to _PARAM1_",
+	"Первый объект прикреплён именно ко второму. Оставляет в выборке такие пары.": "The first object is attached exactly to the second one. Keeps such pairs in the picking.",
+	"Дублировать _PARAM0_ вместе с переменными со сдвигом _PARAM1_ ; _PARAM2_": "Duplicate _PARAM0_ with its variables at an offset of _PARAM1_ ; _PARAM2_",
+	"Копия каждого отобранного экземпляра — с его переменными и настройками поведений. Переменные у копии свои. Дальше в выборке — копии.": "A copy of every picked instance — with its variables and behavior settings. The copy's variables are its own. The copies are picked afterwards."
 }

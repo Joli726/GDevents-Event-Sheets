@@ -40,6 +40,9 @@ func _ready() -> void:
 	await _test_key_hold()
 	await _test_double_tap()
 	_test_gamepad_absent()
+	print("—— прикрепить, дублировать ——")
+	_test_attach()
+	_test_duplicate()
 	_finish()
 
 
@@ -305,6 +308,73 @@ func _test_gamepad_absent() -> void:
 	_ok((ex["errors"] as Array).is_empty(), "геймпад: выражение StickX() собирается")
 	Gde.vibrate(0.5, 0.5, 0.1)
 	_ok(true, "геймпад: вибрация без геймпада не падает")
+
+
+# --------------------------------------------- прикрепить, дублировать ---
+
+func _test_attach() -> void:
+	var hero := _thing("Hero", Vector2(500, 0), Vector2(20, 20))
+	var coin := _thing("Coin", Vector2(600, 0), Vector2(8, 8))
+	var r := _runner({}, [
+		_event([_cond("system.trigger_once", [])], [_act("object.attach", ["Coin", "Hero", "10", "-20"])]),
+		_event([_cond("object.attached", ["Coin"])], [_act("var.modify", ["held", "=", "1"])]),
+		_event([_cond("object.attached_to", ["Coin", "Hero"])], [_act("var.modify", ["held_by", "=", "1"])]),
+	])
+	_tick(r, 1)
+	_ok(coin.get_parent() == hero and coin.global_position.distance_to(Vector2(510, -20)) < 0.5,
+			"прикрепить: монета у героя со сдвигом 10 ; -20")
+	hero.position += Vector2(100, 50)
+	_ok(coin.global_position.distance_to(Vector2(610, 30)) < 0.5, "прикрепить: едет вместе с ним")
+	_ok(Gde.var_get("held", 0.0) == 1.0 and Gde.var_get("held_by", 0.0) == 1.0, "прикрепить: условия «прикреплён» и «прикреплён к»")
+	Gde.detach(coin)
+	var at := coin.global_position
+	hero.position += Vector2(100, 0)
+	_ok(coin.get_parent() != hero and coin.global_position.distance_to(at) < 0.5, "открепить: остался на месте и больше не едет")
+	# Тело не падает, пока прикреплено.
+	var rb := RigidBody2D.new()
+	rb.add_child(_rect_shape(Vector2(8, 8)))
+	rb.position = Vector2(900, 0)
+	add_child(rb)
+	rb.add_to_group(Gde.GROUP_PREFIX + "Coin")
+	var ctx := Gde.new_context()
+	Gde.attach(rb, ctx, "Hero", 0.0, 0.0, true)
+	_ok(rb.freeze and rb.get_parent() == hero and rb.global_position.distance_to(Vector2(900, 0)) < 0.5,
+			"прикрепить на месте: тело заморожено и осталось где было")
+	Gde.detach(rb)
+	_ok(not rb.freeze, "открепить: тело снова падает")
+	_free([r, rb, coin, hero])
+
+
+func _rect_shape(size: Vector2) -> CollisionShape2D:
+	var cs := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = size
+	cs.shape = rect
+	return cs
+
+
+func _test_duplicate() -> void:
+	var e := _thing("Enemy", Vector2(0, 300), Vector2(10, 10))
+	Gde.ovar_set(e, "hp", 3.0)
+	Gde.main(e)          # кэш главного узла — копия не должна его унаследовать
+	var r := _runner({}, [
+		_event([_cond("system.trigger_once", [])], [
+			_act("object.duplicate", ["Enemy", "40", "0"]),
+			_act("object.variable", ["Enemy", "copy", "=", "1"]),
+		]),
+	])
+	_tick(r, 1)
+	var all := Gde.all_instances("Enemy")
+	_eq(all.size(), 2, "дублировать: стало два экземпляра")
+	var c: Node2D = all[0] if all[0] != e else all[1]
+	_ok(c.global_position.distance_to(e.global_position + Vector2(40, 0)) < 0.5, "дублировать: копия со сдвигом 40")
+	_eq(Gde.ovar_get(c, "hp"), 3.0, "дублировать: переменные скопированы")
+	Gde.ovar_set(c, "hp", 1.0)
+	_eq(Gde.ovar_get(e, "hp"), 3.0, "дублировать: переменные у копии свои")
+	_ok(Gde.main(c) == c, "дублировать: копия не держит кэш оригинала")
+	_ok(float(Gde.ovar_get(c, "copy", 0.0)) == 1.0 and float(Gde.ovar_get(e, "copy", 0.0)) == 0.0,
+			"дублировать: дальше в выборке — копия")
+	_free([r] + all)
 
 
 # ------------------------------------------------------------------ лист ---
