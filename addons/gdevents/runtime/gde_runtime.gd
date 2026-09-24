@@ -2802,6 +2802,13 @@ enum FollowBeat { FRAME, PHYSICS }
 var _follow_beat: int = FollowBeat.FRAME
 var _follow_seen: Vector2 = Vector2.INF
 var _frame_usec: int = 0
+## Сглаживание физики включили мы сами (а не автор в настройках проекта) —
+## тогда оно действует только на того, за кем следит камера, и на камеру.
+var _own_interp: bool = false
+var _interp_node: Node2D = null
+var _interp_last: Vector2 = Vector2.INF
+## Скачок больше этого за один шаг физики — перестановка, а не движение.
+const TELEPORT_PX := 96.0
 
 
 func shake_camera(strength: float, seconds: float) -> void:
@@ -2822,6 +2829,39 @@ func camera_follow(n: Node, smoothing: float) -> void:
 
 func camera_stop_follow() -> void:
 	_follow = null
+	_smooth_target(null)
+
+
+## Персонаж платформера двигается на шаге физики — 60 раз в секунду, а
+## монитор рисует 120–165 кадров. Каждое положение держится то 2, то 3
+## кадра, и на экране он дёргается, даже когда камера идёт с ним в ногу.
+## Лечит это сглаживание физики Godot: промежуточные кадры он дорисовывает
+## сам. Включаем его только для того, за кем следит камера, и для самой
+## камеры: объекты, которые двигают события каждый кадр, со сглаживанием
+## пошли бы рывками. Автор включил сглаживание в проекте — не вмешиваемся.
+func _smooth_target(target: Node2D) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	if bool(ProjectSettings.get_setting("physics/common/physics_interpolation", false)):
+		return
+	if is_instance_valid(_interp_node) and _interp_node != target:
+		_interp_node.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_INHERIT
+	_interp_node = target
+	var cam := _camera()
+	if target == null:
+		if cam != null:
+			cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_INHERIT
+		return
+	if not _own_interp:
+		_own_interp = true
+		tree.root.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		tree.physics_interpolation = true
+	target.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+	target.reset_physics_interpolation()
+	if cam != null:
+		cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+		cam.reset_physics_interpolation()
 
 
 ## Слежение и тряска за один шаг — для тестов и там, где ритм не важен.
@@ -2837,16 +2877,33 @@ func _update_camera(delta: float) -> void:
 ## Шаг физики: после того как платформер сдвинул персонажа (приоритет у
 ## Gde в физике поздний). Если сдвинулся здесь — камера ходит тут же.
 func _physics_process(delta: float) -> void:
-	if _follow == null or not is_instance_valid(_follow) or _interpolated():
+	if _follow == null or not is_instance_valid(_follow):
 		return
 	var p := pos_of(_follow)
 	if p != _follow_seen:
 		_follow_seen = p
-		_follow_beat = FollowBeat.PHYSICS
+		if _follow_beat != FollowBeat.PHYSICS or _interp_node != main(_follow):
+			_follow_beat = FollowBeat.PHYSICS
+			var m := main(_follow)
+			if m is Node2D:
+				_smooth_target(m as Node2D)
 	if _follow_beat == FollowBeat.PHYSICS:
 		var cam := _camera()
 		if cam != null:
+			var jumped := _interp_last != Vector2.INF and p.distance_to(_interp_last) > TELEPORT_PX
+			# Новая камера (после смены сцены) сглаживается вместе с персонажем.
+			if _own_interp and is_instance_valid(_interp_node) \
+					and cam.physics_interpolation_mode != Node.PHYSICS_INTERPOLATION_MODE_ON:
+				cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+				cam.reset_physics_interpolation()
 			_follow_step(cam, p, delta)
+			# Персонажа переставили (возрождение, «задать позицию») — без
+			# сглаживания, иначе на кадр он «проехал» бы через пол-уровня.
+			if jumped and _own_interp:
+				if is_instance_valid(_interp_node):
+					_interp_node.reset_physics_interpolation()
+				cam.reset_physics_interpolation()
+	_interp_last = p
 
 
 ## Перед отрисовкой кадра — когда все _process уже отработали и персонаж,
@@ -2860,23 +2917,22 @@ func _on_frame_pre_draw() -> void:
 	var cam := _camera()
 	if cam == null:
 		return
-	# Включено сглаживание физики Godot: берём сглаженное положение и едем
-	# каждый кадр — так плавнее всего.
-	if _interpolated():
-		var m := main(_follow)
-		if m != null:
-			_follow_step(cam, m.get_global_transform_interpolated().origin, delta)
-		return
+	# Здесь камера ходит только за тем, кто движется каждый кадр. За тем, кто
+	# движется на шаге физики, она ходит там же, а промежуточные кадры
+	# сглаживает Godot — двигать её ещё и здесь значило бы мешать ему.
 	var p := pos_of(_follow)
 	if p != _follow_seen:
 		_follow_seen = p
-		_follow_beat = FollowBeat.FRAME
+		if _follow_beat != FollowBeat.FRAME:
+			_follow_beat = FollowBeat.FRAME
+			# Ходит каждый кадр — сглаживание ему только мешало бы.
+			_smooth_target(null)
 	if _follow_beat == FollowBeat.FRAME:
 		_follow_step(cam, p, delta)
 
 
-static func _interpolated() -> bool:
-	return bool(ProjectSettings.get_setting("physics/common/physics_interpolation", false))
+func _interpolated() -> bool:
+	return get_tree() != null and get_tree().physics_interpolation
 
 
 func _follow_step(cam: Camera2D, target: Vector2, delta: float) -> void:

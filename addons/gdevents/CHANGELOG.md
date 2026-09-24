@@ -8,6 +8,18 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.9.3
+
+- **The character no longer shakes while the camera follows it.** The
+  platformer moves on the physics step (60 times a second), and on a faster
+  monitor each position stayed on screen for 2 or 3 frames unevenly. The
+  camera now turns on Godot's physics interpolation for the character it
+  follows and for itself only — everything moved by events every frame stays
+  as it was. Measured on rendered frames: the character now moves 1 px every
+  frame instead of 3 px jumps with pauses. Also fixed a script error with
+  physics interpolation enabled in the project. · **Персонаж больше не
+  дрожит**, когда за ним следует камера.
+
 ## 0.9.2
 
 - **Camera no longer jitters behind a moving character**: it moves in the
