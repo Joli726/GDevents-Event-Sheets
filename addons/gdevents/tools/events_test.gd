@@ -49,6 +49,18 @@ func _ready() -> void:
 	print("—— списки, значения на экране ——")
 	_test_lists()
 	await _test_screen_values()
+	print("—— любое из условий (ИЛИ) ——")
+	_test_any_of()
+	print("—— локальные переменные ——")
+	_test_locals()
+	print("—— подключённые листы ——")
+	_test_include()
+	print("—— ошибка в игре называет событие ——")
+	_test_error_points_to_event()
+	print("—— функции из событий ——")
+	_test_functions()
+	print("—— быстрые столкновения ——")
+	await _test_fast_collision()
 	_finish()
 
 
@@ -488,6 +500,277 @@ func _test_screen_values() -> void:
 	_ok(Gde.screen_text().is_empty(), "на экране: «убрать надписи»")
 
 
+# ---------------------------------------------------------- любое из условий ---
+
+func _test_any_of() -> void:
+	var e1 := _thing("Enemy", Vector2(10, 0), Vector2(8, 8))
+	var e2 := _thing("Enemy", Vector2(200, 0), Vector2(8, 8))
+	var e3 := _thing("Enemy", Vector2(400, 0), Vector2(8, 8))
+	var off := _cond("system.compare", ["1", "=", "1"])
+	off["disabled"] = true
+	var r := _runner({"a": 1, "b": 0, "one": 0, "none": 0, "dis": 0}, [
+		_any([_cond("system.compare", ["Variable(a)", "=", "1"]), _cond("system.compare", ["Variable(b)", "=", "1"])],
+				[_act("var.modify", ["one", "=", "1"])]),
+		_any([_cond("system.compare", ["Variable(a)", "=", "5"]), _cond("system.compare", ["Variable(b)", "=", "5"])],
+				[_act("var.modify", ["none", "=", "1"])]),
+		_any([_cond("object.x", ["Enemy", "<", "50"]), _cond("object.x", ["Enemy", ">", "300"])],
+				[_act("object.variable", ["Enemy", "edge", "=", "1"])]),
+		_any([_cond("system.compare", ["1", "=", "1"]), _cond("object.x", ["Enemy", ">", "9999"])],
+				[_act("object.variable", ["Enemy", "all", "=", "1"])]),
+		_any([off, _cond("system.compare", ["1", "=", "2"])], [_act("var.modify", ["dis", "=", "1"])]),
+	])
+	_tick(r, 1)
+	_eq(Gde.var_get("one"), 1.0, "ИЛИ: хватает одного верного условия")
+	_eq(Gde.var_get("none"), 0.0, "ИЛИ: оба ложны — событие молчит")
+	var edge := [Gde.ovar_get(e1, "edge", 0.0), Gde.ovar_get(e2, "edge", 0.0), Gde.ovar_get(e3, "edge", 0.0)]
+	_eq(str(edge), str([1.0, 0.0, 1.0]), "ИЛИ: в выборке те, кого отобрало хоть одно условие")
+	var all := [Gde.ovar_get(e1, "all", 0.0), Gde.ovar_get(e2, "all", 0.0), Gde.ovar_get(e3, "all", 0.0)]
+	_eq(str(all), str([1.0, 1.0, 1.0]), "ИЛИ: ложное условие не сужает выборку, когда сработало другое")
+	_eq(Gde.var_get("dis"), 0.0, "ИЛИ: выключенное условие не делает событие верным")
+	_free([r, e1, e2, e3])
+
+
+# ------------------------------------------------------ локальные переменные ---
+
+func _test_locals() -> void:
+	var counter := _event([], [
+		_act("var.modify", ["n", "+", "1"]),
+		_act("var.modify", ["out", "=", "Variable(n)"]),
+	], [_event([], [_act("var.modify", ["out2", "=", "Variable(n) + 10"])])])
+	counter["locals"] = {"n": 0}
+	var later := _event([_cond("system.trigger_once", [])], [
+		_act("system.wait", ["0.1"]),
+		_act("var.modify", ["out3", "=", "Variable(k)"]),
+	])
+	later["locals"] = {"k": 5}
+	var text := _event([_cond("system.compare_text", ["VariableString(who)", "=", "\"bob\""])],
+			[_act("var.modify", ["out4", "=", "1"])])
+	text["locals"] = {"who": "bob"}
+	var r := _runner({"n": 100, "out": 0, "out2": 0, "out3": 0, "out4": 0}, [counter, later, text])
+	_tick(r, 3)
+	_eq(Gde.var_get("out"), 1.0, "локальная: обнуляется при каждом запуске события (3 кадра — всё равно 1)")
+	_eq(Gde.var_get("out2"), 11.0, "локальная: видна в подсобытии")
+	_eq(Gde.var_get("n"), 100.0, "локальная: одноимённая переменная сцены не тронута")
+	_eq(Gde.var_get("out4"), 1.0, "локальная: текстовая, в условии")
+	_tick(r, 10)
+	_eq(Gde.var_get("out3"), 5.0, "локальная: «Подождать» уносит её с собой")
+	var bad := _event([], [])
+	bad["locals"] = {"2x": 0}
+	var res := GdeGenerator.generate({"objects": [], "events": [bad]}, _reg, "res://t.gdes.json")
+	_ok(not (res["errors"] as Array).is_empty(), "локальная: плохое имя — ошибка сборки")
+	_free([r])
+
+
+# ------------------------------------------------------- подключённые листы ---
+
+func _write_sheet(path: String, sheet: Dictionary) -> void:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(sheet))
+	f.close()
+
+
+func _test_include() -> void:
+	var shared := "user://gde_test_shared.gdes.json"
+	_write_sheet(shared, {"format": 1, "objects": [{"name": "Gem", "scene": "res://addons/gdevents/tests/gem_virtual.tscn"}],
+		"variables": {"bonus": 7},
+		"events": [_event([], [_act("var.modify", ["ticks", "+", "Variable(bonus)"])])]})
+	var r := _runner({"ticks": 0, "after": 0}, [
+		{"type": "include", "sheet": shared},
+		_event([], [_act("var.modify", ["after", "=", "Variable(ticks)"])]),
+	])
+	_tick(r, 2)
+	_eq(Gde.var_get("ticks"), 14.0, "подключённый лист: его события выполняются каждый кадр")
+	_eq(Gde.var_get("after"), 14.0, "подключённый лист: на своём месте, до следующих событий")
+	_free([r])
+
+	var host := {"objects": [], "events": [{"type": "include", "sheet": shared}]}
+	var g := GdeGenerator.generate(host, _reg, "res://host.gdes.json")
+	_ok((g["errors"] as Array).is_empty() and str(g["code"]).contains("\"Gem\""), "подключённый лист: его объекты добавлены к листу")
+
+	var a := "user://gde_test_a.gdes.json"
+	var b := "user://gde_test_b.gdes.json"
+	_write_sheet(a, {"format": 1, "events": [{"type": "include", "sheet": b}]})
+	_write_sheet(b, {"format": 1, "events": [{"type": "include", "sheet": a}]})
+	g = GdeGenerator.generate({"events": [{"type": "include", "sheet": a}]}, _reg, "res://host.gdes.json")
+	_ok(str(g["errors"]).contains("по кругу"), "подключение по кругу — ошибка, а не зависание")
+
+	g = GdeGenerator.generate({"events": [_event([], []), {"type": "include", "sheet": "user://нет.gdes.json"}]}, _reg, "res://host.gdes.json")
+	var items: Array = g["error_items"]
+	_ok(items.size() == 1 and str(items[0]["path"]) == str([1]), "нет листа — ошибка на событии подключения")
+
+	var broken := "user://gde_test_broken.gdes.json"
+	_write_sheet(broken, {"format": 1, "events": [_event([], [_act("нет.такого", [])])]})
+	g = GdeGenerator.generate({"events": [{"type": "include", "sheet": broken}]}, _reg, "res://host.gdes.json")
+	items = g["error_items"]
+	_ok(items.size() == 1 and str(items[0]["path"]) == str([0]) and str(items[0]["text"]).contains("нет.такого"),
+			"ошибка внутри подключённого листа видна на событии подключения")
+
+	_write_sheet(broken, {"format": 1, "objects": [{"name": "Coin", "scene": "res://другая.tscn"}], "events": []})
+	g = GdeGenerator.generate({"objects": [{"name": "Coin", "scene": "res://coin.tscn"}],
+			"events": [{"type": "include", "sheet": broken}]}, _reg, "res://host.gdes.json")
+	_ok(str(g["errors"]).contains("Coin"), "один объект с разными сценами — ошибка")
+	for p: String in [shared, a, b, broken]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+
+
+# ------------------------------------------------- ошибка называет событие ---
+
+func _test_error_points_to_event() -> void:
+	var sheet := {"objects": [], "events": [
+		_event([], [_act("var.modify", ["fine", "=", "1"])]),
+		_event([_cond("system.trigger_once", [])], [_act("scene.change", ["res://нет_такой_сцены.tscn"])]),
+	]}
+	var r := GdeGenerator.generate(sheet, _reg, "res://уровень.gdes.json")
+	_ok(str(r["code"]).contains("const GDE_EVENTS"), "в собранном скрипте есть карта строк событий")
+	_ok(str(r["code"]).contains("Gde.dbg_hit(self, 0)"), "сборка с отладкой сообщает о событиях")
+	_ok(not str(GdeGenerator.generate(sheet, _reg, "res://уровень.gdes.json", false)["code"]).contains("dbg_hit"),
+			"сборка без отладки (экспорт release) — без этих строк")
+	var path := "user://gde_err_sheet.gd"
+	# «Сменить сцену» откладывает загрузку на следующий кадр, и её ошибка
+	# приходит уже без стека листа. Для настоящей ошибки скрипта строку
+	# действия подменяем обращением к null — номер строки не меняется.
+	var code := ""
+	for ln: String in str(r["code"]).split("\n"):
+		if ln.contains("change_scene"):
+			ln = ln.substr(0, ln.length() - ln.strip_edges(true, false).length()) + "var _gde_null: Object = null; _gde_null.free()"
+		code += ln + "\n"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(code)
+	f.close()
+	var logger := Gde.error_logger()
+	_ok(logger != null, "журнал ошибок GDevents подключён")
+	if logger == null:
+		return
+	# Строка действия второго события — ищем её в собранном коде.
+	var lines := code.split("\n")
+	var at := -1
+	for i in range(lines.size()):
+		if lines[i].contains("_gde_null.free()"):
+			at = i + 1
+	var hit := logger.locate(path, at)
+	_eq(hit.get("event", ""), "2", "строка собранного кода → событие 2")
+	_ok(str(hit.get("sheet", "")) == "res://уровень.gdes.json", "и лист, из которого оно собрано")
+	_ok(str(hit.get("what", "")).contains(GdeI18n.t("Один раз")) or str(hit.get("what", "")) != "", "и что за событие: %s" % hit.get("what", ""))
+	_ok(logger.locate(path, 3).is_empty(), "строка до первого события — не событие")
+	# Настоящая ошибка в игре: сообщение называет событие.
+	var s := load(path) as GDScript
+	var runner := Node2D.new()
+	runner.set_script(s)
+	add_child(runner)
+	runner.set_process(false)
+	logger.last_message = ""
+	_tick(runner, 1)
+	_ok(logger.last_message.contains("2") and logger.last_message.contains("уровень.gdes.json"),
+			"ошибка в игре названа событием листа: %s" % logger.last_message)
+	_free([runner])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+# ------------------------------------------------------- функции из событий ---
+
+func _fn(name: String, kind: String, params: Array, children: Array) -> Dictionary:
+	return {"type": "function", "name": name, "kind": kind, "params": params, "children": children}
+
+
+func _test_functions() -> void:
+	var near := _thing("Enemy", Vector2(10, 0), Vector2(8, 8))
+	var mid := _thing("Enemy", Vector2(200, 0), Vector2(8, 8))
+	var far := _thing("Enemy", Vector2(500, 0), Vector2(8, 8))
+	var hurt := _fn("Hurt", "action",
+			[{"name": "target", "kind": "object"}, {"name": "amount", "kind": "number"}],
+			[_event([], [_act("object.variable", ["target", "hp", "-", "Variable(amount)"])])])
+	var is_far := _fn("IsFar", "condition", [{"name": "who", "kind": "object"}],
+			[_event([_cond("object.x", ["who", ">", "300"])], [_act(GdeFunctions.RETURN_TRUE, [])])])
+	var add := _fn("Add", "action", [{"name": "amount", "kind": "number"}, {"name": "note", "kind": "string"}],
+			[_event([], [_act("var.modify", ["total", "+", "Variable(amount)"]), _act("var.set_string", ["last", "VariableString(note)"])])])
+	var r := _runner({"total": 0, "none": 0}, [
+		hurt, is_far, add,
+		_event([_cond("system.trigger_once", []), _cond("object.x", ["Enemy", "<", "100"])], [_act("fn.Hurt", ["Enemy", "5"])]),
+		_event([_cond("system.trigger_once", []), _cond("fn.IsFar", ["Enemy"])], [_act("object.variable", ["Enemy", "far", "=", "1"])]),
+		_event([_cond("system.trigger_once", [])], [_act("fn.Add", ["3", "\"раз\""]), _act("fn.Add", ["4", "\"два\""])]),
+		_any([_cond("fn.IsFar", ["Enemy"]), _cond("system.compare", ["1", "=", "2"])], [_act("object.variable", ["Enemy", "any", "=", "1"])]),
+	])
+	_tick(r, 1)
+	var hp := [Gde.ovar_get(near, "hp", 0.0), Gde.ovar_get(mid, "hp", 0.0), Gde.ovar_get(far, "hp", 0.0)]
+	_eq(str(hp), str([-5.0, 0.0, 0.0]), "функция-действие: объект-параметр — отобранные при вызове экземпляры")
+	var f := [Gde.ovar_get(near, "far", 0.0), Gde.ovar_get(mid, "far", 0.0), Gde.ovar_get(far, "far", 0.0)]
+	_eq(str(f), str([0.0, 0.0, 1.0]), "функция-условие сужает выборку, как встроенное условие")
+	_eq(Gde.var_get("total"), 7.0, "функция: числа — как Variable(amount), вызов дважды")
+	_eq(Gde.var_get("last"), "два", "функция: текстовый параметр")
+	_eq(Gde.ovar_get(far, "any", 0.0), 1.0, "функция-условие внутри «ИЛИ»")
+	_free([r, near, mid, far])
+
+	var bad := GdeGenerator.generate({"events": [_event([], [_act(GdeFunctions.RETURN_TRUE, [])]),
+			_fn("C", "condition", [], [])]}, _reg, "res://t.gdes.json")
+	_ok(str(bad["errors"]).contains("Вернуть"), "«Вернуть» вне функции-условия — ошибка")
+	bad = GdeGenerator.generate({"events": [_fn("Twice", "action", [], []), _fn("Twice", "action", [], [])]}, _reg, "res://t.gdes.json")
+	_ok(str(bad["errors"]).contains("дважды"), "две функции с одним именем — ошибка")
+	_ok(_reg.sheet_actions.is_empty(), "после сборки функции листа не остаются в реестре")
+
+	var lib := "user://gde_test_fnlib.gdes.json"
+	_write_sheet(lib, {"format": 2, "events": [_fn("Bump", "action", [], [_event([], [_act("var.modify", ["bumps", "+", "1"])])])]})
+	var r2 := _runner({"bumps": 0}, [{"type": "include", "sheet": lib}, _event([], [_act("fn.Bump", [])])])
+	_tick(r2, 2)
+	_eq(Gde.var_get("bumps"), 2.0, "функция из подключённого листа доступна")
+	_free([r2])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(lib))
+
+
+# -------------------------------------------------------- быстрые столкновения ---
+
+## Быстрая проверка столкновений (сетка и соседи физики) должна отбирать
+## ровно тех же, что и честная проверка каждой пары через overlaps().
+func _test_fast_collision() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for round_i in range(3):
+		var nodes: Array = []
+		for i in range(40):
+			nodes.append(_rand_thing("Enemy", rng, round_i))
+		for j in range(30):
+			nodes.append(_rand_thing("Coin", rng, round_i))
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		for pair: Array in [["Coin", "Enemy"], ["Enemy", "Enemy"]]:
+			var fast := Gde.new_context()
+			var slow := Gde.new_context()
+			var rf := Gde.filter_collision(fast, pair[0], pair[1])
+			var rs := Gde.filter_pair(slow, pair[0], pair[1], func(x: Node, y: Node) -> bool: return Gde.overlaps(x, y))
+			var same := rf == rs and _same_set(fast.pick(pair[0]), slow.pick(pair[0])) and _same_set(fast.pick(pair[1]), slow.pick(pair[1]))
+			var fn := Gde.new_context()
+			var sn := Gde.new_context()
+			Gde.filter_collision_not(fn, pair[0], pair[1])
+			Gde.filter_pair_not(sn, pair[0], pair[1], func(x: Node, y: Node) -> bool: return Gde.overlaps(x, y))
+			same = same and _same_set(fn.pick(pair[0]), sn.pick(pair[0]))
+			_ok(same, "раскладка %d, %s × %s: быстрая проверка = проверка каждой пары (%d отобрано)"
+					% [round_i + 1, pair[0], pair[1], fast.pick(pair[0]).size()])
+		_free(nodes)
+
+
+## Раскладка 0 — без физики, 1 — все с Area2D, 2 — вперемешку и разного размера.
+func _rand_thing(obj: String, rng: RandomNumberGenerator, mode: int) -> Node2D:
+	var area := mode == 1 or (mode == 2 and rng.randf() < 0.5)
+	var n: Node2D = Area2D.new() if area else Node2D.new()
+	n.position = Vector2(rng.randf_range(0, 400), rng.randf_range(0, 300))
+	var cs := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(rng.randf_range(4, 90), rng.randf_range(4, 60)) if mode == 2 else Vector2(16, 16)
+	cs.shape = rect
+	n.add_child(cs)
+	add_child(n)
+	n.add_to_group(Gde.GROUP_PREFIX + obj)
+	return n
+
+
+func _same_set(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return false
+	for x: Variant in a:
+		if not b.has(x):
+			return false
+	return true
+
+
 # ------------------------------------------------------------------ лист ---
 
 func _cond(id: String, params: Array, inverted: bool = false) -> Dictionary:
@@ -503,6 +786,12 @@ func _event(conds: Array, acts: Array, children: Array = []) -> Dictionary:
 
 
 ## Собрать лист и повесить его раннер в сцену. Кадры — вручную, через _tick.
+func _any(conds: Array, acts: Array) -> Dictionary:
+	var e := _event(conds, acts)
+	e["any"] = true
+	return e
+
+
 func _runner(vars: Dictionary, events: Array) -> Node2D:
 	var objects: Array = []
 	for o: String in OBJECTS:

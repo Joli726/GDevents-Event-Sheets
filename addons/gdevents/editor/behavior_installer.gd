@@ -228,9 +228,22 @@ static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
 		if cls.is_empty():
 			continue
 		var alts: Array = nd.get("any", [cls])
+		# Форма столкновения работает только внутри тела или области: у
+		# «Урона при касании» раньше форма ложилась рядом с только что
+		# созданной Area2D, и шипы никого не били.
+		var parent := host
+		var is_shape := cls == "CollisionShape2D" or cls == "CollisionPolygon2D"
+		if is_shape:
+			var body: Node = host if host is CollisionObject2D else _find_class(host, "CollisionObject2D")
+			if body != null:
+				parent = body
 		var already := false
 		for a: Variant in alts:
-			if host.is_class(str(a)) or _find_class(host, str(a)) != null:
+			if is_shape:
+				if _has_child_of(parent, str(a)):
+					already = true
+					break
+			elif host.is_class(str(a)) or _find_class(host, str(a)) != null:
 				already = true
 				break
 		if already:
@@ -238,12 +251,19 @@ static func _scaffold(root: Node, spec: Dictionary) -> Dictionary:
 		var child := _make(cls)
 		if child == null:
 			continue
-		child.name = _unique_name(host, str(nd.get("name", cls)))
-		host.add_child(child)
+		child.name = _unique_name(parent, str(nd.get("name", cls)))
+		parent.add_child(child)
 		child.owner = root
 		created.append("%s (%s)" % [child.name, cls])
 
 	return {"host": host, "created": created}
+
+
+static func _has_child_of(n: Node, cls: String) -> bool:
+	for c: Node in n.get_children():
+		if c.is_class(cls):
+			return true
+	return false
 
 
 static func _find_class(n: Node, cls: String) -> Node:

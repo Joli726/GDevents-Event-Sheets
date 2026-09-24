@@ -408,7 +408,7 @@ it is overwritten on every build.
 
 ```json
 {
-  "format": 1,
+  "format": 2,
   "name": "level",
   "extends": "Node2D",
   "objects": [
@@ -468,6 +468,7 @@ it is overwritten on every build.
 
 | Key | Meaning |
 | --- | --- |
+| `format` | the sheet format number, `2` now. Write the current number; the editor upgrades older sheets itself and refuses sheets from a newer plugin |
 | `objects` | every object type the sheet uses: a name and its scene. Instances already in the scene are found automatically |
 | `groups` | named sets of objects, usable wherever an object name is |
 | `variables` | scene variables with their starting values (numbers or text) |
@@ -478,12 +479,22 @@ Event types and their keys (any other key is an error):
 
 | `type` | Keys |
 | --- | --- |
-| `standard` (default) | `conditions`, `actions`, `children` |
-| `foreach` | `object`, `conditions`, `actions`, `children` — runs once per picked instance of `object` |
-| `repeat` | `count` (expression), `actions`, `children` |
-| `while` | `conditions`, `actions`, `children` — must have conditions |
+| `standard` (default) | `conditions`, `actions`, `children`, `any`, `locals` |
+| `foreach` | `object`, `conditions`, `actions`, `children`, `any`, `locals` — runs once per picked instance of `object` |
+| `repeat` | `count` (expression), `actions`, `children`, `locals` |
+| `while` | `conditions`, `actions`, `children`, `any`, `locals` — must have conditions |
 | `group` | `name`, `children` — a folder of events |
+| `function` | `name`, `kind` (`action` or `condition`), `sentence` (with `_PARAM0_`…), `description`, `params` (`[{"name", "kind": "object"/"number"/"string", "label"}]`), `children` — the body. Called as `fn.<name>`; inside, an object parameter is used by its name, numbers and texts as `Variable(name)`; a condition answers with the action `fn.return_true` |
+| `include` | `sheet` — path of another sheet whose events are built here, as if copied; its objects and variables are added to this sheet |
 | `comment` | `text` |
+
+- `"any": true` joins the conditions with OR: the event runs when at least
+  one is true; instances picked by any true condition stay picked.
+- `"locals": {"count": 0, "name": "Bob"}` declares local variables: they
+  reset each time the event runs, are visible in its conditions, actions and
+  sub-events, and are read and changed with the same `Variable(count)` /
+  `var.modify` as scene variables. Names: Latin letters, digits, `_`.
+- `"folded": true` only collapses the event in the editor.
 
 Every event may have `"disabled": true`. A condition is
 `{"id", "params", "inverted"?, "disabled"?}`; an action is
@@ -667,8 +678,10 @@ This part is only for changes inside `addons/gdevents/`.
 - Built-in instructions live in `registry/builtin.json` (Russian text,
   translated through `en.json`); built-in behaviors and extensions carry
   both languages in their files.
-- Run the whole suite before committing; the list with explanations is in
-  the "Tests" section of `addons/gdevents/README.md`. The most important:
+- Run the whole suite before committing with
+  `bash addons/gdevents/tools/run_tests.sh` (exit code 0 — all passed); the
+  list with explanations is in the "Tests" section of
+  `addons/gdevents/README.md`. Single tests, when you iterate on one area:
 
 ```bash
 godot --headless --script res://addons/gdevents/tools/i18n_test.gd

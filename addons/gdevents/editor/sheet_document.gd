@@ -24,7 +24,7 @@ var _dirty: bool = false
 static func create_empty(name: String) -> GdeSheetDocument:
 	var doc := GdeSheetDocument.new()
 	doc.data = {
-		"format": 1,
+		"format": GdeSheetFormat.CURRENT,
 		"name": name,
 		"extends": "Node2D",
 		"objects": [],
@@ -43,11 +43,16 @@ func load_from(p: String) -> String:
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
 		return GdeI18n.t("некорректный JSON в %s") % p
+	var m := GdeSheetFormat.migrate(parsed)
+	if str(m["error"]) != "":
+		return "%s: %s" % [p, m["error"]]
 	path = p
-	data = parsed
+	data = m["data"]
 	_undo.clear()
 	_redo.clear()
-	_set_dirty(false)
+	# Лист старого формата обновлён в памяти — пусть автосохранение запишет
+	# его уже новым, иначе обновление повторялось бы при каждом открытии.
+	_set_dirty(int(m["from"]) < GdeSheetFormat.CURRENT)
 	changed.emit()
 	return ""
 
@@ -200,6 +205,14 @@ func add_event(parent: Array, index: int, type: String = "standard") -> Array:
 			e["count"] = "1"
 			e["actions"] = []
 			e["children"] = []
+		"include":
+			e["sheet"] = ""
+		"function":
+			e["name"] = "MyAction"
+			e["kind"] = "action"
+			e["sentence"] = ""
+			e["params"] = []
+			e["children"] = []
 		_:
 			e["conditions"] = []
 			e["actions"] = []
@@ -331,6 +344,29 @@ func set_event_field(p: Array, key: String, value: Variant) -> void:
 	_commit()
 
 
+## Убрать ключ совсем, а не ставить false: лист остаётся таким, каким
+## был до включения, и в диффе не остаётся мусора.
+func erase_event_field(p: Array, key: String) -> void:
+	var e: Variant = event_at(p)
+	if e == null or not (e as Dictionary).has(key):
+		return
+	_snapshot()
+	(e as Dictionary).erase(key)
+	_commit()
+
+
+## Заменить текст во всех значениях и текстах листа одним шагом отмены.
+func replace_text(what: String, with: String) -> int:
+	var probe := data.duplicate(true)
+	var n := GdeSearch.replace_all(probe.get("events", []), what, with)
+	if n == 0:
+		return 0
+	_snapshot()
+	data["events"] = probe["events"]
+	_commit()
+	return n
+
+
 func toggle_disabled(p: Array) -> void:
 	var e: Variant = event_at(p)
 	if e == null:
@@ -454,12 +490,32 @@ func objects() -> Array:
 	return data.get("objects", [])
 
 
+## Имена, которые сейчас значат объект, хотя в листе их нет: параметры-
+## объекты функции, в теле которой правят строку. Ставит панель.
+var extra_objects: Array[String] = []
+
+
 func object_names() -> Array[String]:
 	var out: Array[String] = []
 	for o: Dictionary in objects():
 		out.append(str(o.get("name", "")))
 	for g: String in (data.get("groups", {}) as Dictionary):
 		out.append(g)
+	for x: String in extra_objects:
+		if not out.has(x):
+			out.append(x)
+	return out
+
+
+## Параметры-объекты функции, внутри которой лежит событие по пути p.
+func function_objects(p: Array) -> Array[String]:
+	var out: Array[String] = []
+	for n in range(1, p.size() + 1):
+		var e: Variant = event_at(p.slice(0, n))
+		if e is Dictionary and str((e as Dictionary).get("type", "")) == "function":
+			for pr: Variant in (e as Dictionary).get("params", []):
+				if pr is Dictionary and str((pr as Dictionary).get("kind", "")) == "object":
+					out.append(str((pr as Dictionary).get("name", "")))
 	return out
 
 

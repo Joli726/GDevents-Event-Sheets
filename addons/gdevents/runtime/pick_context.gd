@@ -9,6 +9,8 @@ extends RefCounted
 
 var _rt: Node                  ## ссылка на GdeRuntime (автолоад)
 var _picked: Dictionary = {}   ## имя объекта -> Array[Node]
+## Функция-условие уже возвращала «истина» в этом вызове (GdeRuntime.fn_return).
+var returned: bool = false
 
 
 func _init(runtime: Node) -> void:
@@ -59,6 +61,11 @@ func with_single(obj: String, n: Node) -> GdePickContext:
 	var c := copy()
 	c._picked[obj] = [n]
 	return c
+
+
+## Имена объектов, уже упомянутых в контексте.
+func names() -> Array:
+	return _picked.keys()
 
 
 ## Выбросить из всех списков освобождённые ноды.

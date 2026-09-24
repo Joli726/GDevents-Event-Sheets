@@ -101,6 +101,14 @@ static func _expressions(reg: GdeRegistry, doc: GdeSheetDocument,
 				"insert": "Variable(%s)" % v,
 				"hint": GdeI18n.t("Переменная сцены"),
 			})
+		var seen: Dictionary = {}
+		_collect_locals(doc.data.get("events", []), seen)
+		for lv: String in seen:
+			out.append({
+				"text": "Variable(%s)" % lv,
+				"insert": "Variable(%s)" % lv,
+				"hint": GdeI18n.t("Локальная переменная события"),
+			})
 
 	for name: String in reg.expressions:
 		var d: Dictionary = reg.expressions[name]
@@ -230,3 +238,19 @@ static func _walk(dir_path: String, exts: Array, out: Array[String]) -> void:
 
 static func invalidate() -> void:
 	_files_cache.clear()
+
+
+## Имена локальных переменных всех событий листа. Подсказка не знает, в каком
+## событии открыт параметр, поэтому предлагает все — лишняя строка в списке
+## безобиднее, чем пропавшая.
+static func _collect_locals(events: Variant, seen: Dictionary) -> void:
+	if not (events is Array):
+		return
+	for e: Variant in events:
+		if not (e is Dictionary):
+			continue
+		var locals: Variant = (e as Dictionary).get("locals", {})
+		if locals is Dictionary:
+			for k: Variant in (locals as Dictionary):
+				seen[str(k)] = true
+		_collect_locals((e as Dictionary).get("children", []), seen)

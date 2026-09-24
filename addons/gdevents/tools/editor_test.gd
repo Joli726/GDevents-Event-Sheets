@@ -171,6 +171,43 @@ func _test_panel() -> void:
 	_ok(_count_rows(_panel) > rows, "после добавления события дерево перестроилось")
 	_panel.doc.undo()
 
+	# «Любое из условий»: ключ появляется, подпись видна, выключение убирает ключ.
+	_panel.toggle_event_any([0])
+	var ev0: Dictionary = _panel.doc.event_at([0])
+	_ok(ev0.get("any", false) == true, "«Любое из условий» включается из меню события")
+	_ok(_find_label(_panel, GdeI18n.t("Любое из условий (ИЛИ)")), "на событии видна подпись «Любое из условий»")
+	_panel.toggle_event_any([0])
+	_ok(not (_panel.doc.event_at([0]) as Dictionary).has("any"), "выключение убирает ключ из листа")
+	_panel.doc.undo()
+	_panel.doc.undo()
+
+	# Локальные переменные: разбор строк, запись в событие, подпись на карточке.
+	var parsed: Dictionary = GdeEventSheetPanel.text_to_locals("count = 0\nname = \"Bob\"\n\nspeed = 2.5")
+	_eq(parsed["error"], "", "локальные: строки разбираются")
+	_eq(str(parsed["locals"]), str({"count": 0, "name": "Bob", "speed": 2.5}), "локальные: числа и текст")
+	_ok(str(GdeEventSheetPanel.text_to_locals("2x = 1")["error"]) != "", "локальные: плохое имя — ошибка")
+	_ok(str(GdeEventSheetPanel.text_to_locals("a = bob")["error"]) != "", "локальные: текст без кавычек — ошибка")
+	_eq(GdeEventSheetPanel.locals_to_text(parsed["locals"]), "count = 0\nname = \"Bob\"\nspeed = 2.5", "локальные: обратно в строки")
+	_panel.set_event_locals([0], parsed["locals"])
+	_ok(_find_label_prefix(_panel, GdeI18n.t("Локальные: %s") % ""), "локальные: подпись на событии")
+	_panel.set_event_locals([0], {})
+	_ok(not (_panel.doc.event_at([0]) as Dictionary).has("locals"), "локальные: пустой список убирает ключ")
+	_panel.doc.undo()
+	_panel.doc.undo()
+
+	# Подключение листа: карточка с выбором листа, без колонок условий.
+	var before := _count_items(_panel)
+	_panel.doc.add_event([], 9999, "include")
+	var last: int = (_panel.doc.data["events"] as Array).size() - 1
+	_ok(str((_panel.doc.event_at([last]) as Dictionary).get("sheet", "?")) == "", "«Подключить лист» создаётся пустым")
+	_ok(_find_label(_panel, GdeI18n.t("Подключить лист")), "на карточке подключения — подпись и выбор листа")
+	_ok(_count_items(_panel) == before, "у подключения нет своих строк условий и действий")
+	_panel.doc.undo()
+
+	_test_search_and_fold()
+	_test_function_card()
+	_test_debug_view()
+
 	# Фразы рендерятся и с подписями, и со значениями.
 	var def: Dictionary = _panel.instruction_def("actions", "object.x")
 	_ok(GdeText.with_labels(def).contains("‹"), "фраза с подписями параметров")
@@ -282,6 +319,31 @@ func _test_scaffold() -> void:
 	_eq(err, "", "поведение снимается")
 	_eq(GdeBehaviorInstaller.installed(path).size(), 0, "после снятия список пуст")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+	# Каждое встроенное поведение в пустой сцене: каркас без ошибок проверки.
+	# Так нашлась форма «Урона при касании», лежавшая рядом с Area2D.
+	var broken: Array[String] = []
+	for bname: String in reg.behaviors:
+		var bd: Dictionary = reg.behaviors[bname]
+		var p2 := "user://gde_scaffold_%s.tscn" % bname.to_lower()
+		var r0 := Node2D.new()
+		r0.name = bname
+		var pk := PackedScene.new()
+		pk.pack(r0)
+		ResourceSaver.save(pk, p2)
+		r0.free()
+		GdeBehaviorInstaller.invalidate()
+		var added: Dictionary = await GdeBehaviorInstaller.add(p2, bname, str(bd["path"]),
+				{"target": bd.get("target", ""), "needs": bd.get("needs", [])})
+		GdeBehaviorInstaller.invalidate()
+		for it: Dictionary in GdeSceneCheck.check(p2, reg, []):
+			if str(it["level"]) == "error":
+				broken.append("%s: %s" % [bname, it["text"]])
+		if str(added.get("error", "")) != "":
+			broken.append("%s: %s" % [bname, added["error"]])
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p2))
+	_ok(broken.is_empty(), "каждое поведение в пустой сцене — каркас без ошибок (%d поведений)%s"
+			% [reg.behaviors.size(), "" if broken.is_empty() else ": " + "; ".join(broken)])
 
 
 func _has_class(n: Node, cls: String) -> bool:
@@ -576,6 +638,126 @@ func _test_roundtrip() -> void:
 	_ok(str(res["code"]).contains("pick_nearest"), "в сгенерированном коде есть сужение выборки")
 	_ok(str(res["code"]).contains("filter("), "и поштучный отбор по условию")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+
+## Поиск находит по видимому тексту, замена трогает только значения и
+## отменяется одним шагом, свёрнутое событие прячет подсобытия.
+func _test_search_and_fold() -> void:
+	var evs := [
+		{"type": "comment", "text": "Движение героя (hero)"},
+		{"type": "standard", "conditions": [{"id": "key.pressed", "params": ["Left"]}],
+			"actions": [{"id": "object.x", "params": ["Hero", "-", "5"]}],
+			"children": [{"type": "standard", "conditions": [], "actions": [{"id": "object.x", "params": ["Enemy", "+", "1"]}]}]},
+		{"type": "group", "name": "Враги", "children": []},
+	]
+	var reg: GdeRegistry = _panel.registry
+	_eq(str(GdeSearch.find(evs, reg, "hero")), str([[0], [1]]), "поиск: без учёта регистра, в комментарии и в значении")
+	_eq(str(GdeSearch.find(evs, reg, "enemy")), str([[1, 0]]), "поиск: находит в подсобытии")
+	_eq(str(GdeSearch.find(evs, reg, "враги")), str([[2]]), "поиск: имя группы")
+	_ok(not GdeSearch.find(evs, reg, GdeI18n.t("Изменить X у")).is_empty() or not GdeSearch.find(evs, reg, "X").is_empty(),
+			"поиск: по фразе инструкции")
+	var copy := evs.duplicate(true)
+	_eq(GdeSearch.replace_all(copy, "Hero", "Player"), 1, "замена: одна замена в значении")
+	_eq(str(copy[1]["actions"][0]["params"][0]), "Player", "замена: значение параметра заменено")
+	_eq(str(copy[0]["text"]), "Движение героя (hero)", "замена: с учётом регистра — «hero» не тронуто")
+	_eq(GdeSearch.replace_all(copy, "object.x", "zzz"), 0, "замена: id инструкции не трогается")
+
+	# Через панель: поиск, переход, замена с отменой.
+	var events: Array = _panel.doc.data["events"]
+	var saved := events.duplicate(true)
+	_panel.doc.data["events"] = evs.duplicate(true)
+	_panel.doc.changed.emit()
+	_panel.toggle_search(true)
+	_panel._find_edit.text = "hero"
+	_panel._run_search(false)
+	_eq(_panel._found.size(), 2, "панель: найдено два события")
+	_panel.find_next(1)
+	_ok(_panel.is_event_selected([0]), "панель: переход к первому найденному")
+	_panel._find_edit.text = "Hero"
+	_panel._replace_edit.text = "Player"
+	_panel.replace_all_found()
+	_eq(str(_panel.doc.data["events"][1]["actions"][0]["params"][0]), "Player", "панель: «Заменить всё»")
+	_panel.doc.undo()
+	_eq(str(_panel.doc.data["events"][1]["actions"][0]["params"][0]), "Hero", "панель: замена отменяется одним шагом")
+
+	# Сворачивание: подсобытие прячется, остаётся строка «свёрнуто».
+	var rows_open := _count_rows(_panel)
+	_panel.toggle_event_folded([1])
+	_ok(_count_rows(_panel) < rows_open, "свёрнутое событие прячет подсобытия")
+	_ok(_find_label_prefix(_panel, GdeI18n.t("свёрнуто подсобытий: %d") % 1), "на месте подсобытий — «свёрнуто: 1»")
+	_panel._find_edit.text = "Enemy"
+	_panel._run_search(true)
+	_ok(not (_panel.doc.event_at([1]) as Dictionary).get("folded", false), "поиск разворачивает свёрнутое, чтобы показать найденное")
+	_panel.toggle_search(false)
+	_panel.doc.data["events"] = saved
+	_panel.doc.changed.emit()
+
+
+## Функция: карточка с именем, видом и параметрами; её вызов виден реестру.
+func _test_function_card() -> void:
+	var parsed: Dictionary = GdeEventSheetPanel.text_to_params("target: object: Кого\namount: number")
+	_eq(parsed["error"], "", "параметры функции разбираются")
+	_eq(str(parsed["params"]), str([{"name": "target", "kind": "object", "label": "Кого"}, {"name": "amount", "kind": "number"}]),
+			"параметры функции: имя, вид, подпись")
+	_ok(str(GdeEventSheetPanel.text_to_params("x: color")["error"]) != "", "неизвестный вид параметра — ошибка")
+	_eq(GdeEventSheetPanel.params_to_text(parsed["params"]), "target: object: Кого\namount: number", "параметры обратно в строки")
+	_panel.doc.add_event([], 9999, "function")
+	var last: int = (_panel.doc.data["events"] as Array).size() - 1
+	_panel.doc.set_event_field([last], "name", "Heal")
+	_panel.doc.set_event_field([last], "params", parsed["params"])
+	_ok(_panel.registry.action("fn.Heal") != null, "функция листа видна реестру — и окну выбора")
+	_ok(_find_label_prefix(_panel, GdeI18n.t("Параметры: %s") % ""), "на карточке функции — её параметры")
+	_panel.doc.set_event_field([last], "children", [{"type": "standard", "conditions": [], "actions": []}])
+	_ok(_panel.doc.function_objects([last, 0]) == ["target"] and _panel.doc.function_objects([0]).is_empty(),
+			"внутри функции её объект-параметр предлагается как объект")
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_panel.doc.undo()
+	_ok(_panel.registry.action("fn.Heal") == null, "функция удалена — из реестра тоже")
+
+
+## Снимок из игры: сработавшее событие подсвечено, во вкладке — переменные.
+func _test_debug_view() -> void:
+	var st := {"hits": {_panel.doc.path: [[[0], 3]], "res://другой.gdes.json": [[[1], 1]]},
+			"scene": {"score": 5.0, "hero": {"hp": 2.0}}, "global": {}}
+	# Вне редактора EditorDebuggerPlugin не создаётся — снимок идёт в панель
+	# напрямую, тем же вызовом, что делает плагин (связь с игрой проверяет
+	# tools/debugger_test.sh).
+	_panel.show_debug_state(st)
+	var card := _panel._find_card(_panel._rows, [0])
+	_ok(card != null and card._hit, "отладчик: сработавшее событие подсвечено в листе")
+	_ok(not _panel.is_event_hit([1]), "отладчик: событие чужого листа не подсвечено здесь")
+	_panel.clear_debug()
+	_ok(card != null and not card._hit, "отладчик: игра остановлена — подсветка снята")
+	var view := GdeDebugView.new()
+	view.show_state(st)
+	view.show_state(st)
+	var root: TreeItem = view._tree.get_root()
+	var scene_item := root.get_first_child()
+	_eq(scene_item.get_child_count(), 2, "вкладка отладчика: переменные сцены")
+	var hits_item := root.get_child(2)
+	_ok(hits_item.get_child_count() == 2 and hits_item.get_child(1).get_text(1) == "6"
+			or hits_item.get_child(0).get_text(1) == "6", "вкладка отладчика: срабатывания складываются")
+	view.free()
+
+
+func _find_label(n: Node, text: String) -> bool:
+	if n is Label and (n as Label).text == text:
+		return true
+	for c: Node in n.get_children():
+		if _find_label(c, text):
+			return true
+	return false
+
+
+func _find_label_prefix(n: Node, prefix: String) -> bool:
+	if n is Button and (n as Button).text.begins_with(prefix):
+		return true
+	for c: Node in n.get_children():
+		if _find_label_prefix(c, prefix):
+			return true
+	return false
 
 
 func _count_rows(n: Node) -> int:

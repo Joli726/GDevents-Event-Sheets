@@ -206,7 +206,11 @@ func _check_sheet(path: String) -> void:
 	if not (parsed is Dictionary):
 		_err(GdeI18n.t("некорректный JSON"))
 		return
-	var sheet: Dictionary = parsed
+	var m := GdeSheetFormat.migrate(parsed)
+	if str(m["error"]) != "":
+		_err(str(m["error"]))
+		return
+	var sheet: Dictionary = m["data"]
 	_check_structure(sheet)
 	var names: Array = []
 	for o: Variant in sheet.get("objects", []):
@@ -240,11 +244,13 @@ func _check_sheet(path: String) -> void:
 ## и подсобытия просто исчезают из игры.
 const SHEET_KEYS := ["format", "name", "extends", "objects", "groups", "variables", "events"]
 const EVENT_KEYS := {
-	"standard": ["type", "disabled", "conditions", "actions", "children"],
-	"foreach": ["type", "disabled", "object", "conditions", "actions", "children"],
-	"repeat": ["type", "disabled", "count", "actions", "children"],
-	"while": ["type", "disabled", "conditions", "actions", "children"],
-	"group": ["type", "disabled", "name", "children"],
+	"standard": ["type", "disabled", "folded", "any", "locals", "conditions", "actions", "children"],
+	"foreach": ["type", "disabled", "folded", "any", "locals", "object", "conditions", "actions", "children"],
+	"repeat": ["type", "disabled", "folded", "locals", "count", "actions", "children"],
+	"while": ["type", "disabled", "folded", "any", "locals", "conditions", "actions", "children"],
+	"group": ["type", "disabled", "folded", "name", "children"],
+	"include": ["type", "disabled", "sheet"],
+	"function": ["type", "disabled", "folded", "name", "kind", "sentence", "description", "params", "children"],
 	"comment": ["type", "disabled", "text"],
 }
 const COND_KEYS := ["id", "params", "inverted", "disabled"]

@@ -1,0 +1,58 @@
+# Выпуск: метка вида v1.0.0 → тесты → архив с одной папкой addons/gdevents,
+# приложенный к выпуску на GitHub. Архив и кладут в Godot Asset Library.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GODOT_VERSION: 4.7.1-stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version in plugin.cfg matches the tag
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(sed -n 's/^version="\(.*\)"/\1/p' addons/gdevents/plugin.cfg)
+          if [ "$want" != "$have" ]; then
+            echo "Tag $GITHUB_REF_NAME, but plugin.cfg says $have"; exit 1
+          fi
+
+      - name: Download Godot
+        run: |
+          mkdir -p ~/godot
+          curl -fsSL --retry 4 -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+
+      - name: Run tests
+        run: |
+          export GODOT=~/godot/Godot_v${GODOT_VERSION}_linux.x86_64
+          chmod +x "$GODOT"
+          bash addons/gdevents/tools/run_tests.sh
+
+      - name: Pack the plugin
+        run: |
+          git checkout -- .
+          name="gdevents-${GITHUB_REF_NAME}.zip"
+          zip -qr "$name" addons/gdevents
+          echo "ZIP=$name" >> "$GITHUB_ENV"
+
+      - name: Notes from the changelog
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v v="## $ver" '$0==v{on=1;next} /^## /{if(on)exit} on' addons/gdevents/CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "GDevents $ver" > notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP }}
+          body_path: notes.md

@@ -6,8 +6,12 @@ GDevelop-style event sheets for **Godot 4.7**. Build game logic from
 conditions and actions instead of writing code; the sheets compile to plain,
 readable GDScript with no interpreter at runtime.
 
+![The event sheet of the tutorial game: fired events are highlighted while the game runs](addons/gdevents/docs/images/sheet_en.png)
+
 - **Event sheet editor** inside Godot: conditions, actions, sub-events,
-  loops, groups, drag and drop, undo, errors shown right on the row.
+  loops, groups, OR events, local variables, shared sheets, your own
+  functions made of events, a live debugger, find and replace, drag and drop, undo, errors shown right on the row — and a
+  runtime error names the event it came from.
 - **Object picking as in GDevelop**: "Bullet collides with Enemy → Delete
   Bullet" deletes exactly the bullets that hit.
 - **34 ready-made behaviors** — platformer character with ladders, a
@@ -29,12 +33,17 @@ readable GDScript with no interpreter at runtime.
 
 ## Install
 
-1. Copy the `addons/gdevents` folder into your project's `addons/` folder.
+1. Download `gdevents-vX.Y.Z.zip` from the
+   [Releases](https://github.com/Joli726/GDevents/releases) page and unpack
+   it into your project (it holds one folder, `addons/gdevents`), or copy
+   that folder from this repository.
 2. In Godot: **Project → Project Settings → Plugins**, enable **GDevents**.
 3. Choose the interface language in the window that appears. An **Events**
    tab appears next to 2D / 3D / Script.
 
 ## Quick start
+
+A step-by-step first game: [Your first game in 15 minutes](addons/gdevents/docs/TUTORIAL.md).
 
 1. In the **Events** tab press the new-sheet button next to the sheet list.
 2. Open **Objects**, add the scenes your game is made of, and give them
@@ -47,10 +56,20 @@ readable GDScript with no interpreter at runtime.
 
 - [Plugin manual](addons/gdevents/README.md) — the editor, the sheet format,
   expressions, the library, behaviors, extensions, checks and tests.
+- [Your first game in 15 minutes](addons/gdevents/docs/TUTORIAL.md) — a
+  step-by-step tutorial with screenshots.
+- [Instruction reference](addons/gdevents/docs/REFERENCE.md) — every
+  condition, action and expression with its description and id.
 - [Authoring guide](addons/gdevents/docs/AUTHORING.md) — the exact rules for
   writing behaviors, extensions and sheets, for people and for AI models.
 - [AGENTS.md](AGENTS.md) — instructions for AI assistants working in this
   repository.
+- [Changelog](addons/gdevents/CHANGELOG.md) — what changed in each version.
+
+## License
+
+[MIT](LICENSE): use it in any game, free or commercial. Icons: Tabler Icons,
+MIT.
 
 ## Checking your own files
 

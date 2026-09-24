@@ -26,15 +26,37 @@ var _inst: Array = []
 var _cond_i: int = -1
 var _act_i: int = -1
 var _error_items: Array = []
+## Локальные переменные событий, от внешнего к внутреннему:
+## [{"var": имя словаря в коде, "re": RegEx обращений к ним}].
+var _scopes: Array = []
+var _lv_n: int = 0
+## Длина пути события «Подключить лист», внутри которого идёт генерация.
+## Ошибки подключённых событий показываются на нём: в этом листе их строк нет.
+var _include_at: int = -1
+var _include_sheet: String = ""
+## Карта для ошибок во время игры: [строка комментария события, номер, что за событие].
+var _event_lines: Array = []
+## Функции из событий листа (GdeFunctions.collect) и та, что собирается сейчас.
+var _fns: Array = []
+var _in_fn: Dictionary = {}
+## Отладка: в начале тела каждого события — «событие сработало» для панели.
+## В экспорт без отладки (release) эти строки не попадают.
+var debug_hooks: bool = true
+var _hit: int = -1
 
 
-static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
+static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String, debug: bool = true) -> Dictionary:
 	var g := GdeGenerator.new()
 	g._reg = reg
+	g.debug_hooks = debug
 	return g._run(sheet, source_path)
 
 
 func _run(sheet: Dictionary, source_path: String) -> Dictionary:
+	if GdeInclude.has_includes(sheet.get("events", [])):
+		sheet = GdeInclude.expand(sheet, source_path)
+	_fns = GdeFunctions.collect(sheet.get("events", []))
+	var old_fns := _reg.set_sheet_functions(GdeFunctions.defs(_fns))
 	var objects: Array = sheet.get("objects", [])
 	for o: Dictionary in objects:
 		_objects[str(o.get("name", ""))] = true
@@ -53,8 +75,11 @@ func _run(sheet: Dictionary, source_path: String) -> Dictionary:
 		_line(1, "pass")
 	else:
 		_gen_events(events, 1, "")
+	_emit_functions()
+	_emit_event_map(source_path)
 
 	GdeExpr.known_objects = {}
+	_reg.set_sheet_functions(old_fns)
 	return {
 		"code": "\n".join(_out) + "\n",
 		"errors": _errors,
@@ -140,6 +165,10 @@ func _gen_event(e: Dictionary, indent: int, parent_ctx: String) -> void:
 			_gen_comment(e, indent)
 		"group":
 			_gen_group(e, indent, parent_ctx)
+		"include":
+			_gen_include(e, indent, parent_ctx)
+		"function":
+			pass  # тело функции собирается отдельным методом в _emit_functions
 		"foreach":
 			_gen_foreach(e, indent, parent_ctx)
 		"repeat":
@@ -163,6 +192,26 @@ func _gen_group(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "# └─")
 
 
+func _gen_include(e: Dictionary, indent: int, parent_ctx: String) -> void:
+	if e.has("_error"):
+		_err(str(e["_error"]))
+		return
+	var outer := _include_at < 0
+	var sheet := str(e.get("sheet", ""))
+	if outer:
+		_include_at = _path.size()
+		_include_sheet = sheet
+	_line(indent, "")
+	_line(indent, GdeI18n.t("# ┌─ Подключён лист %s") % sheet)
+	var saved := _path.duplicate()
+	_gen_events(e.get("_events", []), indent, parent_ctx)
+	_path = saved
+	_line(indent, "# └─")
+	if outer:
+		_include_at = -1
+		_include_sheet = ""
+
+
 func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	if e.get("disabled", false):
 		return
@@ -170,10 +219,9 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var ctx := _new_ctx()
 	_emit_event_comment(e, indent)
 	_line(indent, _ctx_decl(ctx, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, ctx))
+	var conds := _gen_conditions(e, ctx)
 
 	var body := indent
 	if not conds.is_empty():
@@ -183,6 +231,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var emitted := _gen_body(e.get("actions", []), e.get("children", []), ctx, body)
 	if not emitted and body > indent:
 		_line(body, "pass")
+	_close_locals(scoped)
 
 
 func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -194,15 +243,14 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, GdeI18n.t("Для каждого объекта %s") % obj)
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	var it := _tmp("_each")
 	_line(indent, "for %s in %s.pick(%s):" % [it, outer, _quote(obj)])
 	_line(indent + 1, "if not is_instance_valid(%s): continue" % it)
 	var inner := _new_ctx()
 	_line(indent + 1, _ctx_decl(inner, "%s.with_single(%s, %s)" % [outer, _quote(obj), it]))
 
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, inner))
+	var conds := _gen_conditions(e, inner)
 	var body := indent + 1
 	if not conds.is_empty():
 		_line(indent + 1, "if %s:" % _join_conds(conds, indent + 1))
@@ -210,6 +258,7 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 
 	if not _gen_body(e.get("actions", []), e.get("children", []), inner, body):
 		_line(body, "pass")
+	_close_locals(scoped)
 
 
 func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -217,6 +266,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, GdeI18n.t("Повторить %s раз") % str(e.get("count", "1")))
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	var n := GdeExpr.compile_as(str(e.get("count", "1")), "number", outer, _reg)
 	_collect(n, GdeI18n.t("«Повторить»: количество"))
 	var it := _tmp("_rep")
@@ -225,6 +275,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
 	if not _gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1):
 		_line(indent + 1, "pass")
+	_close_locals(scoped)
 
 
 func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -234,14 +285,13 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "var %s := 0" % guard)
 	var outer := _new_ctx()
 	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
+	var scoped := _open_locals(e, indent)
 	# Контекст условия пересоздаётся каждой итерацией — иначе выборка,
 	# суженная на первом проходе, заморозила бы цикл.
 	_line(indent, "while true:")
 	var inner := _new_ctx()
 	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
-	var conds: Array[String] = []
-	for c: Dictionary in e.get("conditions", []):
-		conds.append(_gen_condition(c, inner))
+	var conds := _gen_conditions(e, inner)
 	if conds.is_empty():
 		_err(GdeI18n.t("событие «Пока» без условий — это вечный цикл"))
 		conds.append("false")
@@ -251,6 +301,7 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent + 2, "push_error(%s)" % _quote(GdeI18n.t("GDevents: событие «Пока» превысило %d итераций") % MAX_WHILE_ITERATIONS))
 	_line(indent + 2, "break")
 	_gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1)
+	_close_locals(scoped)
 
 
 ## Действия и подсобытия события. «Подождать N секунд» уносит всё, что
@@ -259,6 +310,10 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> bool:
 	var emitted := false
 	var cur := indent
+	if debug_hooks and _hit >= 0:
+		_line(indent, "if Gde.debugging: Gde.dbg_hit(self, %d)" % _hit)
+		emitted = true
+	_hit = -1
 	var opened: Array[int] = []
 	for a: Dictionary in actions:
 		var d: Variant = _reg.action(str(a.get("id", "")))
@@ -285,7 +340,174 @@ func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> boo
 	return emitted
 
 
+# ---------------------------------------------------------------- функции ---
+
+## Аргументы вызова функции: контекст, какие объекты под каким именем
+## параметра, и сама функция с числами и текстами.
+func _fn_call_args(d: Dictionary, args: Array, ctx: String) -> String:
+	var aliases: Array[String] = []
+	var values: Array[String] = []
+	var defs: Array = d.get("params", [])
+	var fn := _fn_by_name(str(d["function"]))
+	var names: Array = (fn.get("params", []) as Array) if not fn.is_empty() else []
+	for i in range(defs.size()):
+		var pname := str((names[i] as Dictionary).get("name", "p%d" % i)) if i < names.size() else "p%d" % i
+		var val: String = args[i] if i < args.size() else ""
+		if str((defs[i] as Dictionary).get("kind", "")) == "object":
+			aliases.append("%s: %s" % [_quote(pname), _quote(val)])
+		else:
+			values.append(val)
+	var sub := _tmp("_fs")
+	return "%s, {%s}, func(%s: GdePickContext) -> bool: return %s(%s)" % [
+			ctx, ", ".join(aliases), sub, GdeFunctions.method_name(str(d["function"])),
+			", ".join([sub] + values)]
+
+
+func _fn_by_name(name: String) -> Dictionary:
+	for f: Dictionary in _fns:
+		if str((f["e"] as Dictionary).get("name", "")) == name:
+			return f["e"]
+	return {}
+
+
+## Каждая функция — метод собранного скрипта. Параметры-числа и тексты —
+## её локальные переменные, параметры-объекты — имена объектов внутри тела.
+func _emit_functions() -> void:
+	var seen: Dictionary = {}
+	for f: Dictionary in _fns:
+		var e: Dictionary = f["e"]
+		var name := str(e.get("name", ""))
+		_path = (f["path"] as Array).duplicate()
+		_inst = []
+		var inc: Array = f["include"]
+		_include_at = inc.size() if not inc.is_empty() else -1
+		if not GdeFunctions.is_valid_name(name):
+			_err(GdeI18n.t("функция «%s»: имя — латинские буквы, цифры и _, не с цифры") % name)
+			continue
+		if seen.has(name):
+			_err(GdeI18n.t("функция «%s» объявлена дважды") % name)
+			continue
+		seen[name] = true
+		var obj_params: Array[String] = []
+		var val_params: Array[String] = []
+		for p: Variant in e.get("params", []):
+			var pd: Dictionary = p if p is Dictionary else {}
+			var pn := str(pd.get("name", ""))
+			if not pn.is_valid_ascii_identifier():
+				_err(GdeI18n.t("функция «%s»: имя параметра «%s» — латинские буквы, цифры и _") % [name, pn])
+				continue
+			if str(pd.get("kind", "number")) == "object":
+				obj_params.append(pn)
+			else:
+				val_params.append(pn)
+		_line(0, "")
+		_line(0, "")
+		_line(0, GdeI18n.t("# Функция «%s» (%s) — из событий листа.") % [name,
+				GdeI18n.t("условие") if str(e.get("kind", "action")) == "condition" else GdeI18n.t("действие")])
+		var sig: Array[String] = ["_fc: GdePickContext"]
+		for vp: String in val_params:
+			sig.append("p_%s: Variant" % vp)
+		_line(0, "func %s(%s) -> bool:" % [GdeFunctions.method_name(name), ", ".join(sig)])
+		_line(1, "var _gde_ret := false")
+		var added: Array[String] = []
+		for op: String in obj_params:
+			if not _objects.has(op):
+				_objects[op] = true
+				added.append(op)
+		GdeExpr.known_objects = _objects.duplicate()
+		var scoped := false
+		if not val_params.is_empty():
+			var init: Array[String] = []
+			for vp2: String in val_params:
+				init.append("%s: p_%s" % [_quote(vp2), vp2])
+			_lv_n += 1
+			var dict_var := "_lv%d" % _lv_n
+			_line(1, "var %s: Dictionary = {%s}" % [dict_var, ", ".join(init)])
+			var re := RegEx.new()
+			re.compile("Gde\\.(var_get|var_set|str_get)\\(\"(%s)(?=[\".])" % "|".join(val_params))
+			_scopes.append({"var": dict_var, "re": re})
+			scoped = true
+		_in_fn = e
+		_event_n += 1
+		_emit_event_comment(e, 1, GdeI18n.t("Функция %s") % name)
+		_gen_events(e.get("children", []), 1, "_fc")
+		_in_fn = {}
+		_close_locals(scoped)
+		_line(1, "return _gde_ret")
+		for op2: String in added:
+			_objects.erase(op2)
+		GdeExpr.known_objects = _objects.duplicate()
+	_include_at = -1
+	_path = []
+
+
+# ------------------------------------------------ локальные переменные ---
+
+## Локальные переменные события: словарь объявляется в начале события, так
+## что они обнуляются при каждом его запуске, видны в условиях, действиях и
+## подсобытиях, а «Подождать» уносит их с собой — функция захватывает словарь.
+## Обращения к ним в собранном коде переписываются в _line: Variable(n) и
+## «Изменить переменную n» те же, что для переменных сцены, и локальная
+## переменная просто перекрывает одноимённую переменную сцены.
+func _open_locals(e: Dictionary, indent: int) -> bool:
+	var locals: Variant = e.get("locals", {})
+	if not (locals is Dictionary) or (locals as Dictionary).is_empty():
+		return false
+	var names: Array[String] = []
+	for k: Variant in (locals as Dictionary):
+		var name := str(k)
+		if not name.is_valid_ascii_identifier():
+			_err(GdeI18n.t("локальная переменная «%s»: имя — латинские буквы, цифры и _, не с цифры") % name)
+			continue
+		names.append(name)
+	if names.is_empty():
+		return false
+	_lv_n += 1
+	var dict_var := "_lv%d" % _lv_n
+	_line(indent, "var %s: Dictionary = %s" % [dict_var, _literal(locals)])
+	var re := RegEx.new()
+	re.compile("Gde\\.(var_get|var_set|str_get)\\(\"(%s)(?=[\".])" % "|".join(names))
+	_scopes.append({"var": dict_var, "re": re})
+	return true
+
+
+func _close_locals(opened: bool) -> void:
+	if opened:
+		_scopes.pop_back()
+
+
+func _scoped(text: String) -> String:
+	var out := text
+	for i in range(_scopes.size() - 1, -1, -1):
+		var sc: Dictionary = _scopes[i]
+		out = (sc["re"] as RegEx).sub(out, "Gde.l$1(%s, \"$2" % sc["var"], true)
+	return out
+
+
 # -------------------------------------------------------- условия/действия ---
+
+## Условия события: через «и» или, у события «Любое из условий», через «или».
+func _gen_conditions(e: Dictionary, ctx: String) -> Array[String]:
+	var conds: Array[String] = []
+	if not e.get("any", false):
+		for c: Dictionary in e.get("conditions", []):
+			conds.append(_gen_condition(c, ctx))
+		return conds
+	var branches: Array[String] = []
+	for c2: Dictionary in e.get("conditions", []):
+		var sub := _new_ctx()
+		var code := _gen_condition(c2, sub)
+		# Выключенное условие даёт «true» — в «или» оно сделало бы истинным
+		# всё событие. Его просто нет.
+		if c2.get("disabled", false):
+			continue
+		branches.append("func(%s: GdePickContext) -> bool: return %s" % [sub, code])
+	# Одной строкой: встроенная функция внутри скобок, разорванная переносом,
+	# у парсера GDScript капризна, а читают этот код по комментарию выше.
+	if not branches.is_empty():
+		conds.append("Gde.any_of(%s, [%s])" % [ctx, ", ".join(branches)])
+	return conds
+
 
 func _gen_condition(c: Dictionary, ctx: String) -> String:
 	_cond_i += 1
@@ -304,6 +526,8 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 	var p := _compile_params(d, raw, ctx, id)
 	var args: Array = p["args"]
 	var bare: Array = p["bare"]
+	if d.has("function"):
+		return "%s(%s)" % ["Gde.call_fn_not" if inverted else "Gde.call_fn", _fn_call_args(d, args, ctx)]
 	var kind := str(d.get("kind", "global"))
 
 	match kind:
@@ -321,10 +545,22 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 			var b := _object_arg(d, args, 1, id)
 			if a == "" or b == "":
 				return "false"
+			# Быстрая проверка всей пары списков сразу (столкновения): без
+			# лямбды на каждую пару экземпляров.
+			if d.has("pair_fn"):
+				return "Gde.%s%s(%s, %s, %s)" % [str(d["pair_fn"]), "_not" if inverted else "", ctx, _quote(a), _quote(b)]
 			var av := _tmp("_a")
 			var bv := _tmp("_b")
-			var pred2 := _fill(_template(d, "pred", id), _memory_subs(_template(d, "pred", id),
-					{"ctx": ctx, "self": "self", "a": av, "b": bv}), args, bare)
+			var subs2 := _memory_subs(_template(d, "pred", id), {"ctx": ctx, "self": "self", "a": av, "b": bv})
+			var pred2 := _fill(_template(d, "pred", id), subs2, args, bare)
+			# Верно только для касающихся — предикат только на парах рядом.
+			if d.get("touching", false):
+				var extra := ""
+				if d.has("touching_extra"):
+					extra = ", " + _fill(str(d["touching_extra"]), subs2, args, bare)
+				return "%s(%s, %s, %s, func(%s, %s): return %s%s)" % [
+						"Gde.filter_pair_touching_not" if inverted else "Gde.filter_pair_touching",
+						ctx, _quote(a), _quote(b), av, bv, pred2, extra]
 			var fn2 := "Gde.filter_pair_not" if inverted else "Gde.filter_pair"
 			return "%s(%s, %s, %s, func(%s, %s): return %s)" % [fn2, ctx, _quote(a), _quote(b), av, bv, pred2]
 		_:
@@ -363,6 +599,24 @@ func _gen_action(a: Dictionary, ctx: String, indent: int) -> bool:
 	var p := _compile_params(d, raw, ctx, id)
 	var args: Array = p["args"]
 	var bare: Array = p["bare"]
+	if d.has("function"):
+		_line(indent, "Gde.call_fn_action(%s)" % _fn_call_args(d, args, ctx))
+		return true
+	if id == GdeFunctions.RETURN_TRUE or id == GdeFunctions.RETURN_FALSE:
+		if _in_fn.is_empty() or str(_in_fn.get("kind", "")) != "condition":
+			_err(GdeI18n.t("«Вернуть» — только внутри функции-условия"))
+			return false
+		if id == GdeFunctions.RETURN_TRUE:
+			# Выборка внутри функции живёт в контексте этого события — наверх,
+			# вызывающему условию, её передаёт возврат.
+			var names: Array[String] = []
+			for p2: Variant in _in_fn.get("params", []):
+				if p2 is Dictionary and str((p2 as Dictionary).get("kind", "")) == "object":
+					names.append(_quote(str((p2 as Dictionary).get("name", ""))))
+			_line(indent, "_gde_ret = true")
+			if not names.is_empty():
+				_line(indent, "Gde.fn_return(_fc, %s, [%s])" % [ctx, ", ".join(names)])
+			return true
 	var template := str(d.get("code", ""))
 	# «=» у изменяющих действий — это присваивание, а не «x = x = v».
 	if d.has("code_assign") and _has_plain_assign(d, bare):
@@ -479,19 +733,59 @@ func _object_arg(d: Dictionary, args: Array, which: int, id: String) -> String:
 
 # ------------------------------------------------------------------ утилиты ---
 
+## Карта «строка → событие» в конце собранного скрипта. По ней
+## GdeErrorLogger называет событие, в котором случилась ошибка в игре.
+func _emit_event_map(source_path: String) -> void:
+	_line(0, "")
+	_line(0, "")
+	_line(0, GdeI18n.t("# Карта строк для сообщений об ошибках: строка, событие, что в нём."))
+	_line(0, "const GDE_SHEET := %s" % _quote(source_path))
+	if _event_lines.is_empty():
+		_line(0, "const GDE_EVENTS: Array = []")
+		return
+	_line(0, "const GDE_EVENTS: Array = [")
+	for entry: Array in _event_lines:
+		var ints: Array[String] = []
+		for i: Variant in (entry[3] as Array):
+			ints.append(str(int(i)))
+		_line(1, "[%d, %s, %s, [%s]]," % [entry[0], _quote(str(entry[1])), _quote(str(entry[2])), ", ".join(ints)])
+	_line(0, "]")
+
+
 func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void:
 	_line(indent, "")
+	var at: Array = _path.slice(0, _include_at) if _include_at >= 0 else _path.duplicate()
+	_hit = _event_lines.size()
+	_event_lines.append([_out.size() + 1, str(_event_n), _event_summary(e, title), at])
 	_line(indent, GdeI18n.t("# ── Событие %d ─%s") % [_event_n, (" " + title) if title != "" else ""])
 	var conds: Array = e.get("conditions", [])
 	var acts: Array = e.get("actions", [])
 	for i in range(conds.size()):
 		var c: Dictionary = conds[i]
-		var prefix := GdeI18n.t("ЕСЛИ:  ") if i == 0 else GdeI18n.t("  И:   ")
+		var prefix := GdeI18n.t("ЕСЛИ:  ") if i == 0 \
+				else (GdeI18n.t("  ИЛИ: ") if e.get("any", false) else GdeI18n.t("  И:   "))
 		var neg := GdeI18n.t("НЕ ") if c.get("inverted", false) else ""
 		_line(indent, "# %s%s%s" % [prefix, neg, _sentence(_reg.condition(str(c.get("id", ""))), c)])
 	for i in range(acts.size()):
 		var a: Dictionary = acts[i]
 		_line(indent, "# %s%s" % [GdeI18n.t("ТО:    ") if i == 0 else "       ", _sentence(_reg.action(str(a.get("id", ""))), a)])
+
+
+## Коротко, что за событие: заголовок или первое условие, иначе первое действие.
+func _event_summary(e: Dictionary, title: String) -> String:
+	var s := title
+	if s.is_empty():
+		var conds: Array = e.get("conditions", [])
+		var acts: Array = e.get("actions", [])
+		if not conds.is_empty():
+			s = GdeI18n.t("ЕСЛИ %s") % _sentence(_reg.condition(str((conds[0] as Dictionary).get("id", ""))), conds[0])
+		elif not acts.is_empty():
+			s = _sentence(_reg.action(str((acts[0] as Dictionary).get("id", ""))), acts[0])
+		else:
+			s = GdeI18n.t("пустое событие")
+	if _include_at >= 0:
+		s = GdeI18n.t("(подключённый лист %s) %s") % [_include_sheet.get_file(), s]
+	return s
 
 
 ## Человеческая фраза инструкции с подставленными параметрами.
@@ -506,6 +800,14 @@ func _sentence(def: Variant, inst: Dictionary) -> String:
 
 
 func _err(text: String) -> void:
+	if _include_at >= 0:
+		# Ошибка внутри подключённого листа: строки её здесь нет — показать на
+		# событии подключения и сказать, где искать.
+		var at := _path.slice(0, _include_at)
+		var msg := GdeI18n.t("в подключённом листе: %s") % text
+		_errors.append(msg)
+		_error_items.append({"text": msg, "path": at, "inst": []})
+		return
 	_errors.append(text)
 	_error_items.append({"text": text, "path": _path.duplicate(), "inst": _inst.duplicate()})
 
@@ -544,6 +846,8 @@ func _tmp(prefix: String) -> String:
 
 
 func _line(indent: int, text: String) -> void:
+	if not _scopes.is_empty():
+		text = _scoped(text)
 	_out.append("" if text.is_empty() else "\t".repeat(indent) + text)
 
 

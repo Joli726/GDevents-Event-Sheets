@@ -97,6 +97,7 @@
         }
       ],
       "pred": "Gde.overlaps({a}, {b})",
+      "pair_fn": "filter_collision",
       "description": "Объекты соприкасаются. В выборке остаются только столкнувшиеся пары — дальше действия работают именно с ними."
     },
     "object.distance": {
@@ -872,6 +873,8 @@
         }
       ],
       "pred": "Gde.touch_began({self}, {once}, {a}, {b})",
+      "touching": true,
+      "touching_extra": "Gde.touch_prev_pairs({self}, {once})",
       "description": "Срабатывает один раз — в момент касания. Для урона, звука, очков: «сталкивается» истинно каждый кадр, пока объекты касаются, и действие по нему повторялось бы."
     },
     "object.collision_end": {
@@ -889,6 +892,8 @@
         }
       ],
       "pred": "Gde.touch_ended({self}, {once}, {a}, {b})",
+      "touching": true,
+      "touching_extra": "Gde.touch_prev_pairs({self}, {once})",
       "description": "Срабатывает один раз, когда объекты перестали касаться: вышел из воды, сошёл с кнопки, покинул зону."
     },
     "object.touch_top": {
@@ -906,6 +911,7 @@
         }
       ],
       "pred": "Gde.touch_side({a}, {b}, 0)",
+      "touching": true,
       "description": "Первый объект стоит или приземлился на второй — прыжок врагу на голову, как в Марио."
     },
     "object.touch_bottom": {
@@ -923,6 +929,7 @@
         }
       ],
       "pred": "Gde.touch_side({a}, {b}, 1)",
+      "touching": true,
       "description": "Первый объект упёрся во второй снизу — удар головой о блок."
     },
     "object.touch_side": {
@@ -940,6 +947,7 @@
         }
       ],
       "pred": "Gde.touch_side({a}, {b}, 2)",
+      "touching": true,
       "description": "Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага."
     },
     "system.waiting": {
@@ -2857,50 +2865,58 @@
         "number",
         "number"
       ],
-      "template": "randf_range({0}, {1})"
+      "template": "randf_range({0}, {1})",
+      "description": "Случайное дробное число от первого до второго. RandomInRange(-50, 50) — разброс ±50."
     },
     "Random": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "float(randi() % max(1, int({0}) + 1))"
+      "template": "float(randi() % max(1, int({0}) + 1))",
+      "description": "Случайное целое от 0 до числа включительно. Random(5) — одно из 0, 1, 2, 3, 4, 5."
     },
     "TimeDelta": {
       "type": "number",
       "params": [],
-      "template": "_delta"
+      "template": "_delta",
+      "description": "Секунды, прошедшие с прошлого кадра. Умножайте на неё скорость: 200 * TimeDelta() — 200 пикселей в секунду при любом FPS."
     },
     "MouseX": {
       "type": "number",
       "params": [],
-      "template": "Gde.mouse_world().x"
+      "template": "Gde.mouse_world().x",
+      "description": "X курсора мыши в мире игры (с учётом камеры)."
     },
     "MouseY": {
       "type": "number",
       "params": [],
-      "template": "Gde.mouse_world().y"
+      "template": "Gde.mouse_world().y",
+      "description": "Y курсора мыши в мире игры (с учётом камеры)."
     },
     "ToString": {
       "type": "string",
       "params": [
         "number"
       ],
-      "template": "Gde.num_str({0})"
+      "template": "Gde.num_str({0})",
+      "description": "Число как текст: \"Счёт: \" + ToString(Variable(score)). Целые — без «.0»."
     },
     "ToNumber": {
       "type": "number",
       "params": [
         "string"
       ],
-      "template": "float({0})"
+      "template": "float({0})",
+      "description": "Текст как число: ToNumber(\"42\") — 42. Не число — 0."
     },
     "abs": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "absf({0})"
+      "template": "absf({0})",
+      "description": "Число без знака: abs(-5) — 5."
     },
     "min": {
       "type": "number",
@@ -2908,7 +2924,8 @@
         "number",
         "number"
       ],
-      "template": "minf({0}, {1})"
+      "template": "minf({0}, {1})",
+      "description": "Меньшее из двух: min(Variable(hp), 100)."
     },
     "max": {
       "type": "number",
@@ -2916,35 +2933,40 @@
         "number",
         "number"
       ],
-      "template": "maxf({0}, {1})"
+      "template": "maxf({0}, {1})",
+      "description": "Большее из двух: max(Variable(hp), 0) — не меньше нуля."
     },
     "floor": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "floorf({0})"
+      "template": "floorf({0})",
+      "description": "Округление вниз: floor(2.7) — 2."
     },
     "ceil": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "ceilf({0})"
+      "template": "ceilf({0})",
+      "description": "Округление вверх: ceil(2.1) — 3."
     },
     "round": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "roundf({0})"
+      "template": "roundf({0})",
+      "description": "Округление до ближайшего целого: round(2.5) — 3."
     },
     "sqrt": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "sqrt({0})"
+      "template": "sqrt({0})",
+      "description": "Квадратный корень: sqrt(16) — 4."
     },
     "pow": {
       "type": "number",
@@ -2952,7 +2974,8 @@
         "number",
         "number"
       ],
-      "template": "pow({0}, {1})"
+      "template": "pow({0}, {1})",
+      "description": "Степень: pow(2, 3) — 8."
     },
     "clamp": {
       "type": "number",
@@ -2961,80 +2984,92 @@
         "number",
         "number"
       ],
-      "template": "clampf({0}, {1}, {2})"
+      "template": "clampf({0}, {1}, {2})",
+      "description": "Число, зажатое в границы: clamp(Variable(hp), 0, 100)."
     },
     "cos": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "cos({0})"
+      "template": "cos({0})",
+      "description": "Косинус угла в радианах. Для градусов: cos(ToRad(45))."
     },
     "sin": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "sin({0})"
+      "template": "sin({0})",
+      "description": "Синус угла в радианах. Покачивание: sin(SceneTime() * 3) * 10."
     },
     "ToRad": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "deg_to_rad({0})"
+      "template": "deg_to_rad({0})",
+      "description": "Градусы в радианы: ToRad(180) — 3.14…."
     },
     "ToDeg": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "rad_to_deg({0})"
+      "template": "rad_to_deg({0})",
+      "description": "Радианы в градусы."
     },
     "Variable": {
       "type": "number",
       "params": [
         "varname"
       ],
-      "template": "float(Gde.var_get({0}))"
+      "template": "float(Gde.var_get({0}))",
+      "description": "Число из переменной сцены (или локальной переменной события): Variable(score), Variable(player.hp)."
     },
     "VariableString": {
       "type": "string",
       "params": [
         "varname"
       ],
-      "template": "str(Gde.var_get({0}, \"\"))"
+      "template": "str(Gde.var_get({0}, \"\"))",
+      "description": "Текст из переменной сцены: VariableString(name)."
     },
     "GlobalVariable": {
       "type": "number",
       "params": [
         "varname"
       ],
-      "template": "float(Gde.gvar_get({0}))"
+      "template": "float(Gde.gvar_get({0}))",
+      "description": "Число из глобальной переменной — она живёт между сценами: GlobalVariable(coins)."
     },
     "Count": {
       "type": "number",
       "params": [
         "raw"
       ],
-      "template": "Gde.count({ctx}, {0})"
+      "template": "Gde.count({ctx}, {0})",
+      "description": "Сколько экземпляров объекта отобрано сейчас: Count(Enemy)."
     },
     "Timer": {
       "type": "number",
       "params": [
         "raw"
       ],
-      "template": "Gde.timer_value({self}, {0})"
+      "template": "Gde.timer_value({self}, {0})",
+      "description": "Секунды на таймере сцены: Timer(spawn)."
     },
     "ScreenWidth": {
       "type": "number",
       "params": [],
-      "template": "Gde.screen_size().x"
+      "template": "Gde.screen_size().x",
+      "description": "Ширина окна игры в пикселях."
     },
     "ScreenHeight": {
       "type": "number",
       "params": [],
-      "template": "Gde.screen_size().y"
+      "template": "Gde.screen_size().y",
+      "description": "Высота окна игры в пикселях."
     },
     "lerp": {
       "type": "number",
@@ -3043,14 +3078,16 @@
         "number",
         "number"
       ],
-      "template": "lerpf({0}, {1}, {2})"
+      "template": "lerpf({0}, {1}, {2})",
+      "description": "Плавный переход: lerp(от, до, доля). lerp(0, 100, 0.25) — 25."
     },
     "sign": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "signf({0})"
+      "template": "signf({0})",
+      "description": "Знак числа: -1, 0 или 1."
     },
     "atan2": {
       "type": "number",
@@ -3058,29 +3095,34 @@
         "number",
         "number"
       ],
-      "template": "atan2({0}, {1})"
+      "template": "atan2({0}, {1})",
+      "description": "Угол в радианах по dy и dx: atan2(dy, dx)."
     },
     "tan": {
       "type": "number",
       "params": [
         "number"
       ],
-      "template": "tan({0})"
+      "template": "tan({0})",
+      "description": "Тангенс угла в радианах."
     },
     "SceneTime": {
       "type": "number",
       "params": [],
-      "template": "Gde.scene_time()"
+      "template": "Gde.scene_time()",
+      "description": "Секунды с начала сцены."
     },
     "TimeScale": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_time_scale()"
+      "template": "Gde.get_time_scale()",
+      "description": "Текущая скорость времени: 1 — обычная, 0.5 — замедление."
     },
     "MouseWheel": {
       "type": "number",
       "params": [],
-      "template": "Gde.wheel()"
+      "template": "Gde.wheel()",
+      "description": "На сколько щелчков прокрутили колесо в этом кадре: вверх — больше нуля."
     },
     "Distance": {
       "type": "number",
@@ -3090,7 +3132,8 @@
         "number",
         "number"
       ],
-      "template": "Vector2({0}, {1}).distance_to(Vector2({2}, {3}))"
+      "template": "Vector2({0}, {1}).distance_to(Vector2({2}, {3}))",
+      "description": "Расстояние между двумя точками: Distance(x1, y1, x2, y2)."
     },
     "AngleBetween": {
       "type": "number",
@@ -3100,14 +3143,16 @@
         "number",
         "number"
       ],
-      "template": "rad_to_deg((Vector2({2}, {3}) - Vector2({0}, {1})).angle())"
+      "template": "rad_to_deg((Vector2({2}, {3}) - Vector2({0}, {1})).angle())",
+      "description": "Угол в градусах от первой точки ко второй: AngleBetween(x1, y1, x2, y2)."
     },
     "VariableText": {
       "type": "string",
       "params": [
         "varname"
       ],
-      "template": "Gde.str_get({0})"
+      "template": "Gde.str_get({0})",
+      "description": "Переменная сцены как текст — число тоже превратится в текст."
     },
     "Length": {
       "type": "number",
@@ -3260,88 +3305,104 @@
     "X": {
       "type": "number",
       "params": [],
-      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).x"
+      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).x",
+      "description": "X первого отобранного экземпляра: Player.X()."
     },
     "Y": {
       "type": "number",
       "params": [],
-      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).y"
+      "template": "Gde.pos_of({ctx}.first(\"{obj}\")).y",
+      "description": "Y первого отобранного экземпляра: Player.Y()."
     },
     "Angle": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_angle({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_angle({ctx}.first(\"{obj}\"))",
+      "description": "Угол поворота в градусах."
     },
     "Width": {
       "type": "number",
       "params": [],
-      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.x"
+      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.x",
+      "description": "Ширина объекта по форме столкновения или картинке."
     },
     "Height": {
       "type": "number",
       "params": [],
-      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.y"
+      "template": "Gde.aabb({ctx}.first(\"{obj}\")).size.y",
+      "description": "Высота объекта по форме столкновения или картинке."
     },
     "Count": {
       "type": "number",
       "params": [],
-      "template": "Gde.count({ctx}, \"{obj}\")"
+      "template": "Gde.count({ctx}, \"{obj}\")",
+      "description": "Сколько экземпляров отобрано: Enemy.Count()."
     },
     "Variable": {
       "type": "number",
       "params": [
         "varname"
       ],
-      "template": "float(Gde.ovar_get({ctx}.first(\"{obj}\"), {0}))"
+      "template": "float(Gde.ovar_get({ctx}.first(\"{obj}\"), {0}))",
+      "description": "Число из переменной экземпляра: Enemy.Variable(hp)."
     },
     "Animation": {
       "type": "string",
       "params": [],
-      "template": "Gde.current_animation({ctx}.first(\"{obj}\"))"
+      "template": "Gde.current_animation({ctx}.first(\"{obj}\"))",
+      "description": "Имя текущей анимации."
     },
     "DistanceTo": {
       "type": "number",
       "params": [
         "raw"
       ],
-      "template": "Gde.distance({ctx}.first(\"{obj}\"), {ctx}.first({0}))"
+      "template": "Gde.distance({ctx}.first(\"{obj}\"), {ctx}.first({0}))",
+      "description": "Расстояние до первого отобранного экземпляра другого объекта: Enemy.DistanceTo(Player)."
     },
     "AngleTo": {
       "type": "number",
       "params": [
         "raw"
       ],
-      "template": "Gde.angle_to({ctx}.first(\"{obj}\"), {ctx}.first({0}))"
+      "template": "Gde.angle_to({ctx}.first(\"{obj}\"), {ctx}.first({0}))",
+      "description": "Угол в градусах к другому объекту: Turret.AngleTo(Player)."
     },
     "Opacity": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_opacity({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_opacity({ctx}.first(\"{obj}\"))",
+      "description": "Непрозрачность от 0 (невидим) до 1."
     },
     "Text": {
       "type": "string",
       "params": [],
-      "template": "Gde.get_text({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_text({ctx}.first(\"{obj}\"))",
+      "description": "Текст надписи (Label)."
     },
     "ZIndex": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_z({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_z({ctx}.first(\"{obj}\"))",
+      "description": "Порядок отрисовки: больше — ближе к зрителю."
     },
     "ScaleX": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_scale_x({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_scale_x({ctx}.first(\"{obj}\"))",
+      "description": "Масштаб по горизонтали."
     },
     "ScaleY": {
       "type": "number",
       "params": [],
-      "template": "Gde.get_scale_y({ctx}.first(\"{obj}\"))"
+      "template": "Gde.get_scale_y({ctx}.first(\"{obj}\"))",
+      "description": "Масштаб по вертикали."
     },
     "Frame": {
       "type": "number",
       "params": [],
-      "template": "Gde.animation_frame({ctx}.first(\"{obj}\"))"
+      "template": "Gde.animation_frame({ctx}.first(\"{obj}\"))",
+      "description": "Номер текущего кадра анимации, с нуля."
     },
     "Facing": {
       "type": "number",

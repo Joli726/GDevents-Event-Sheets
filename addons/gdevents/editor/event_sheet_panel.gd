@@ -7,6 +7,10 @@ class_name GdeEventSheetPanel
 extends VBoxContainer
 
 const DEFAULT_ACCENT := Color(1, 0.78, 0.42)
+## События, у которых условия можно соединить через «или».
+const ANY_TYPES := ["standard", "foreach", "while"]
+## События, у которых бывают локальные переменные.
+const LOCALS_TYPES := ["standard", "foreach", "repeat", "while"]
 
 ## Выбран другой язык — плагин перестроит панель на нём.
 signal language_changed(code: String)
@@ -64,6 +68,15 @@ static var _clip_event: Dictionary = {}
 ## значение — [{"text", "inst"}]. Считаются при каждой перерисовке,
 ## поэтому сломанная строка краснеет сразу, а не при запуске игры.
 var _live_errors: Dictionary = {}
+## Поиск: панель, найденные пути по порядку, текущий номер и те же пути
+## множеством — для подсветки карточек при построении.
+var _search_bar: PanelContainer
+var _find_edit: LineEdit
+var _replace_edit: LineEdit
+var _found_label: Label
+var _found: Array = []
+var _found_i: int = -1
+var _found_set: Dictionary = {}
 var _live_error_count: int = 0
 
 
@@ -139,6 +152,10 @@ func _build_ui() -> void:
 	am.add_icon_item(GdeIcons.get_icon("repeat"), GdeI18n.t("Повторить N раз"), 3)
 	am.add_icon_item(GdeIcons.get_icon("refresh"), GdeI18n.t("Пока выполняется"), 4)
 	am.add_icon_item(GdeIcons.get_icon("group"), GdeI18n.t("Группа"), 5)
+	am.add_icon_item(GdeIcons.get_icon("link"), GdeI18n.t("Подключить лист"), 6)
+	am.set_item_tooltip(am.item_count - 1, GdeI18n.t("События другого листа — управление игроком, пауза, счёт — собираются здесь, как будто их скопировали. Правка общего листа доходит до всех, кто его подключил"))
+	am.add_icon_item(GdeIcons.get_icon("function"), GdeI18n.t("Функция (своё действие или условие)"), 7)
+	am.set_item_tooltip(am.item_count - 1, GdeI18n.t("Своё действие или условие из событий: появится в окне выбора рядом со встроенными, в этом листе и во всех, кто его подключил"))
 	am.id_pressed.connect(_on_add_root_event)
 	bar.add_child(add_menu)
 
@@ -154,6 +171,8 @@ func _build_ui() -> void:
 			_objects.open_on_problem(doc, registry, _first_problem), "")
 	_problems_btn.visible = false
 	bar.add_child(_problems_btn)
+
+	bar.add_child(_icon_button("search", GdeI18n.t("Найти и заменить (Ctrl+F)"), func(): toggle_search(true)))
 
 	bar.add_child(_sep())
 
@@ -233,6 +252,8 @@ func _build_ui() -> void:
 	bind_btn.icon = GdeIcons.get_icon("scene")
 	bind_btn.pressed.connect(func(): GdeUi.popup_fit(_bind_file, Vector2i(900, 620)))
 	warn_row.add_child(bind_btn)
+
+	_build_search_bar()
 
 	# Шапка колонок — чтобы сразу было видно, где что.
 	var head := HBoxContainer.new()
@@ -404,6 +425,25 @@ func _reload() -> void:
 		open_sheet(keep)
 
 
+## Листы, которые можно подключить к открытому: все, кроме него самого.
+func includable_sheets() -> Array[String]:
+	var out: Array[String] = []
+	for p: String in _sheet_paths:
+		if doc == null or p != doc.path:
+			out.append(p)
+	return out
+
+
+## Перейти к другому листу, сохранив правки этого — как при выборе в списке.
+func go_to_sheet(p: String) -> void:
+	var i := _sheet_paths.find(p)
+	if i < 0:
+		_set_status(GdeI18n.t("листа %s нет") % p, true)
+		return
+	_sheets.select(i)
+	_on_sheet_selected(i)
+
+
 func open_sheet(p: String) -> void:
 	var d := GdeSheetDocument.new()
 	var err := d.load_from(p)
@@ -558,10 +598,22 @@ func _rebuild(recheck: bool = true) -> void:
 		c.queue_free()
 	if doc == null:
 		return
+	# Функции листа — в реестр, чтобы окно выбора и строки их знали.
+	if registry != null:
+		registry.set_sheet_functions(GdeFunctions.defs_for_sheet(doc.data, doc.path))
 	if recheck:
 		if _autosave != null and autosave_enabled:
 			_autosave.start()
 		_live_check()
+		# Лист изменился — найденное тоже: пересчитать, не прыгая по листу.
+		if _search_bar != null and _search_bar.visible:
+			var keep := _found_i
+			_found = GdeSearch.find(doc.data.get("events", []), registry, _find_edit.text)
+			_found_set.clear()
+			for fp: Array in _found:
+				_found_set[str(fp)] = true
+			_found_i = mini(keep, _found.size() - 1)
+			_update_found_label()
 	var events: Array = doc.data.get("events", [])
 	for i in range(events.size()):
 		var row := GdeEventRow.new()
@@ -718,6 +770,7 @@ func add_instruction(p: Array, kind: String) -> void:
 	_pending_add = p
 	_pending_kind = kind
 	_editing = []
+	doc.extra_objects = doc.function_objects(p)
 	_picker.open_add(registry, doc, kind, _preferred_object(p), accent)
 
 
@@ -732,6 +785,7 @@ func edit_instruction(p: Array, kind: String, index: int) -> void:
 		_set_status(GdeI18n.t("Инструкция «%s» больше не существует") % str(inst.get("id", "")), true)
 		return
 	_editing = [p, kind, index]
+	doc.extra_objects = doc.function_objects(p)
 	_picker.open_edit(registry, doc, kind, inst, accent)
 
 
@@ -854,6 +908,179 @@ func remove_instruction(p: Array, kind: String, index: int) -> void:
 func duplicate_event(p: Array) -> void:
 	if doc != null:
 		doc.duplicate_event(p)
+
+
+## «Любое из условий»: условия события соединяются через «или».
+func toggle_event_any(p: Array) -> void:
+	if doc == null:
+		return
+	var e: Variant = doc.event_at(p)
+	if e == null:
+		return
+	var on := not bool((e as Dictionary).get("any", false))
+	if on:
+		doc.set_event_field(p, "any", true)
+	else:
+		doc.erase_event_field(p, "any")
+
+
+## Параметры функции — строками «имя: вид: подпись».
+func edit_function_params(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	var e: Dictionary = doc.event_at(p)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = GdeI18n.t("Параметры функции «%s»") % str(e.get("name", ""))
+	var box := VBoxContainer.new()
+	var hint := Label.new()
+	hint.text = GdeI18n.t("По одному на строке: имя: вид: подпись. Вид — object (объект), number (число) или string (текст).\nВ фразе функции параметры — _PARAM0_, _PARAM1_… по порядку. Внутри функции объект-параметр пишется своим именем, число и текст — Variable(имя).")
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(460, 0)
+	hint.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(hint)
+	var te := TextEdit.new()
+	te.custom_minimum_size = Vector2(460, 150)
+	te.text = params_to_text(e.get("params", []))
+	te.placeholder_text = GdeI18n.t("target: object: Кого\namount: number: Сколько")
+	box.add_child(te)
+	var err := Label.new()
+	err.add_theme_color_override("font_color", Color(0.85, 0.55, 0.55))
+	box.add_child(err)
+	dlg.add_child(box)
+	dlg.get_ok_button().text = GdeI18n.t("Сохранить")
+	dlg.get_ok_button().pressed.connect(func():
+		var parsed := text_to_params(te.text)
+		if str(parsed["error"]) != "":
+			err.text = parsed["error"]
+			dlg.show.call_deferred()
+			return
+		doc.set_event_field(p, "params", parsed["params"])
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+static func params_to_text(params: Variant) -> String:
+	var lines: Array[String] = []
+	if params is Array:
+		for pr: Variant in params:
+			if pr is Dictionary:
+				var d: Dictionary = pr
+				var line := "%s: %s" % [d.get("name", ""), d.get("kind", "number")]
+				if str(d.get("label", "")) != "":
+					line += ": %s" % d["label"]
+				lines.append(line)
+	return "\n".join(lines)
+
+
+## {"params": Array, "error": ""}
+static func text_to_params(text: String) -> Dictionary:
+	var out: Array = []
+	var seen: Dictionary = {}
+	var n := 0
+	for raw: String in text.split("\n"):
+		n += 1
+		var line := raw.strip_edges()
+		if line.is_empty():
+			continue
+		var parts := line.split(":", true, 2)
+		var name := parts[0].strip_edges()
+		var kind := parts[1].strip_edges().to_lower() if parts.size() > 1 else "number"
+		var label := parts[2].strip_edges() if parts.size() > 2 else ""
+		if not name.is_valid_ascii_identifier():
+			return {"params": [], "error": GdeI18n.t("строка %d: имя «%s» — латинские буквы, цифры и _, не с цифры") % [n, name]}
+		if seen.has(name):
+			return {"params": [], "error": GdeI18n.t("строка %d: параметр «%s» уже есть") % [n, name]}
+		if not kind in GdeFunctions.PARAM_KINDS:
+			return {"params": [], "error": GdeI18n.t("строка %d: вид «%s» — нужно object, number или string") % [n, kind]}
+		seen[name] = true
+		var d := {"name": name, "kind": kind}
+		if not label.is_empty():
+			d["label"] = label
+		out.append(d)
+	return {"params": out, "error": ""}
+
+
+## Локальные переменные события — строками «имя = значение».
+func edit_event_locals(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	var e: Dictionary = doc.event_at(p)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = GdeI18n.t("Локальные переменные события")
+	var box := VBoxContainer.new()
+	var hint := Label.new()
+	hint.text = GdeI18n.t("По одной на строке: имя = значение. Текст — в кавычках.\nЖивут только в этом событии и его подсобытиях и обнуляются при каждом его запуске.")
+	hint.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(hint)
+	var te := TextEdit.new()
+	te.custom_minimum_size = Vector2(420, 160)
+	te.text = locals_to_text(e.get("locals", {}))
+	te.placeholder_text = "count = 0\nname = \"Bob\""
+	box.add_child(te)
+	var err := Label.new()
+	err.add_theme_color_override("font_color", Color(0.85, 0.55, 0.55))
+	box.add_child(err)
+	dlg.add_child(box)
+	dlg.get_ok_button().text = GdeI18n.t("Сохранить")
+	# Окно не закрывается при ошибке: иначе набранное пропало бы.
+	dlg.get_ok_button().pressed.connect(func():
+		var parsed := text_to_locals(te.text)
+		if str(parsed["error"]) != "":
+			err.text = parsed["error"]
+			dlg.show.call_deferred()
+			return
+		set_event_locals(p, parsed["locals"])
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func set_event_locals(p: Array, locals: Dictionary) -> void:
+	if doc == null:
+		return
+	if locals.is_empty():
+		doc.erase_event_field(p, "locals")
+	else:
+		doc.set_event_field(p, "locals", locals)
+
+
+static func locals_to_text(locals: Variant) -> String:
+	var lines: Array[String] = []
+	if locals is Dictionary:
+		for k: Variant in (locals as Dictionary):
+			var v: Variant = (locals as Dictionary)[k]
+			lines.append("%s = %s" % [k, JSON.stringify(v) if v is String else str(GdeSheetDocument._normalize(v))])
+	return "\n".join(lines)
+
+
+## {"locals": Dictionary, "error": ""}
+static func text_to_locals(text: String) -> Dictionary:
+	var out: Dictionary = {}
+	var n := 0
+	for raw: String in text.split("\n"):
+		n += 1
+		var line := raw.strip_edges()
+		if line.is_empty():
+			continue
+		var eq := line.find("=")
+		if eq < 0:
+			return {"locals": {}, "error": GdeI18n.t("строка %d: нужно «имя = значение»") % n}
+		var name := line.substr(0, eq).strip_edges()
+		var val := line.substr(eq + 1).strip_edges()
+		if not name.is_valid_ascii_identifier():
+			return {"locals": {}, "error": GdeI18n.t("строка %d: имя «%s» — латинские буквы, цифры и _, не с цифры") % [n, name]}
+		if val.length() >= 2 and val.begins_with("\"") and val.ends_with("\""):
+			out[name] = val.substr(1, val.length() - 2)
+		elif val.is_valid_float():
+			out[name] = GdeSheetDocument._normalize(val.to_float())
+		elif val.is_empty():
+			out[name] = 0
+		else:
+			return {"locals": {}, "error": GdeI18n.t("строка %d: «%s» — не число; текст пишите в кавычках") % [n, val]}
+	return {"locals": out, "error": ""}
 
 
 func toggle_event_disabled(p: Array) -> void:
@@ -1066,6 +1293,17 @@ func _shortcut_input(event: InputEvent) -> void:
 			KEY_N:
 				accept_event()
 				doc.add_event([], 9999, "standard")
+			KEY_F:
+				accept_event()
+				toggle_search(true)
+		return
+
+	if k.keycode == KEY_F3:
+		accept_event()
+		if _search_bar != null and _search_bar.visible:
+			find_next(-1 if k.shift_pressed else 1)
+		else:
+			toggle_search(true)
 		return
 
 	if k.alt_pressed and (k.keycode == KEY_UP or k.keycode == KEY_DOWN):
@@ -1182,6 +1420,15 @@ func event_menu(p: Array, at: Vector2) -> void:
 	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Подсобытие"), 1)
 	_event_menu.add_icon_item(GdeIcons.get_icon("comment"), GdeI18n.t("Комментарий после"), 2)
 	_event_menu.add_separator()
+	if e != null and str((e as Dictionary).get("type", "standard")) in ANY_TYPES:
+		_event_menu.add_check_item(GdeI18n.t("Любое из условий (ИЛИ)"), 12)
+		_event_menu.set_item_checked(_event_menu.item_count - 1, bool((e as Dictionary).get("any", false)))
+		_event_menu.set_item_tooltip(_event_menu.item_count - 1,
+				GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие, а не все сразу"))
+		_event_menu.add_separator()
+	if e != null and str((e as Dictionary).get("type", "standard")) in LOCALS_TYPES:
+		_event_menu.add_icon_item(GdeIcons.get_icon("variable"), GdeI18n.t("Локальные переменные…"), 13)
+		_event_menu.add_separator()
 	_event_menu.add_icon_item(GdeIcons.get_icon("up"), GdeI18n.t("Выше	Alt+↑"), 3)
 	_event_menu.add_icon_item(GdeIcons.get_icon("down"), GdeI18n.t("Ниже	Alt+↓"), 4)
 	_event_menu.add_icon_item(GdeIcons.get_icon("indent"), GdeI18n.t("Вложить в предыдущее"), 5)
@@ -1225,12 +1472,246 @@ func _on_event_menu(id: int) -> void:
 		9: remove_event(p)
 		10: copy_event(p)
 		11: paste()
+		12: toggle_event_any(p)
+		13: edit_event_locals(p)
 
 
 func _on_add_root_event(id: int) -> void:
 	if doc == null:
 		return
-	var types := ["standard", "comment", "foreach", "repeat", "while", "group"]
+	var types := ["standard", "comment", "foreach", "repeat", "while", "group", "include", "function"]
 	if id < 0 or id >= types.size():
 		return
 	doc.add_event([], 9999, types[id])
+
+
+# ------------------------------------------------------------------ поиск ---
+
+func _build_search_bar() -> void:
+	_search_bar = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, 0.04)
+	sb.set_content_margin_all(6)
+	sb.content_margin_left = 10
+	_search_bar.add_theme_stylebox_override("panel", sb)
+	_search_bar.visible = false
+	add_child(_search_bar)
+
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 4)
+	_search_bar.add_child(row)
+
+	_find_edit = LineEdit.new()
+	_find_edit.placeholder_text = GdeI18n.t("Найти в листе…")
+	_find_edit.custom_minimum_size = Vector2(220, 0)
+	_find_edit.clear_button_enabled = true
+	_find_edit.right_icon = GdeIcons.get_icon("search")
+	_find_edit.text_changed.connect(func(_t: String): _run_search(true))
+	_find_edit.text_submitted.connect(func(_t: String):
+		find_next(-1 if Input.is_key_pressed(KEY_SHIFT) else 1))
+	_find_edit.gui_input.connect(_search_key)
+	row.add_child(_find_edit)
+
+	_found_label = Label.new()
+	_found_label.custom_minimum_size = Vector2(90, 0)
+	_found_label.modulate = Color(1, 1, 1, 0.7)
+	row.add_child(_found_label)
+
+	var prev := _icon_button("up", GdeI18n.t("Предыдущее (Shift+Enter)"), func(): find_next(-1))
+	row.add_child(prev)
+	var next := _icon_button("down", GdeI18n.t("Следующее (Enter, F3)"), func(): find_next(1))
+	row.add_child(next)
+
+	_replace_edit = LineEdit.new()
+	_replace_edit.placeholder_text = GdeI18n.t("Заменить на…")
+	_replace_edit.custom_minimum_size = Vector2(200, 0)
+	_replace_edit.gui_input.connect(_search_key)
+	_replace_edit.text_submitted.connect(func(_t: String): replace_all_found())
+	row.add_child(_replace_edit)
+	row.add_child(_icon_button("replace",
+			GdeI18n.t("Заменить во всём листе: в значениях параметров, комментариях и именах групп. С учётом регистра. Отменяется Ctrl+Z"),
+			replace_all_found, GdeI18n.t("Заменить всё")))
+	row.add_child(_icon_button("close", GdeI18n.t("Закрыть поиск (Escape)"), func(): toggle_search(false)))
+
+
+func _search_key(ev: InputEvent) -> void:
+	var k := ev as InputEventKey
+	if k != null and k.pressed and k.keycode == KEY_ESCAPE:
+		toggle_search(false)
+		accept_event()
+
+
+func toggle_search(on: bool) -> void:
+	if _search_bar == null:
+		return
+	_search_bar.visible = on
+	if on:
+		_find_edit.grab_focus()
+		_find_edit.select_all()
+		_run_search(false)
+	else:
+		_found.clear()
+		_found_set.clear()
+		_found_i = -1
+		_rebuild(false)
+		grab_focus()
+
+
+## Найти заново. first — сразу перейти к первому найденному (при наборе).
+func _run_search(first: bool) -> void:
+	_found.clear()
+	_found_set.clear()
+	_found_i = -1
+	if doc != null and _search_bar != null and _search_bar.visible:
+		_found = GdeSearch.find(doc.data.get("events", []), registry, _find_edit.text)
+		for p: Array in _found:
+			_found_set[str(p)] = true
+	_update_found_label()
+	if first and not _found.is_empty():
+		find_next(1)
+	else:
+		_rebuild(false)
+
+
+func _update_found_label() -> void:
+	if _found_label == null:
+		return
+	if _find_edit.text.strip_edges().is_empty():
+		_found_label.text = ""
+	elif _found.is_empty():
+		_found_label.text = GdeI18n.t("не найдено")
+	elif _found_i < 0:
+		_found_label.text = GdeI18n.t("найдено: %d") % _found.size()
+	else:
+		_found_label.text = GdeI18n.t("%d из %d") % [_found_i + 1, _found.size()]
+
+
+## Перейти к следующему (dir = 1) или предыдущему (-1) найденному событию.
+## Свёрнутые родители разворачиваются — иначе найденное было бы не видно.
+func find_next(dir: int) -> void:
+	if _found.is_empty():
+		_update_found_label()
+		return
+	_found_i = posmod(_found_i + dir, _found.size()) if _found_i >= 0 else (0 if dir > 0 else _found.size() - 1)
+	var p: Array = _found[_found_i]
+	_unfold_to(p)
+	_sel_what = "event"
+	_sel_path = p.duplicate()
+	_sel_kind = ""
+	_sel_index = -1
+	_update_found_label()
+	await _rebuild(false)
+	_scroll_to_event(p)
+
+
+func _unfold_to(p: Array) -> void:
+	for n in range(1, p.size()):
+		var parent: Variant = doc.event_at(p.slice(0, n))
+		if parent is Dictionary and (parent as Dictionary).get("folded", false):
+			(parent as Dictionary).erase("folded")
+
+
+func _scroll_to_event(p: Array) -> void:
+	var card := _find_card(_rows, p)
+	if card != null:
+		_scroll.ensure_control_visible(card)
+
+
+func _find_card(n: Node, p: Array) -> GdeEventCard:
+	for c: Node in n.get_children():
+		if c is GdeEventCard and (c as GdeEventCard).path == p:
+			return c
+		var deep := _find_card(c, p)
+		if deep != null:
+			return deep
+	return null
+
+
+func is_event_found(p: Array) -> bool:
+	return _found_set.has(str(p))
+
+
+func replace_all_found() -> void:
+	if doc == null or _find_edit.text.is_empty():
+		return
+	var n := doc.replace_text(_find_edit.text, _replace_edit.text)
+	if n == 0:
+		_set_status(GdeI18n.t("Заменять нечего: «%s» в значениях и текстах листа нет") % _find_edit.text, true)
+	else:
+		_set_status(GdeI18n.t("Заменено: %d. Отменить — Ctrl+Z") % n, false)
+	_run_search(false)
+
+
+# ------------------------------------------------------------ сворачивание ---
+
+func toggle_event_folded(p: Array) -> void:
+	if doc == null or doc.event_at(p) == null:
+		return
+	if (doc.event_at(p) as Dictionary).get("folded", false):
+		doc.erase_event_field(p, "folded")
+	else:
+		doc.set_event_field(p, "folded", true)
+
+
+# ---------------------------------------------------------------- отладка ---
+
+## Сработавшие события: путь -> когда (мс) сработало последний раз.
+var _debug_hits: Dictionary = {}
+var _debug_timer: Timer = null
+const HIT_GLOW_MS := 450
+
+
+## Снимок из запущенной игры (GdeDebuggerPlugin): подсветить сработавшие
+## события открытого листа. Подсветка гаснет сама через полсекунды.
+func show_debug_state(st: Dictionary) -> void:
+	if doc == null:
+		return
+	var hits: Dictionary = st.get("hits", {})
+	var now := Time.get_ticks_msec()
+	for sheet: String in hits:
+		if sheet != doc.path:
+			continue
+		for pair: Variant in hits[sheet]:
+			if pair is Array and (pair as Array).size() == 2:
+				var p: Array = []
+				for x: Variant in (pair[0] as Array):
+					p.append(int(x))
+				_debug_hits[str(p)] = now
+	if _debug_timer == null:
+		_debug_timer = Timer.new()
+		_debug_timer.wait_time = 0.15
+		_debug_timer.timeout.connect(_apply_hits)
+		add_child(_debug_timer)
+	if _debug_timer.is_stopped():
+		_debug_timer.start()
+	_apply_hits()
+
+
+func clear_debug() -> void:
+	_debug_hits.clear()
+	if _debug_timer != null:
+		_debug_timer.stop()
+	_apply_hits()
+
+
+func is_event_hit(p: Array) -> bool:
+	return _debug_hits.has(str(p)) and Time.get_ticks_msec() - int(_debug_hits[str(p)]) < HIT_GLOW_MS
+
+
+func _apply_hits() -> void:
+	if _rows != null:
+		_apply_hits_in(_rows)
+	var now := Time.get_ticks_msec()
+	for k: String in _debug_hits.keys():
+		if now - int(_debug_hits[k]) >= HIT_GLOW_MS:
+			_debug_hits.erase(k)
+	if _debug_hits.is_empty() and _debug_timer != null:
+		_debug_timer.stop()
+
+
+func _apply_hits_in(n: Node) -> void:
+	for c: Node in n.get_children():
+		if c is GdeEventCard:
+			(c as GdeEventCard).set_hit(is_event_hit((c as GdeEventCard).path))
+		_apply_hits_in(c)

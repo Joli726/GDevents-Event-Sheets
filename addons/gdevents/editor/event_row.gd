@@ -36,7 +36,9 @@ func setup(p: Control, event_path: Array, e: Dictionary, accent: Color) -> void:
 		add_child(card)
 
 	var children: Array = e.get("children", [])
-	if not children.is_empty():
+	if not children.is_empty() and e.get("folded", false):
+		add_child(_folded_note(children.size()))
+	elif not children.is_empty():
 		var wrap := HBoxContainer.new()
 		wrap.add_theme_constant_override("separation", 0)
 		var spacer := Control.new()
@@ -62,6 +64,7 @@ func _build_comment(e: Dictionary) -> Control:
 	var pc := GdeEventCard.new()
 	pc.comment = true
 	pc.setup(panel, path, _accent, panel.is_event_selected(path))
+	pc.set_found(panel.is_event_found(path))
 
 	var row := HBoxContainer.new()
 	pc.add_child(row)
@@ -87,6 +90,7 @@ func _build_comment(e: Dictionary) -> Control:
 func _build_card(e: Dictionary, accent: Color) -> Control:
 	var card := GdeEventCard.new()
 	card.setup(panel, path, accent, panel.is_event_selected(path))
+	card.set_found(panel.is_event_found(path))
 	var errs: Array[String] = panel.event_errors(path)
 	if not errs.is_empty():
 		card.set_errors(errs)
@@ -104,12 +108,24 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	content.add_child(header)
+	if not (e.get("children", []) as Array).is_empty():
+		var folded: bool = e.get("folded", false)
+		var fb := _tool_button("fold_closed" if folded else "fold_open",
+				GdeI18n.t("Развернуть подсобытия") if folded else GdeI18n.t("Свернуть подсобытия"),
+				func(): panel.toggle_event_folded(path))
+		fb.custom_minimum_size = Vector2(20, 18)
+		header.add_child(fb)
 	_fill_header(header, e)
 	var pad := Control.new()
 	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_child(pad)
 	header.add_child(_row_tools(e))
+
+	# У подключения и функции нет своих условий и действий: у подключения —
+	# только выбор листа, у функции тело — подсобытия.
+	if _type == "include" or _type == "function":
+		return card
 
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", COL_SEPARATION)
@@ -125,6 +141,31 @@ func _build_card(e: Dictionary, accent: Color) -> Control:
 
 ## Шапка специальных событий с редактированием прямо на месте.
 func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
+	_fill_type_header(row, e)
+	if e.get("any", false) and _type in ["standard", "foreach", "while"]:
+		var any := _caption(GdeI18n.t("Любое из условий (ИЛИ)"))
+		any.modulate = _accent
+		any.tooltip_text = GdeI18n.t("Событие сработает, если выполнено хотя бы одно условие. Выключить — в меню события")
+		any.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.add_child(any)
+	var locals: Variant = e.get("locals", {})
+	if locals is Dictionary and not (locals as Dictionary).is_empty():
+		var parts: Array[String] = []
+		for k: Variant in (locals as Dictionary):
+			var v: Variant = (locals as Dictionary)[k]
+			parts.append("%s = %s" % [k, JSON.stringify(v) if v is String else str(GdeSheetDocument._normalize(v))])
+		var lb := Button.new()
+		lb.flat = true
+		lb.focus_mode = Control.FOCUS_NONE
+		lb.icon = GdeIcons.get_icon("variable")
+		lb.text = GdeI18n.t("Локальные: %s") % ", ".join(parts)
+		lb.tooltip_text = GdeI18n.t("Локальные переменные события: живут в нём и его подсобытиях, обнуляются при каждом запуске. Нажмите, чтобы изменить")
+		lb.add_theme_font_size_override("font_size", 11)
+		lb.pressed.connect(func(): panel.edit_event_locals(path))
+		row.add_child(lb)
+
+
+func _fill_type_header(row: HBoxContainer, e: Dictionary) -> void:
 	match _type:
 		"foreach":
 			row.add_child(_caption(GdeI18n.t("Для каждого объекта")))
@@ -175,6 +216,83 @@ func _fill_header(row: HBoxContainer, e: Dictionary) -> void:
 			row.add_child(ne)
 		"while":
 			row.add_child(_caption(GdeI18n.t("Пока выполняется")))
+		"function":
+			var icon := TextureRect.new()
+			icon.texture = GdeIcons.get_icon("function")
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.custom_minimum_size = Vector2(18, 18)
+			row.add_child(icon)
+			var kind := OptionButton.new()
+			kind.add_item(GdeI18n.t("Действие"), 0)
+			kind.add_item(GdeI18n.t("Условие"), 1)
+			kind.selected = 1 if str(e.get("kind", "action")) == "condition" else 0
+			kind.tooltip_text = GdeI18n.t("Условие отвечает действием «Вернуть: условие истинно»")
+			kind.item_selected.connect(func(i: int):
+				panel.set_event_field(path, "kind", "condition" if i == 1 else "action"))
+			row.add_child(kind)
+			var ne := LineEdit.new()
+			ne.text = str(e.get("name", ""))
+			ne.placeholder_text = GdeI18n.t("Имя латиницей")
+			ne.custom_minimum_size = Vector2(150, 0)
+			ne.tooltip_text = GdeI18n.t("Имя функции: латинские буквы, цифры и _")
+			ne.focus_exited.connect(func():
+				if ne.text != str(e.get("name", "")):
+					panel.set_event_field(path, "name", ne.text))
+			ne.text_submitted.connect(func(t: String): panel.set_event_field(path, "name", t))
+			row.add_child(ne)
+			var se := LineEdit.new()
+			se.text = str(e.get("sentence", ""))
+			se.placeholder_text = GdeI18n.t("Фраза: Ранить _PARAM0_ на _PARAM1_")
+			se.custom_minimum_size = Vector2(260, 0)
+			se.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			se.tooltip_text = GdeI18n.t("Как функция читается в листе. _PARAM0_, _PARAM1_… — параметры по порядку")
+			se.focus_exited.connect(func():
+				if se.text != str(e.get("sentence", "")):
+					panel.set_event_field(path, "sentence", se.text))
+			se.text_submitted.connect(func(t: String): panel.set_event_field(path, "sentence", t))
+			row.add_child(se)
+			var pb := Button.new()
+			var names: Array[String] = []
+			for pr: Variant in e.get("params", []):
+				if pr is Dictionary:
+					names.append("%s: %s" % [(pr as Dictionary).get("name", ""), (pr as Dictionary).get("kind", "")])
+			pb.text = GdeI18n.t("Параметры: %s") % (", ".join(names) if not names.is_empty() else GdeI18n.t("нет"))
+			pb.flat = true
+			pb.focus_mode = Control.FOCUS_NONE
+			pb.add_theme_font_size_override("font_size", 11)
+			pb.pressed.connect(func(): panel.edit_function_params(path))
+			row.add_child(pb)
+		"include":
+			var cap := _caption(GdeI18n.t("Подключить лист"))
+			row.add_child(cap)
+			var ob := OptionButton.new()
+			var cur := str(e.get("sheet", ""))
+			var sheets: Array[String] = panel.includable_sheets()
+			var sel := -1
+			for i in range(sheets.size()):
+				ob.add_item(sheets[i].replace("res://", ""), i)
+				ob.set_item_metadata(i, sheets[i])
+				if sheets[i] == cur:
+					sel = i
+			if sel < 0:
+				var label := GdeI18n.t("— выберите лист —")
+				if not cur.is_empty():
+					label = cur.replace("res://", "") if FileAccess.file_exists(cur) else GdeI18n.t("%s (нет такого листа)") % cur
+				ob.add_item(label, ob.item_count)
+				ob.set_item_metadata(ob.item_count - 1, cur)
+				sel = ob.item_count - 1
+			ob.selected = sel
+			ob.item_selected.connect(func(i: int):
+				panel.set_event_field(path, "sheet", str(ob.get_item_metadata(i))))
+			row.add_child(ob)
+			if not cur.is_empty():
+				var go := Button.new()
+				go.flat = true
+				go.focus_mode = Control.FOCUS_NONE
+				go.icon = GdeIcons.get_icon("edit")
+				go.tooltip_text = GdeI18n.t("Открыть подключённый лист")
+				go.pressed.connect(func(): panel.go_to_sheet(cur))
+				row.add_child(go)
 
 
 func _build_column(e: Dictionary, kind: String, add_label: String,
@@ -264,6 +382,26 @@ func _add_row(kind: String, add_label: String) -> Control:
 
 
 # ------------------------------------------------------------------ мелочи ---
+
+## Вместо свёрнутых подсобытий — строка «скрыто: N», по нажатию разворачивает.
+func _folded_note(n: int) -> Control:
+	var wrap := HBoxContainer.new()
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(INDENT, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(spacer)
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.icon = GdeIcons.get_icon("fold_closed")
+	b.text = GdeI18n.t("свёрнуто подсобытий: %d") % n
+	b.tooltip_text = GdeI18n.t("Развернуть подсобытия")
+	b.modulate = Color(1, 1, 1, 0.55)
+	b.add_theme_font_size_override("font_size", 11)
+	b.pressed.connect(func(): panel.toggle_event_folded(path))
+	wrap.add_child(b)
+	return wrap
+
 
 ## Кнопки события. Показываются при наведении на карточку: постоянно висящий
 ## ряд иконок шумит, а прятать удаление в правую кнопку — неудобно.
