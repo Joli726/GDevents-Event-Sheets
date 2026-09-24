@@ -31,9 +31,10 @@ const STICK := preload("res://addons/gdevents/behaviors/stick_to/stick_to.gd")
 const BAR := preload("res://addons/gdevents/behaviors/value_bar/value_bar.gd")
 const JUICE := preload("res://addons/gdevents/behaviors/juice/juice.gd")
 const MENU_BUTTON := preload("res://addons/gdevents/behaviors/menu_button/menu_button.gd")
+const DIALOGUE := preload("res://addons/gdevents/behaviors/dialogue/dialogue.gd")
 const RUNNER_SCENE := "user://gde_scenario_runner.tscn"
 
-const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states", "stick_to", "value_bar", "juice", "menu_button"]
+const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states", "stick_to", "value_bar", "juice", "menu_button", "dialogue"]
 
 var _fails: int = 0
 var _checks: int = 0
@@ -1066,6 +1067,75 @@ func _menu_button() -> void:
 	_eq(clicks[1], 1, "кнопка: выключенная не нажимается")
 	w.queue_free()
 	await _frames(2)
+
+
+func _dialogue() -> void:
+	print("— Диалог")
+	var w := _world()
+	var npc := _sprite_box(w, Vector2(400, 300))
+	var d := _beh(npc, DIALOGUE, {"letters_per_second": 50.0, "advance_key": "Enter"})
+	var typed: Array[int] = [0]
+	var done: Array[int] = [0]
+	d.connect("line_typed", func() -> void: typed[0] += 1)
+	d.connect("finished", func() -> void: done[0] += 1)
+	d.call("say", "Hello|World")
+	await get_tree().process_frame
+	_ok(bool(d.call("is_talking")) and bool(d.call("is_typing")), "диалог: заговорил и печатает")
+	_eq(d.call("current_line"), "Hello", "диалог: первая реплика из «Hello|World»")
+	_eq(d.call("lines_left"), 1.0, "диалог: одна реплика в очереди")
+	await _wait_ms(250)
+	_ok(typed[0] == 1 and not bool(d.call("is_typing")), "диалог: допечатал по буквам")
+	var bubble := d.get_child(0) as Node2D
+	_ok(bubble != null and bubble.global_position.y < npc.global_position.y - 12.0, "диалог: облачко над персонажем")
+	d.call("advance")
+	_eq(d.call("current_line"), "World", "диалог: «дальше» — следующая реплика")
+	d.call("advance")
+	_ok(not bool(d.call("is_typing")) and typed[0] == 2, "диалог: «дальше» во время печати — допечатал сразу")
+	d.call("advance")
+	_ok(not bool(d.call("is_talking")) and done[0] == 1, "диалог: реплики кончились — облачко закрылось")
+	# Вопрос с ответами.
+	var picked: Array = []
+	d.connect("choice_made", func(i: int, t: String) -> void: picked.append([i, t]))
+	d.call("ask", "Go?", "Yes|No")
+	await _wait_ms(150)
+	_ok(bool(d.call("is_asking")), "вопрос: ждёт ответа")
+	d.call("choose", 1.0)
+	_eq(d.call("choice_index"), 1.0, "вопрос: выбран второй ответ")
+	_eq(d.call("choice_text"), "No", "вопрос: текст ответа")
+	_ok(bool(d.call("just_chose", 1.0)), "вопрос: «только что выбрали ответ 1»")
+	_ok(not bool(d.call("is_talking")), "вопрос: после ответа разговор закончился")
+	# Стрелкой вниз и Enter.
+	d.call("say", "Pick? [A|B|C]")
+	await _wait_ms(200)
+	await _action("ui_down")
+	await _key(KEY_ENTER)
+	_ok(picked.size() == 2 and str(picked[1][1]) == "B", "вопрос: стрелка вниз и Enter выбрали «B»")
+	# Разговор на паузе.
+	d.set("pause_game", true)
+	d.call("say", "Wait")
+	_ok(get_tree().paused, "пауза: разговор поставил игру на паузу")
+	await _wait_ms(150)
+	await _key(KEY_ENTER)
+	_ok(not get_tree().paused and not bool(d.call("is_talking")), "пауза: разговор кончился — игра идёт")
+	w.queue_free()
+	await _frames(2)
+
+
+func _key(code: Key) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = code
+	ev.physical_keycode = code
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	for i in 3:
+		await get_tree().process_frame
+	var up := InputEventKey.new()
+	up.keycode = code
+	up.physical_keycode = code
+	up.pressed = false
+	Input.parse_input_event(up)
+	for i in 2:
+		await get_tree().process_frame
 
 
 func _mouse_move(at: Vector2) -> void:
