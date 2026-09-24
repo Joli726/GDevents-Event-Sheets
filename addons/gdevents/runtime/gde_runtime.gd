@@ -362,6 +362,232 @@ func timer_advance(runner: Node, delta: float) -> void:
 	_advance_waits(runner, delta)
 
 
+# --------------------------------------------------------------- эффекты ---
+
+## Имена эффектов, по-английски и по-русски.
+const EFFECTS := {
+	"explosion": "explosion", "взрыв": "explosion",
+	"sparks": "sparks", "искры": "sparks",
+	"dust": "dust", "пыль": "dust",
+	"smoke": "smoke", "дым": "smoke",
+	"magic": "magic", "волшебство": "magic", "магия": "magic",
+	"confetti": "confetti", "конфетти": "confetti",
+}
+
+var _soft_dot: Texture2D = null
+var _square: Texture2D = null
+var _additive: CanvasItemMaterial = null
+
+
+## Мягкий круг — из него собраны все эффекты, картинки не нужны.
+func _dot() -> Texture2D:
+	if _soft_dot == null:
+		var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+		for x in 32:
+			for y in 32:
+				var d := Vector2(x - 15.5, y - 15.5).length() / 15.5
+				img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - d, 0.0, 1.0) ** 1.6))
+		_soft_dot = ImageTexture.create_from_image(img)
+	return _soft_dot
+
+
+func _sq() -> Texture2D:
+	if _square == null:
+		var img := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+		img.fill(Color.WHITE)
+		_square = ImageTexture.create_from_image(img)
+	return _square
+
+
+func _add_mat() -> CanvasItemMaterial:
+	if _additive == null:
+		_additive = CanvasItemMaterial.new()
+		_additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return _additive
+
+
+func _level() -> Node:
+	var scene := get_tree().current_scene
+	return scene if scene != null else get_tree().root
+
+
+## Готовый эффект в точке: взрыв, искры, пыль, дым, волшебство, конфетти.
+## size — во сколько раз крупнее обычного.
+func effect(name: String, x: float, y: float, size: float = 1.0) -> void:
+	var kind: String = EFFECTS.get(name.strip_edges().to_lower(), "")
+	if kind.is_empty():
+		_warn_once(self, "fx:" + name, GdeI18n.t("GDevents: неизвестный эффект «%s». Есть: %s")
+				% [name, "explosion, sparks, dust, smoke, magic, confetti"])
+		return
+	var at := Vector2(x, y)
+	var s := maxf(0.1, size)
+	match kind:
+		"explosion":
+			# Яркое ядро, огненные клочья и дым после.
+			_puff(at, Vector2.ZERO, Color(1.0, 0.95, 0.7), 0.0, 0.0, 0.16, 2.2 * s, 2.2, true)
+			for i in 22:
+				var c := Color(1.0, 0.85, 0.3).lerp(Color(1.0, 0.25, 0.05), randf())
+				_puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(80, 300) * s, c,
+						0.0, 3.5, randf_range(0.35, 0.65), randf_range(0.8, 2.0) * s, 0.2, true)
+			for i in 8:
+				_puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(20, 80) * s,
+						Color(0.55, 0.52, 0.5, 0.55), -40.0 * s, 1.5, randf_range(0.8, 1.2),
+						randf_range(1.2, 2.0) * s, 2.0, false)
+		"sparks":
+			for i in 16:
+				var v := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(180, 420) * s
+				var d := _puff(at, v, Color(1.0, 0.9, 0.5), 500.0 * s, 0.5, randf_range(0.25, 0.5), s, 0.5, true)
+				# Искра вытянута по ходу полёта.
+				d.scale = Vector2(0.9, 0.2) * s
+				d.rotation = v.angle()
+		"dust":
+			for i in 14:
+				var v := Vector2(randf_range(-110, 110), randf_range(-60, -10)) * s
+				_puff(at, v, Color(0.85, 0.8, 0.72, 0.7), 60.0 * s, 2.0, randf_range(0.5, 0.9),
+						randf_range(0.8, 1.4) * s, 1.8, false)
+		"smoke":
+			for i in 12:
+				var v := Vector2(randf_range(-30, 30), randf_range(-50, -15)) * s
+				_puff(at + Vector2(randf_range(-8, 8), 0) * s, v, Color(0.62, 0.62, 0.66, 0.6), -60.0 * s, 1.0,
+						randf_range(1.0, 1.7), randf_range(1.2, 2.0) * s, 2.5, false)
+		"magic":
+			for i in 22:
+				var c2 := [Color(0.4, 0.9, 1.0), Color(0.7, 0.45, 1.0), Color(1.0, 0.5, 0.85)][i % 3] as Color
+				var d2 := _puff(at, Vector2.RIGHT.rotated(randf() * TAU) * randf_range(50, 150) * s, c2,
+						-30.0 * s, 1.0, randf_range(0.6, 1.0), randf_range(0.5, 0.9) * s, 0.0, true)
+				d2.spin = randf_range(-360, 360)
+		"confetti":
+			for i in 30:
+				var v := Vector2.UP.rotated(randf_range(-0.8, 0.8)) * randf_range(180, 340) * s
+				var d3 := _puff(at, v, Color.from_hsv(randf(), 0.75, 1.0), 400.0 * s, 1.0,
+						randf_range(1.2, 1.8), randf_range(1.6, 2.4) * s, 1.0, false, _sq())
+				d3.spin = randf_range(-720, 720)
+
+
+func _puff(at: Vector2, v: Vector2, c: Color, grav: float, drag: float, life: float, sc: float,
+		end_scale: float, add: bool, tex: Texture2D = null) -> GdeDebris:
+	var d := GdeDebris.new()
+	d.texture = tex if tex != null else _dot()
+	d.velocity = v
+	d.gravity = grav
+	d.drag = drag
+	d.lifetime = life
+	d.scale = Vector2.ONE * sc
+	d.end_scale = end_scale
+	d.modulate = c
+	d.z_index = 150
+	if add:
+		d.material = _add_mat()
+	_level().add_child(d)
+	d.global_position = at
+	return d
+
+
+## Всплывающий текст над объектом.
+func float_text(n: Node, text: String, color_name: String) -> void:
+	if not is_instance_valid(n):
+		return
+	var c := Color.from_string(color_name.strip_edges(), Color.WHITE) if not color_name.strip_edges().is_empty() else Color.WHITE
+	var f := GdeFloatText.make(text, c, 16)
+	_level().add_child(f)
+	var r := aabb(n)
+	f.global_position = Vector2(r.get_center().x, r.position.y - 4.0) if r.size != Vector2.ZERO else pos_of(n)
+
+
+## Стоп-кадр: игра замирает на мгновение — удар кажется тяжелее.
+var _hitstop_scale: float = -1.0
+var _hitstop_until: int = 0
+
+
+func hitstop(seconds: float) -> void:
+	var ms := int(clampf(seconds, 0.0, 2.0) * 1000.0)
+	if ms <= 0:
+		return
+	if _hitstop_scale < 0.0:
+		_hitstop_scale = Engine.time_scale
+	_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + ms)
+	Engine.time_scale = 0.0
+	# Таймер в настоящем времени: игровое сейчас стоит.
+	get_tree().create_timer(float(ms) / 1000.0, true, false, true).timeout.connect(_end_hitstop)
+
+
+func _end_hitstop() -> void:
+	if _hitstop_scale < 0.0 or Time.get_ticks_msec() < _hitstop_until - 5:
+		return
+	Engine.time_scale = _hitstop_scale
+	_hitstop_scale = -1.0
+
+
+func in_hitstop() -> bool:
+	return _hitstop_scale >= 0.0
+
+
+## Слой поверх всего — вспышка и затемнение.
+var _overlay: CanvasLayer = null
+var _flash: ColorRect = null
+var _fade: ColorRect = null
+var _fading: bool = false
+
+
+func _screen_rect(layer_index: int) -> ColorRect:
+	if _overlay == null:
+		_overlay = CanvasLayer.new()
+		_overlay.layer = 120
+		_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_overlay)
+	var r := ColorRect.new()
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.color = Color(0, 0, 0, 0)
+	r.z_index = layer_index
+	_overlay.add_child(r)
+	return r
+
+
+func _tween() -> Tween:
+	# Анимации экрана идут и на паузе, и в стоп-кадре.
+	var t := get_tree().create_tween()
+	t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	t.set_ignore_time_scale(true)
+	return t
+
+
+## Вспышка экрана: белая при взрыве, красная при уроне.
+func screen_flash(color_name: String, seconds: float, strength: float) -> void:
+	if _flash == null:
+		_flash = _screen_rect(0)
+	var c := Color.from_string(color_name.strip_edges(), Color.WHITE) if not color_name.strip_edges().is_empty() else Color.WHITE
+	c.a = clampf(strength, 0.0, 1.0)
+	_flash.color = c
+	var t := _tween()
+	t.tween_property(_flash, "color:a", 0.0, maxf(0.01, seconds)).set_ease(Tween.EASE_OUT)
+
+
+## Перейти на сцену через затемнение: экран темнеет, сцена меняется, светлеет.
+func change_scene_fade(path: String, seconds: float, color_name: String) -> void:
+	if _fading:
+		return
+	if _fade == null:
+		_fade = _screen_rect(1)
+	var c := Color.from_string(color_name.strip_edges(), Color.BLACK) if not color_name.strip_edges().is_empty() else Color.BLACK
+	c.a = 0.0
+	_fade.color = c
+	_fading = true
+	var half := maxf(0.01, seconds * 0.5)
+	var t := _tween()
+	t.tween_property(_fade, "color:a", 1.0, half)
+	t.tween_callback(func() -> void:
+		get_tree().paused = false
+		change_scene(path))
+	t.tween_interval(0.05)
+	t.tween_property(_fade, "color:a", 0.0, half)
+	t.tween_callback(func() -> void: _fading = false)
+
+
+func is_fading() -> bool:
+	return _fading
+
+
 # ------------------------------------------------------- таймеры объекта ---
 
 ## Таймер экземпляра: у каждого врага свой, иначе десять врагов стреляли

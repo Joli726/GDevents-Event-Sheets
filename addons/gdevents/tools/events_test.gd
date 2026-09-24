@@ -43,6 +43,9 @@ func _ready() -> void:
 	print("—— прикрепить, дублировать ——")
 	_test_attach()
 	_test_duplicate()
+	print("—— эффекты ——")
+	await _test_effects()
+	await _test_hitstop_flash_fade()
 	_finish()
 
 
@@ -375,6 +378,65 @@ func _test_duplicate() -> void:
 	_ok(float(Gde.ovar_get(c, "copy", 0.0)) == 1.0 and float(Gde.ovar_get(e, "copy", 0.0)) == 0.0,
 			"дублировать: дальше в выборке — копия")
 	_free([r] + all)
+
+
+# --------------------------------------------------------------- эффекты ---
+
+func _count(cls: String) -> int:
+	var n := 0
+	for c: Node in get_children():
+		if c.get_class() == cls or (c.get_script() != null and (c.get_script() as Script).get_global_name() == cls):
+			n += 1
+	return n
+
+
+func _test_effects() -> void:
+	var r := _runner({}, [
+		_event([_cond("system.trigger_once", [])], [
+			_act("effect.at", ["explosion", "100", "100", "1"]),
+			_act("effect.at", ["искры", "300", "100", "2"]),
+		]),
+	])
+	_tick(r, 1)
+	var n := _count("GdeDebris")
+	_ok(n >= 32, "эффект в точке: взрыв и «искры» по-русски — частицы на месте (%d)" % n)
+	var before := _count("GdeDebris")
+	Gde.effect("nope", 0, 0, 1)
+	_eq(_count("GdeDebris"), before, "эффект: неизвестное имя — ничего, только предупреждение")
+	var hero := _thing("Hero", Vector2(500, 200), Vector2(20, 20))
+	var r2 := _runner({}, [
+		_event([_cond("system.trigger_once", [])], [_act("effect.float_text", ["Hero", "\"-3\"", "red"])]),
+	])
+	_tick(r2, 1)
+	var ft: Node2D = null
+	for c: Node in get_children():
+		if c is GdeFloatText:
+			ft = c
+	_ok(ft != null and ft.global_position.y < hero.global_position.y, "всплывающий текст: появился над объектом")
+	await _wait_ms(1100)
+	_ok(not is_instance_valid(ft) and _count("GdeDebris") == 0, "всплывающий текст и частицы растаяли сами")
+	_free([r, r2, hero])
+
+
+func _test_hitstop_flash_fade() -> void:
+	Gde.hitstop(0.1)
+	_ok(Engine.time_scale == 0.0 and Gde.in_hitstop(), "стоп-кадр: игра замерла")
+	await _wait_ms(180)
+	_ok(Engine.time_scale == 1.0 and not Gde.in_hitstop(), "стоп-кадр: через 0.1 с отпустило")
+	Gde.screen_flash("red", 0.15, 0.8)
+	await get_tree().process_frame
+	var flash: ColorRect = Gde.get("_flash")
+	_ok(flash != null and flash.color.r > 0.9 and flash.color.a > 0.5, "вспышка: экран вспыхнул красным")
+	await _wait_ms(250)
+	_ok(flash.color.a < 0.01, "вспышка: погасла")
+	# Путь нарочно без сцены: переход не случится, а затемнение пройдёт целиком.
+	Gde.change_scene_fade("res://addons/gdevents/tests/no_such_scene.tscn", 0.2, "black")
+	_ok(Gde.is_fading(), "затемнение: началось")
+	await _wait_ms(100)
+	var fade: ColorRect = Gde.get("_fade")
+	_ok(fade.color.a > 0.9, "затемнение: экран потемнел")
+	await _wait_ms(250)
+	_ok(not Gde.is_fading() and fade.color.a < 0.01, "затемнение: проявился обратно")
 
 
 # ------------------------------------------------------------------ лист ---

@@ -1179,6 +1179,22 @@
       ],
       "pred": "Gde.attached_to({a}, {b})",
       "description": "Первый объект прикреплён именно ко второму. Оставляет в выборке такие пары."
+    },
+    "effect.in_hitstop": {
+      "group": "Эффекты",
+      "sentence": "Идёт стоп-кадр",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.in_hitstop()",
+      "description": "Игра сейчас замерла стоп-кадром."
+    },
+    "scene.fading": {
+      "group": "Сцена",
+      "sentence": "Идёт переход с затемнением",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.is_fading()",
+      "description": "Экран сейчас темнеет или проявляется — например, чтобы не запускать переход второй раз."
     }
   },
   "actions": {
@@ -2531,6 +2547,128 @@
       ],
       "code": "Gde.duplicate_picked({ctx}, \"{0}\", {1}, {2})",
       "description": "Копия каждого отобранного экземпляра — с его переменными и настройками поведений. Переменные у копии свои. Дальше в выборке — копии."
+    },
+    "effect.at": {
+      "group": "Эффекты",
+      "sentence": "Эффект _PARAM0_ в точке _PARAM1_ ; _PARAM2_, размер _PARAM3_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Эффект: explosion, sparks, dust, smoke, magic, confetti"
+        },
+        {
+          "kind": "number",
+          "label": "X"
+        },
+        {
+          "kind": "number",
+          "label": "Y"
+        },
+        {
+          "kind": "number",
+          "label": "Размер, 1 — обычный"
+        }
+      ],
+      "code": "Gde.effect(\"{0}\", {1}, {2}, {3})",
+      "description": "Готовые частицы, картинки не нужны: взрыв (explosion), искры (sparks), пыль (dust), дым (smoke), волшебство (magic), конфетти (confetti). Имена можно писать и по-русски."
+    },
+    "effect.at_object": {
+      "group": "Эффекты",
+      "sentence": "Эффект _PARAM1_ у _PARAM0_, размер _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "raw",
+          "label": "Эффект: explosion, sparks, dust, smoke, magic, confetti"
+        },
+        {
+          "kind": "number",
+          "label": "Размер, 1 — обычный"
+        }
+      ],
+      "code": "Gde.effect(\"{1}\", Gde.pos_of({o}).x, Gde.pos_of({o}).y, {2})",
+      "description": "Тот же эффект в том месте, где стоит каждый отобранный экземпляр: враг взорвался, монета рассыпалась искрами."
+    },
+    "effect.float_text": {
+      "group": "Эффекты",
+      "sentence": "Всплывающий текст _PARAM1_ над _PARAM0_, цвет _PARAM2_",
+      "kind": "object",
+      "params": [
+        {
+          "kind": "object",
+          "label": "Объект"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        },
+        {
+          "kind": "raw",
+          "label": "Цвет: white, red, yellow, #ff8800…"
+        }
+      ],
+      "code": "Gde.float_text({o}, {1}, \"{2}\")",
+      "description": "«−3», «+1 монета»: текст подскакивает над объектом, взлетает и тает. Цвет — именем по-английски или #ff8800."
+    },
+    "effect.hitstop": {
+      "group": "Эффекты",
+      "sentence": "Стоп-кадр на _PARAM0_ сек",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Секунды, 0.05…0.1"
+        }
+      ],
+      "code": "Gde.hitstop({0})",
+      "description": "Игра замирает на мгновение при ударе — 0.05–0.1 секунды. Дёшево, а удар сразу ощущается тяжелее."
+    },
+    "effect.flash": {
+      "group": "Эффекты",
+      "sentence": "Вспышка экрана: цвет _PARAM0_, _PARAM1_ сек, сила _PARAM2_ (0…1)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Цвет: white, red, #ff8800…"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        },
+        {
+          "kind": "number",
+          "label": "Сила, 0…1"
+        }
+      ],
+      "code": "Gde.screen_flash(\"{0}\", {1}, {2})",
+      "description": "Экран вспыхивает и гаснет: белым при взрыве, красным при уроне. Сила 0.5 — полупрозрачная вспышка."
+    },
+    "scene.change_fade": {
+      "group": "Сцена",
+      "sentence": "Перейти на сцену _PARAM0_ с затемнением за _PARAM1_ сек, цвет _PARAM2_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Путь к сцене"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        },
+        {
+          "kind": "raw",
+          "label": "Цвет: black, white…"
+        }
+      ],
+      "code": "Gde.change_scene_fade(\"{0}\", {1}, \"{2}\")",
+      "description": "Экран плавно темнеет, сцена меняется, и новая плавно проявляется — вместо резкого переключения. Работает и из меню паузы."
     }
   },
   "expressions": {

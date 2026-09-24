@@ -21,7 +21,7 @@ const HERO := "Hero"
 ## Действия, которые уносят со сцены саму проверку: смена и перезапуск
 ## сцены, выход, пауза, удаление подопытного. Звук и сохранения с
 ## бутафорскими путями только ругаются.
-const SKIP := ["scene.change", "scene.restart", "system.quit", "scene.pause",
+const SKIP := ["scene.change", "scene.restart", "scene.change_fade", "system.quit", "scene.pause",
 	"object.delete", "object.delete_all", "audio.play", "audio.play_music",
 	"audio.play_pitch", "save.save", "save.load", "save.delete"]
 
