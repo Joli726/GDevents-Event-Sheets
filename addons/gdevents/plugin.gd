@@ -9,8 +9,28 @@ const MENU_ITEM := "GDevents: пересобрать листы событий"
 var _panel: GdeEventSheetPanel
 
 
+## Автозагрузка — часть настроек проекта, а не сеанса редактора. Её ставят
+## при включении плагина и убирают при выключении; раньше это делалось в
+## _enter_tree/_exit_tree, то есть при каждом открытии и закрытии редактора.
+func _enable_plugin() -> void:
+	_ensure_autoload()
+
+
+func _disable_plugin() -> void:
+	remove_autoload_singleton(AUTOLOAD_NAME)
+
+
+## Ставить уже стоящую автозагрузку незачем: это лишняя правка настроек
+## проекта при каждом открытии редактора.
+func _ensure_autoload() -> void:
+	if not ProjectSettings.has_setting("autoload/" + AUTOLOAD_NAME):
+		add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)
+
+
 func _enter_tree() -> void:
-	add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)
+	# Плагин включён, а Gde в проекте нет (удалили руками или её снял
+	# _exit_tree прежней версии) — без неё не собирается ни один лист.
+	_ensure_autoload()
 	add_tool_menu_item(MENU_ITEM, _rebuild)
 
 	_panel = GdeEventSheetPanel.new()
@@ -27,7 +47,6 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	remove_tool_menu_item(MENU_ITEM)
-	remove_autoload_singleton(AUTOLOAD_NAME)
 	if is_instance_valid(_panel):
 		_panel.queue_free()
 	_panel = null

@@ -32,7 +32,7 @@ func _events() -> void:
 	#        Создать объект Enemy в позиции 300 ; 0
 	#        Создать объект Bullet в позиции 0 ; 0
 	#        Записать в консоль "расставлено"
-	var _c1 := Gde.new_context()
+	var _c1: GdePickContext = Gde.new_context()
 	if Gde.at_start(self):
 		Gde.create_object(_c1, "Enemy", 100.0, 0.0, self)
 		Gde.create_object(_c1, "Enemy", 300.0, 0.0, self)
@@ -45,7 +45,7 @@ func _events() -> void:
 	# ЕСЛИ:  В начале сцены
 	#   И:   Взять ближайший Enemy к точке 90 ; 0
 	# ТО:    Изменить X у Enemy: = 999
-	var _c2 := Gde.new_context()
+	var _c2: GdePickContext = Gde.new_context()
 	if Gde.at_start(self) \
 			and Gde.pick_nearest(_c2, "Enemy", 90.0, 0.0):
 		for _o1 in _c2.pick("Enemy"):
@@ -55,7 +55,7 @@ func _events() -> void:
 	# ── Событие 3 ─
 	# ЕСЛИ:  Каждые 0.1 секунд
 	# ТО:    Изменить переменную сцены ticks: + 1
-	var _c3 := Gde.new_context()
+	var _c3: GdePickContext = Gde.new_context()
 	if Gde.every(self, 0, 0.1):
 		Gde.var_set("ticks", Gde.var_get("ticks") + 1.0)
 
@@ -64,21 +64,21 @@ func _events() -> void:
 	# ── Событие 4 ─
 	# ЕСЛИ:  Таймер итог > 0.5 сек
 	#   И:   Триггер один раз, пока истинно
-	var _c4 := Gde.new_context()
+	var _c4: GdePickContext = Gde.new_context()
 	if Gde.timer_value(self, "итог") > 0.5 \
 			and Gde.once(self, 0):
 
 		# ── Событие 5 ─
 		# ЕСЛИ:  X у Enemy > 900
 		# ТО:    Изменить переменную сцены уехал: + Enemy.Count()
-		var _c5 := _c4.copy()
+		var _c5: GdePickContext = _c4.copy()
 		if Gde.filter(_c5, "Enemy", func(_o2): return Gde.pos_of(_o2).x > 900.0):
 			Gde.var_set("уехал", Gde.var_get("уехал") + Gde.count(_c5, "Enemy"))
 
 		# ── Событие 6 ─
 		# ЕСЛИ:  X у Enemy < 900
 		# ТО:    Изменить переменную сцены остался: + Enemy.Count()
-		var _c6 := _c4.copy()
+		var _c6: GdePickContext = _c4.copy()
 		if Gde.filter(_c6, "Enemy", func(_o3): return Gde.pos_of(_o3).x < 900.0):
 			Gde.var_set("остался", Gde.var_get("остался") + Gde.count(_c6, "Enemy"))
 
@@ -87,7 +87,7 @@ func _events() -> void:
 	#   И:   Триггер один раз, пока истинно
 	#   И:   Взять все Enemy
 	# ТО:    Записать в консоль "ИТОГ врагов=" + ToString(Enemy.Count()) + " уехал=" + ToString(Variable(уехал)) + " остался=" + ToString(Variable(остался)) + " пуля=" + ToString(Bullet.X()) + " скорость=" + ToString(Bullet.LinearMove::Speed()) + " тиков=" + ToString(Variable(ticks))
-	var _c7 := Gde.new_context()
+	var _c7: GdePickContext = Gde.new_context()
 	if Gde.timer_value(self, "итог") > 0.6 \
 			and Gde.once(self, 1) \
 			and Gde.pick_all(_c7, "Enemy"):

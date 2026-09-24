@@ -235,7 +235,10 @@ func _ident() -> Array:
 			_skip_args()
 			return ["0.0", "number"]
 		var args := _args(def)
-		return [_fill(def["template"], {}, args), def.get("type", "number")]
+		# Count() и Timer() смотрят на выборку события и на раннер листа —
+		# без этих подстановок в код уходили голые {ctx} и {self}.
+		var fsubs := {"ctx": _ctx, "self": "self"}
+		return [_fill(def["template"], fsubs, args), def.get("type", "number")]
 
 	if _is_op("."):
 		_next()

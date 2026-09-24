@@ -69,7 +69,7 @@ func _process(delta: float) -> void:
 		return
 
 	var pressed := Input.is_mouse_button_pressed(mouse_button as MouseButton)
-	var mouse := Gde.mouse_world()
+	var mouse: Vector2 = Gde.mouse_world()
 
 	if not _dragging:
 		if enabled and pressed and Gde.aabb(o).has_point(mouse):
@@ -110,7 +110,7 @@ func _clamped(o: Node2D, p: Vector2) -> Vector2:
 		return p
 	var r := vp.get_visible_rect()
 	var inv := vp.get_canvas_transform().affine_inverse()
-	var half := Gde.aabb(o).size * 0.5
+	var half: Vector2 = Gde.aabb(o).size * 0.5
 	var tl := inv * r.position + half
 	var br := inv * r.end - half
 	return Vector2(clampf(p.x, tl.x, br.x), clampf(p.y, tl.y, br.y))

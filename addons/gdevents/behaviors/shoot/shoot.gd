@@ -270,7 +270,7 @@ func _spawn_one(o: Node2D, angle_deg: float) -> void:
 		if body != null:
 			speed += body.velocity.dot(dir) * inherit_velocity
 
-	var mv := Gde.behavior(b, "LinearMove", true)
+	var mv: Node = Gde.behavior(b, "LinearMove", true)
 	var created := false
 	if mv == null and auto_move:
 		mv = _give_movement(b)

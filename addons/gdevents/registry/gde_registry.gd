@@ -382,6 +382,12 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 		entry["labels"] = {}
 	(entry["labels"] as Dictionary)[pname] = label
 	var about := _property_about(doc, group)
+	# Чтение свойства в шаблонах. Строке нужен запасной "" — иначе на объекте
+	# без поведения приходил 0.0 и сравнение со строкой падало. Галочку
+	# читаем числом: в листе она 1 или 0, а «true == 1.0» в Godot — ошибка.
+	var read := "Gde.beh_get({o}, \"%s\", \"%s\"%s)" % [bname, pname, ", \"\"" if kind == "string" else ""]
+	if ptype == "bool":
+		read = "float(%s)" % read
 
 	entry["actions"]["set_" + pname] = {
 		"group": bname,
@@ -394,8 +400,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 			{"kind": "modop", "label": "Знак"},
 			{"kind": kind, "label": "Значение"},
 		],
-		"code": "Gde.beh_set({o}, \"%s\", \"%s\", Gde.beh_get({o}, \"%s\", \"%s\") {1~} {2})"
-				% [bname, pname, bname, pname],
+		"code": "Gde.beh_set({o}, \"%s\", \"%s\", %s {1~} {2})" % [bname, pname, read],
 		"code_assign": "Gde.beh_set({o}, \"%s\", \"%s\", {2})" % [bname, pname],
 	}
 	entry["conditions"]["is_" + pname] = {
@@ -409,7 +414,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 			{"kind": "cmpop", "label": "Знак"},
 			{"kind": kind, "label": "Значение"},
 		],
-		"pred": "Gde.beh_get({o}, \"%s\", \"%s\") {1} {2}" % [bname, pname],
+		"pred": "%s {1} {2}" % read,
 	}
 	var getter := "Gde.beh_get({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\"%s)" \
 			% [pname, ", \"\"" if kind == "string" else ""]

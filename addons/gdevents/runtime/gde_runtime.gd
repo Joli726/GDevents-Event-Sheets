@@ -120,8 +120,13 @@ func create_object(ctx: GdePickContext, obj: String, x: float, y: float, parent:
 		m.global_position = Vector2(x, y)
 	_try_tag(n)
 	if ctx != null:
-		var list := ctx.pick(obj)
-		list.append(n)
+		# Объект, который событие ещё не отбирало, начинает выборку с нуля:
+		# «Создать Bullet» и следом «Повернуть Bullet» трогают только новую
+		# пулю, а не все пули уровня. Раньше pick() подтягивал всех живых,
+		# включая только что созданную, и она попадала в список дважды.
+		var list: Array = ctx.pick(obj) if ctx.is_picked(obj) else []
+		if not list.has(n):
+			list.append(n)
 		ctx.set_pick(obj, list)
 	return n
 
@@ -157,13 +162,17 @@ func filter(ctx: GdePickContext, obj: String, pred: Callable) -> bool:
 	return not kept.is_empty()
 
 
-## Инвертированное условие. В GDevelop «НЕ» не фильтрует выборку — оно лишь
-## отвечает true, когда условию не удовлетворяет ни один отобранный экземпляр.
+## Инвертированное условие. Как в GDevelop, «НЕ» переворачивает проверку
+## для каждого экземпляра: в выборке остаются те, кто условию НЕ отвечает,
+## и условие истинно, если такие нашлись. «НЕ Враг видим → Удалить Врага»
+## удаляет невидимых, даже когда рядом есть видимые.
 func filter_not(ctx: GdePickContext, obj: String, pred: Callable) -> bool:
+	var kept: Array = []
 	for n: Node in ctx.pick(obj):
-		if is_instance_valid(n) and pred.call(n):
-			return false
-	return true
+		if is_instance_valid(n) and not pred.call(n):
+			kept.append(n)
+	ctx.set_pick(obj, kept)
+	return not kept.is_empty()
 
 
 ## Условие на паре объектов (столкновения, дистанция). Сужает ОБА списка:
@@ -195,16 +204,25 @@ func filter_pair(ctx: GdePickContext, a: String, b: String, pred: Callable) -> b
 	return not ka.is_empty()
 
 
+## «НЕ» для пары: в выборке первого объекта остаются те, кто не совпал ни с
+## одним из второго. Второй список не трогается — так же в GDevelop.
 func filter_pair_not(ctx: GdePickContext, a: String, b: String, pred: Callable) -> bool:
+	var lb := ctx.pick(b)
+	var kept: Array = []
 	for x: Node in ctx.pick(a):
 		if not is_instance_valid(x):
 			continue
-		for y: Node in ctx.pick(b):
+		var hit := false
+		for y: Node in lb:
 			if not is_instance_valid(y) or x == y:
 				continue
 			if pred.call(x, y):
-				return false
-	return true
+				hit = true
+				break
+		if not hit:
+			kept.append(x)
+	ctx.set_pick(a, kept)
+	return not kept.is_empty()
 
 
 # -------------------------------------------------------------- кадр/время ---
@@ -260,15 +278,46 @@ func timer_reset(runner: Node, name: String) -> void:
 
 # --------------------------------------------------------------- переменные ---
 
+## Сцена, для которой begin_scene уже отработал (id экземпляра, 0 — никакой).
+var _scene_id: int = 0
+
+
+## Вызывается из _ready каждого раннера листа. Раннер может стоять внутри
+## объекта — игрока, врага, — и тогда каждый новый экземпляр зовёт это
+## снова. Раньше каждый вызов обнулял переменные сцены и все таймеры:
+## респаун игрока сбрасывал счёт. Теперь сброс — только в новой сцене,
+## а повторный вызов лишь добавляет переменные, которых ещё нет.
 func begin_scene(initial: Dictionary) -> void:
+	var scene := get_tree().current_scene
+	var id := scene.get_instance_id() if scene != null else 0
+	if id != 0 and id == _scene_id:
+		for k: Variant in initial:
+			if not _scene_vars.has(k):
+				var v: Variant = initial[k]
+				_scene_vars[k] = v.duplicate(true) if (v is Dictionary or v is Array) else v
+		return
+	_scene_id = id
 	_scene_start = _clock
 	_scene_vars = initial.duplicate(true)
 	_timers.clear()
+	_forget_dead_runners()
+
+
+## Состояние раннеров хранится по id экземпляра. Раннеры ушедшей сцены
+## освобождены — их записи больше никому не нужны.
+func _forget_dead_runners() -> void:
+	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused]:
+		for id: Variant in store.keys():
+			if not is_instance_id_valid(int(id)):
+				store.erase(id)
 
 
 func _dig(store: Dictionary, path: String, create: bool) -> Array:
 	## Возвращает [контейнер, последний_ключ] для пути вида "player.hp".
+	## Для пустого пути — [null, ""]: тут раньше был выход за границы массива.
 	var parts := path.split(".", false)
+	if parts.is_empty():
+		return [null, ""]
 	var cur := store
 	for i in range(parts.size() - 1):
 		var k := parts[i]
@@ -289,6 +338,9 @@ func var_get(path: String, fallback: Variant = 0.0) -> Variant:
 
 func var_set(path: String, value: Variant) -> void:
 	var loc := _dig(_scene_vars, path, true)
+	if loc[0] == null:
+		push_warning("GDevents: пустое имя переменной сцены")
+		return
 	(loc[0] as Dictionary)[loc[1]] = value
 
 
@@ -301,6 +353,9 @@ func gvar_get(path: String, fallback: Variant = 0.0) -> Variant:
 
 func gvar_set(path: String, value: Variant) -> void:
 	var loc := _dig(_global_vars, path, true)
+	if loc[0] == null:
+		push_warning("GDevents: пустое имя глобальной переменной")
+		return
 	(loc[0] as Dictionary)[loc[1]] = value
 
 
@@ -320,6 +375,9 @@ func ovar_set(n: Node, path: String, value: Variant) -> void:
 		return
 	var store: Dictionary = n.get_meta("__gde_vars", {})
 	var loc := _dig(store, path, true)
+	if loc[0] == null:
+		push_warning("GDevents: пустое имя переменной объекта")
+		return
 	(loc[0] as Dictionary)[loc[1]] = value
 	n.set_meta("__gde_vars", store)
 
@@ -411,10 +469,18 @@ func beh_get(n: Node, bname: String, prop: String, fallback: Variant = 0.0) -> V
 	return b.get(prop)
 
 
+## Из листа приходят числа, а свойство может быть галочкой или целым:
+## приводим к типу свойства явно, а не надеемся на неявное преобразование.
 func beh_set(n: Node, bname: String, prop: String, value: Variant) -> void:
 	var b := behavior(n, bname)
-	if b != null:
-		b.set(prop, value)
+	if b == null:
+		return
+	match typeof(b.get(prop)):
+		TYPE_BOOL:
+			value = bool(value)
+		TYPE_INT:
+			value = int(value)
+	b.set(prop, value)
 
 
 # ------------------------------------------------------------------- ввод ---
