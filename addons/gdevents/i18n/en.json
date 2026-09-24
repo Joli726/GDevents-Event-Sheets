@@ -1003,5 +1003,10 @@
 	"Заменено: %d. Отменить — Ctrl+Z": "Replaced: %d. Undo — Ctrl+Z",
 	"Развернуть подсобытия": "Expand sub-events",
 	"Свернуть подсобытия": "Collapse sub-events",
-	"свёрнуто подсобытий: %d": "collapsed sub-events: %d"
+	"свёрнуто подсобытий: %d": "collapsed sub-events: %d",
+	"GDevents: ошибка выше — в событии %s листа %s: %s": "GDevents: the error above is in event %s of sheet %s: %s",
+	"# Карта строк для сообщений об ошибках: строка, событие, что в нём.": "# Line map for error messages: line, event, what is in it.",
+	"ЕСЛИ %s": "IF %s",
+	"пустое событие": "empty event",
+	"(подключённый лист %s) %s": "(included sheet %s) %s"
 }

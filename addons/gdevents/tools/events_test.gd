@@ -55,6 +55,8 @@ func _ready() -> void:
 	_test_locals()
 	print("—— подключённые листы ——")
 	_test_include()
+	print("—— ошибка в игре называет событие ——")
+	_test_error_points_to_event()
 	_finish()
 
 
@@ -605,6 +607,56 @@ func _test_include() -> void:
 	_ok(str(g["errors"]).contains("Coin"), "один объект с разными сценами — ошибка")
 	for p: String in [shared, a, b, broken]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+
+
+# ------------------------------------------------- ошибка называет событие ---
+
+func _test_error_points_to_event() -> void:
+	var sheet := {"objects": [], "events": [
+		_event([], [_act("var.modify", ["fine", "=", "1"])]),
+		_event([_cond("system.trigger_once", [])], [_act("scene.change", ["res://нет_такой_сцены.tscn"])]),
+	]}
+	var r := GdeGenerator.generate(sheet, _reg, "res://уровень.gdes.json")
+	_ok(str(r["code"]).contains("const GDE_EVENTS"), "в собранном скрипте есть карта строк событий")
+	var path := "user://gde_err_sheet.gd"
+	# «Сменить сцену» откладывает загрузку на следующий кадр, и её ошибка
+	# приходит уже без стека листа. Для настоящей ошибки скрипта строку
+	# действия подменяем обращением к null — номер строки не меняется.
+	var code := ""
+	for ln: String in str(r["code"]).split("\n"):
+		if ln.contains("change_scene"):
+			ln = ln.substr(0, ln.length() - ln.strip_edges(true, false).length()) + "var _gde_null: Object = null; _gde_null.free()"
+		code += ln + "\n"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(code)
+	f.close()
+	var logger := Gde.error_logger()
+	_ok(logger != null, "журнал ошибок GDevents подключён")
+	if logger == null:
+		return
+	# Строка действия второго события — ищем её в собранном коде.
+	var lines := code.split("\n")
+	var at := -1
+	for i in range(lines.size()):
+		if lines[i].contains("_gde_null.free()"):
+			at = i + 1
+	var hit := logger.locate(path, at)
+	_eq(hit.get("event", ""), "2", "строка собранного кода → событие 2")
+	_ok(str(hit.get("sheet", "")) == "res://уровень.gdes.json", "и лист, из которого оно собрано")
+	_ok(str(hit.get("what", "")).contains(GdeI18n.t("Один раз")) or str(hit.get("what", "")) != "", "и что за событие: %s" % hit.get("what", ""))
+	_ok(logger.locate(path, 3).is_empty(), "строка до первого события — не событие")
+	# Настоящая ошибка в игре: сообщение называет событие.
+	var s := load(path) as GDScript
+	var runner := Node2D.new()
+	runner.set_script(s)
+	add_child(runner)
+	runner.set_process(false)
+	logger.last_message = ""
+	_tick(runner, 1)
+	_ok(logger.last_message.contains("2") and logger.last_message.contains("уровень.gdes.json"),
+			"ошибка в игре названа событием листа: %s" % logger.last_message)
+	_free([runner])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 # ------------------------------------------------------------------ лист ---

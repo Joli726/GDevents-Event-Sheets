@@ -33,6 +33,9 @@ var _lv_n: int = 0
 ## Длина пути события «Подключить лист», внутри которого идёт генерация.
 ## Ошибки подключённых событий показываются на нём: в этом листе их строк нет.
 var _include_at: int = -1
+var _include_sheet: String = ""
+## Карта для ошибок во время игры: [строка комментария события, номер, что за событие].
+var _event_lines: Array = []
 
 
 static func generate(sheet: Dictionary, reg: GdeRegistry, source_path: String) -> Dictionary:
@@ -62,6 +65,7 @@ func _run(sheet: Dictionary, source_path: String) -> Dictionary:
 		_line(1, "pass")
 	else:
 		_gen_events(events, 1, "")
+	_emit_event_map(source_path)
 
 	GdeExpr.known_objects = {}
 	return {
@@ -179,9 +183,10 @@ func _gen_include(e: Dictionary, indent: int, parent_ctx: String) -> void:
 		_err(str(e["_error"]))
 		return
 	var outer := _include_at < 0
+	var sheet := str(e.get("sheet", ""))
 	if outer:
 		_include_at = _path.size()
-	var sheet := str(e.get("sheet", ""))
+		_include_sheet = sheet
 	_line(indent, "")
 	_line(indent, GdeI18n.t("# ┌─ Подключён лист %s") % sheet)
 	var saved := _path.duplicate()
@@ -190,6 +195,7 @@ func _gen_include(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "# └─")
 	if outer:
 		_include_at = -1
+		_include_sheet = ""
 
 
 func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
@@ -576,8 +582,25 @@ func _object_arg(d: Dictionary, args: Array, which: int, id: String) -> String:
 
 # ------------------------------------------------------------------ утилиты ---
 
+## Карта «строка → событие» в конце собранного скрипта. По ней
+## GdeErrorLogger называет событие, в котором случилась ошибка в игре.
+func _emit_event_map(source_path: String) -> void:
+	_line(0, "")
+	_line(0, "")
+	_line(0, GdeI18n.t("# Карта строк для сообщений об ошибках: строка, событие, что в нём."))
+	_line(0, "const GDE_SHEET := %s" % _quote(source_path))
+	if _event_lines.is_empty():
+		_line(0, "const GDE_EVENTS: Array = []")
+		return
+	_line(0, "const GDE_EVENTS: Array = [")
+	for entry: Array in _event_lines:
+		_line(1, "[%d, %s, %s]," % [entry[0], _quote(str(entry[1])), _quote(str(entry[2]))])
+	_line(0, "]")
+
+
 func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void:
 	_line(indent, "")
+	_event_lines.append([_out.size() + 1, str(_event_n), _event_summary(e, title)])
 	_line(indent, GdeI18n.t("# ── Событие %d ─%s") % [_event_n, (" " + title) if title != "" else ""])
 	var conds: Array = e.get("conditions", [])
 	var acts: Array = e.get("actions", [])
@@ -590,6 +613,23 @@ func _emit_event_comment(e: Dictionary, indent: int, title: String = "") -> void
 	for i in range(acts.size()):
 		var a: Dictionary = acts[i]
 		_line(indent, "# %s%s" % [GdeI18n.t("ТО:    ") if i == 0 else "       ", _sentence(_reg.action(str(a.get("id", ""))), a)])
+
+
+## Коротко, что за событие: заголовок или первое условие, иначе первое действие.
+func _event_summary(e: Dictionary, title: String) -> String:
+	var s := title
+	if s.is_empty():
+		var conds: Array = e.get("conditions", [])
+		var acts: Array = e.get("actions", [])
+		if not conds.is_empty():
+			s = GdeI18n.t("ЕСЛИ %s") % _sentence(_reg.condition(str((conds[0] as Dictionary).get("id", ""))), conds[0])
+		elif not acts.is_empty():
+			s = _sentence(_reg.action(str((acts[0] as Dictionary).get("id", ""))), acts[0])
+		else:
+			s = GdeI18n.t("пустое событие")
+	if _include_at >= 0:
+		s = GdeI18n.t("(подключённый лист %s) %s") % [_include_sheet.get_file(), s]
+	return s
 
 
 ## Человеческая фраза инструкции с подставленными параметрами.

@@ -25,9 +25,26 @@ var _once: Dictionary = {}
 var _timers: Dictionary = {}
 
 
+## Журнал ошибок, который называет событие листа. Один на игру.
+var _error_logger: GdeErrorLogger = null
+
+
 func _ready() -> void:
 	process_priority = -100
 	get_tree().node_added.connect(_on_node_added)
+	if _error_logger == null:
+		_error_logger = GdeErrorLogger.new()
+		OS.add_logger(_error_logger)
+
+
+func _exit_tree() -> void:
+	if _error_logger != null:
+		OS.remove_logger(_error_logger)
+		_error_logger = null
+
+
+func error_logger() -> GdeErrorLogger:
+	return _error_logger
 
 
 # ---------------------------------------------------------------- объекты ---
