@@ -36,6 +36,10 @@ func _ready() -> void:
 	await _test_object_timers()
 	_test_compare()
 	_test_pick_radius()
+	print("—— ввод ——")
+	await _test_key_hold()
+	await _test_double_tap()
+	_test_gamepad_absent()
 	_finish()
 
 
@@ -240,6 +244,67 @@ func _test_pick_radius() -> void:
 	_ok(boomed == 2 and float(Gde.ovar_get(outside, "boom", 0.0)) == 0.0 and float(Gde.ovar_get(near[0], "boom", 0.0)) == 0.0,
 			"в радиусе от объекта: взрыв задел всех рядом и никого дальше")
 	_free([r, far, boom, outside] + near + around)
+
+
+# ------------------------------------------------------------------ ввод ---
+
+func _key_event(code: Key, down: bool) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = code
+	ev.physical_keycode = code
+	ev.pressed = down
+	Input.parse_input_event(ev)
+
+
+func _test_key_hold() -> void:
+	_key_event(KEY_SPACE, true)
+	await get_tree().process_frame
+	await _wait_ms(150)
+	_ok(Gde.key_held("Space", 0.1) and not Gde.key_held("Space", 1.0), "удержание: держим 0.15 с — «дольше 0.1» да, «дольше 1» нет")
+	_ok(Gde.key_held_time("Space") > 0.1, "удержание: KeyHeldTime(Space) = %.2f" % Gde.key_held_time("Space"))
+	_key_event(KEY_SPACE, false)
+	var fired := false
+	for i in 5:
+		await get_tree().process_frame
+		if Gde.key_released_after("Space", 0.1):
+			fired = true
+			break
+	_ok(fired, "удержание: отпустили после 0.1 с — «заряженный выстрел»")
+	await get_tree().process_frame
+	_ok(not Gde.key_released_after("Space", 0.1), "удержание: «отпущена после» — только в кадр отпускания")
+	_eq(Gde.key_held_time("Space"), 0.0, "удержание: отпущена — время 0")
+
+
+func _test_double_tap() -> void:
+	var taps := 0
+	for step: Array in [[true, 0], [false, 60], [true, 60], [false, 60], [true, 60]]:
+		_key_event(KEY_Z, step[0])
+		for i in 3:
+			await get_tree().process_frame
+			if Gde.key_double_tap("Z", 0.3):
+				taps += 1
+		await _wait_ms(step[1])
+	_key_event(KEY_Z, false)
+	await get_tree().process_frame
+	_eq(taps, 1, "двойное нажатие: два быстрых нажатия — один раз, третье следом не считается")
+	await _wait_ms(400)
+	_key_event(KEY_Z, true)
+	var late := false
+	for i in 3:
+		await get_tree().process_frame
+		late = late or Gde.key_double_tap("Z", 0.3)
+	_key_event(KEY_Z, false)
+	await get_tree().process_frame
+	_ok(not late, "двойное нажатие: второе через 0.4 с — уже не двойное")
+
+
+func _test_gamepad_absent() -> void:
+	_ok(not Gde.pad_connected() and not Gde.pad_pressed("A") and Gde.stick(JOY_AXIS_LEFT_X) == 0.0,
+			"геймпад: без геймпада — не нажато, стик в нуле, без ошибок")
+	var ex := GdeExpr.compile("StickX() * 200", "_c", _reg)
+	_ok((ex["errors"] as Array).is_empty(), "геймпад: выражение StickX() собирается")
+	Gde.vibrate(0.5, 0.5, 0.1)
+	_ok(true, "геймпад: вибрация без геймпада не падает")
 
 
 # ------------------------------------------------------------------ лист ---

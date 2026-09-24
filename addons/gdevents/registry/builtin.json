@@ -1064,6 +1064,91 @@
       ],
       "code": "Gde.pick_in_radius_of({ctx}, \"{0}\", \"{1}\", {2})",
       "description": "Оставляет в выборке всех, кто ближе радиуса к отобранному объекту: «все Enemy в радиусе 80 от Explosion»."
+    },
+    "gamepad.button": {
+      "group": "Геймпад",
+      "sentence": "Кнопка геймпада _PARAM0_ нажата",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Кнопка: A, B, X, Y, LB, RB, LT, RT, Start, Up…"
+        }
+      ],
+      "code": "Gde.pad_pressed(\"{0}\")",
+      "description": "Истинно, пока кнопка первого подключённого геймпада зажата. Имена — как на геймпаде Xbox: A, B, X, Y, LB, RB, LT, RT, Start, Back, L3, R3, Up, Down, Left, Right."
+    },
+    "gamepad.just_pressed": {
+      "group": "Геймпад",
+      "sentence": "Кнопка геймпада _PARAM0_ нажата (один раз)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Кнопка: A, B, X, Y, LB, RB, LT, RT, Start, Up…"
+        }
+      ],
+      "code": "Gde.pad_just_pressed(\"{0}\")",
+      "description": "Истинно один кадр — в момент нажатия. Для прыжка, выстрела, меню."
+    },
+    "gamepad.connected": {
+      "group": "Геймпад",
+      "sentence": "Геймпад подключён",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.pad_connected()",
+      "description": "Хоть один геймпад подключён — показать подсказки для геймпада, а не для клавиатуры."
+    },
+    "key.held": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ удерживается дольше _PARAM1_ сек",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.key_held(\"{0}\", {1})",
+      "description": "Долгое нажатие: истинно, пока клавиша зажата дольше N секунд. Для зарядки выстрела, бега, открытия двери удержанием."
+    },
+    "key.released_after": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ отпущена после удержания дольше _PARAM1_ сек",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.key_released_after(\"{0}\", {1})",
+      "description": "Заряженный выстрел: истинно в кадр отпускания, если держали достаточно долго. Отпустили раньше — обычный выстрел по «отпущена»."
+    },
+    "key.double_tap": {
+      "group": "Клавиатура",
+      "sentence": "Клавиша _PARAM0_ нажата дважды (за _PARAM1_ сек)",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "raw",
+          "label": "Клавиша"
+        },
+        {
+          "kind": "number",
+          "label": "Промежуток, сек"
+        }
+      ],
+      "code": "Gde.key_double_tap(\"{0}\", {1})",
+      "description": "Двойное нажатие: истинно в момент второго нажатия, если оно пришло быстрее промежутка. Рывок двойным тапом, 0.3 секунды — привычный промежуток."
     }
   },
   "actions": {
@@ -2311,6 +2396,35 @@
       ],
       "code": "Gde.otimer_pause({o}, \"{1}\", bool({2}))",
       "description": "Останавливает или снова пускает таймер экземпляра: оглушённый враг не копит время до выстрела."
+    },
+    "gamepad.vibrate": {
+      "group": "Геймпад",
+      "sentence": "Вибрация геймпада: слабый мотор _PARAM0_, сильный _PARAM1_, _PARAM2_ сек",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "number",
+          "label": "Слабый мотор, 0…1"
+        },
+        {
+          "kind": "number",
+          "label": "Сильный мотор, 0…1"
+        },
+        {
+          "kind": "number",
+          "label": "Секунды"
+        }
+      ],
+      "code": "Gde.vibrate({0}, {1}, {2})",
+      "description": "Встряхнуть геймпад при ударе или взрыве. Слабый мотор — мелкая дрожь, сильный — тяжёлый удар. Без геймпада на телефоне вибрирует телефон."
+    },
+    "gamepad.stop_vibration": {
+      "group": "Геймпад",
+      "sentence": "Остановить вибрацию геймпада",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.stop_vibration()",
+      "description": "Сразу прекращает вибрацию."
     }
   },
   "expressions": {
@@ -2642,6 +2756,38 @@
       ],
       "description": "Сколько экземпляров объекта живо в сцене — всех, а не отобранных.",
       "template": "Gde.instance_count({0})"
+    },
+    "StickX": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.stick(JOY_AXIS_LEFT_X)",
+      "description": "Левый стик по горизонтали: от -1 (влево) до 1 (вправо)."
+    },
+    "StickY": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.stick(JOY_AXIS_LEFT_Y)",
+      "description": "Левый стик по вертикали: от -1 (вверх) до 1 (вниз)."
+    },
+    "RightStickX": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.stick(JOY_AXIS_RIGHT_X)",
+      "description": "Правый стик по горизонтали: для прицела."
+    },
+    "RightStickY": {
+      "type": "number",
+      "params": [],
+      "template": "Gde.stick(JOY_AXIS_RIGHT_Y)",
+      "description": "Правый стик по вертикали."
+    },
+    "KeyHeldTime": {
+      "type": "number",
+      "params": [
+        "raw"
+      ],
+      "template": "Gde.key_held_time({0})",
+      "description": "Сколько секунд клавиша удерживается: KeyHeldTime(Space). Сила броска, заряд."
     }
   },
   "object_expressions": {

@@ -600,6 +600,8 @@ func _input(event: InputEvent) -> void:
 		_mouse_moved_acc = true
 		return
 	var k := event as InputEventKey
+	if k != null and not k.echo:
+		_track_key(k)
 	if k != null and k.pressed and not k.echo:
 		# Имя, а не код: в листе клавиша пишется словом, и сравнивать
 		# «последнюю нажатую» надо с тем же самым словом.
@@ -621,6 +623,8 @@ func _process(delta: float) -> void:
 	_wheel_acc = 0.0
 	_mouse_prev = _mouse_now
 	_mouse_now = {}
+	_pad_prev = _pad_now
+	_pad_now = {}
 	for b in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
 		if Input.is_mouse_button_pressed(b):
 			_mouse_now[int(b)] = true
@@ -670,6 +674,143 @@ func key_just_released(name: String) -> bool:
 	if down:
 		_keys_now[k] = true
 	return not down and _keys_prev.has(k)
+
+
+# ------------------------------------------- удержание и двойное нажатие ---
+
+## Клавиша -> когда её нажали (часы Gde). Ведётся по событиям ввода, а не
+## по опросу: удержание считается с настоящего нажатия, даже если условие
+## проверили не сразу.
+var _key_since: Dictionary = {}
+## Клавиша -> {"last": время нажатия, "prev": время прошлого, "frame": кадр}
+var _key_taps: Dictionary = {}
+## Клавиша -> {"held": сколько держали, "frame": кадр отпускания}
+var _key_released: Dictionary = {}
+
+
+func _track_key(k: InputEventKey) -> void:
+	var code := int(k.keycode if k.keycode != KEY_NONE else k.physical_keycode)
+	if k.pressed:
+		if _key_since.has(code):
+			return
+		_key_since[code] = _clock
+		var t: Dictionary = _key_taps.get(code, {"last": -1000.0, "prev": -1000.0, "frame": -1, "used": false})
+		# Третье нажатие подряд не делает второго «двойного».
+		t["prev"] = -1000.0 if bool(t.get("used", false)) else float(t["last"])
+		t["last"] = _clock
+		t["frame"] = Engine.get_process_frames()
+		t["used"] = false
+		_key_taps[code] = t
+	else:
+		var since: float = _key_since.get(code, _clock)
+		_key_since.erase(code)
+		_key_released[code] = {"held": _clock - since, "frame": Engine.get_process_frames()}
+
+
+## Сколько секунд клавиша удерживается сейчас; 0 — отпущена.
+func key_held_time(name: String) -> float:
+	var k := _keycode(name)
+	if k == KEY_NONE or not _key_since.has(k):
+		return 0.0
+	if not Input.is_key_pressed(k):
+		_key_since.erase(k)
+		return 0.0
+	return _clock - float(_key_since[k])
+
+
+func key_held(name: String, seconds: float) -> bool:
+	return key_held_time(name) >= seconds
+
+
+## Отпустили в этом кадре, продержав не меньше seconds: заряженный выстрел.
+func key_released_after(name: String, seconds: float) -> bool:
+	var k := _keycode(name)
+	var r: Dictionary = _key_released.get(k, {})
+	return not r.is_empty() and int(r["frame"]) == Engine.get_process_frames() and float(r["held"]) >= seconds
+
+
+## Второе нажатие не позже window секунд после первого — в этом кадре.
+func key_double_tap(name: String, window: float) -> bool:
+	var k := _keycode(name)
+	var t: Dictionary = _key_taps.get(k, {})
+	if t.is_empty() or int(t["frame"]) != Engine.get_process_frames():
+		return false
+	var ok := float(t["last"]) - float(t["prev"]) <= window
+	if ok:
+		t["used"] = true
+	return ok
+
+
+# --------------------------------------------------------------- геймпад ---
+
+const PAD_BUTTONS := {
+	"A": JOY_BUTTON_A, "B": JOY_BUTTON_B, "X": JOY_BUTTON_X, "Y": JOY_BUTTON_Y,
+	"Back": JOY_BUTTON_BACK, "Select": JOY_BUTTON_BACK, "Guide": JOY_BUTTON_GUIDE, "Start": JOY_BUTTON_START,
+	"L3": JOY_BUTTON_LEFT_STICK, "R3": JOY_BUTTON_RIGHT_STICK,
+	"LB": JOY_BUTTON_LEFT_SHOULDER, "RB": JOY_BUTTON_RIGHT_SHOULDER,
+	"Up": JOY_BUTTON_DPAD_UP, "Down": JOY_BUTTON_DPAD_DOWN,
+	"Left": JOY_BUTTON_DPAD_LEFT, "Right": JOY_BUTTON_DPAD_RIGHT,
+}
+## Мёртвая зона стиков: старый геймпад в покое показывает не ноль.
+const STICK_DEADZONE := 0.2
+
+var _pad_now: Dictionary = {}
+var _pad_prev: Dictionary = {}
+
+
+## Первый подключённый геймпад.
+func _pad() -> int:
+	var pads := Input.get_connected_joypads()
+	return pads[0] if not pads.is_empty() else 0
+
+
+func _pad_down(name: String) -> bool:
+	var n := name.strip_edges()
+	if n == "LT" or n == "RT":
+		return Input.get_joy_axis(_pad(), JOY_AXIS_TRIGGER_LEFT if n == "LT" else JOY_AXIS_TRIGGER_RIGHT) > 0.5
+	if not PAD_BUTTONS.has(n):
+		_warn_once(self, "pad:" + n, GdeI18n.t("GDevents: неизвестная кнопка геймпада «%s». Есть: %s")
+				% [n, ", ".join(PackedStringArray(PAD_BUTTONS.keys() + ["LT", "RT"]))])
+		return false
+	return Input.is_joy_button_pressed(_pad(), PAD_BUTTONS[n])
+
+
+func pad_pressed(name: String) -> bool:
+	var down := _pad_down(name)
+	if down:
+		_pad_now[name] = true
+	return down
+
+
+func pad_just_pressed(name: String) -> bool:
+	var down := pad_pressed(name)
+	return down and not _pad_prev.has(name)
+
+
+func pad_connected() -> bool:
+	return not Input.get_connected_joypads().is_empty()
+
+
+func stick(axis: int) -> float:
+	var v := Input.get_joy_axis(_pad(), axis as JoyAxis)
+	if absf(v) < STICK_DEADZONE:
+		return 0.0
+	# После мёртвой зоны — снова от 0 до 1, без скачка.
+	return signf(v) * (absf(v) - STICK_DEADZONE) / (1.0 - STICK_DEADZONE)
+
+
+## Вибрация: слабый и сильный моторы от 0 до 1. Без геймпада на телефоне —
+## вибрация телефона.
+func vibrate(weak: float, strong: float, seconds: float) -> void:
+	if pad_connected():
+		Input.start_joy_vibration(_pad(), clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), maxf(0.0, seconds))
+	elif OS.has_feature("mobile"):
+		Input.vibrate_handheld(int(maxf(0.0, seconds) * 1000.0))
+
+
+func stop_vibration() -> void:
+	if pad_connected():
+		Input.stop_joy_vibration(_pad())
 
 
 ## Нажата хоть какая-нибудь клавиша — удобно для заставок и меню.

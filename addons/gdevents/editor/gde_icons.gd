@@ -31,6 +31,9 @@ const GROUP_ICONS := {
 	"Урон": "damage",  # i18n: ключ
 	"Подбор": "pickup",  # i18n: ключ
 	"Сетка": "layer",  # i18n: ключ
+	"Геймпад": "gamepad",  # i18n: ключ
+	"Эффекты": "effects",  # i18n: ключ
+	"Списки": "list",  # i18n: ключ
 }
 
 static var _cache: Dictionary = {}
