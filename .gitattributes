@@ -5,6 +5,7 @@
 # проект для разработки и файлы для нейросетей тому, кто ставит плагин,
 # не нужны.
 /.claude export-ignore
+/.github export-ignore
 /.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore

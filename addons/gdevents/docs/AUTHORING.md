@@ -468,6 +468,7 @@ it is overwritten on every build.
 
 | Key | Meaning |
 | --- | --- |
+| `format` | the sheet format number, `1` now. Write the current number; the editor upgrades older sheets itself and refuses sheets from a newer plugin |
 | `objects` | every object type the sheet uses: a name and its scene. Instances already in the scene are found automatically |
 | `groups` | named sets of objects, usable wherever an object name is |
 | `variables` | scene variables with their starting values (numbers or text) |
@@ -667,8 +668,10 @@ This part is only for changes inside `addons/gdevents/`.
 - Built-in instructions live in `registry/builtin.json` (Russian text,
   translated through `en.json`); built-in behaviors and extensions carry
   both languages in their files.
-- Run the whole suite before committing; the list with explanations is in
-  the "Tests" section of `addons/gdevents/README.md`. The most important:
+- Run the whole suite before committing with
+  `bash addons/gdevents/tools/run_tests.sh` (exit code 0 — all passed); the
+  list with explanations is in the "Tests" section of
+  `addons/gdevents/README.md`. Single tests, when you iterate on one area:
 
 ```bash
 godot --headless --script res://addons/gdevents/tools/i18n_test.gd

@@ -51,6 +51,12 @@ readable GDScript with no interpreter at runtime.
   writing behaviors, extensions and sheets, for people and for AI models.
 - [AGENTS.md](AGENTS.md) — instructions for AI assistants working in this
   repository.
+- [Changelog](addons/gdevents/CHANGELOG.md) — what changed in each version.
+
+## License
+
+[MIT](LICENSE): use it in any game, free or commercial. Icons: Tabler Icons,
+MIT.
 
 ## Checking your own files
 

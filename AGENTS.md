@@ -72,6 +72,10 @@ Conventions:
   *why*. Match the surrounding code.
 - Interface strings are Russian source text wrapped in `GdeI18n.t("…")`, with
   the English text added to `i18n/en.json` under the same key.
-- Run the full test suite before committing (commands and what each test
-  covers are in the "Tests" section of `addons/gdevents/README.md`). A change
-  is not finished while any test fails.
+- Run the full test suite before committing:
+  `bash addons/gdevents/tools/run_tests.sh` (what each test covers is in the
+  "Tests" section of `addons/gdevents/README.md`). A change is not finished
+  while any test fails; GitHub runs the same script on every pull request.
+- A change to the sheet format bumps `GdeSheetFormat.CURRENT` and adds an
+  upgrade step to `codegen/gde_sheet_format.gd`, so existing games keep
+  working. Record user-visible changes in `addons/gdevents/CHANGELOG.md`.

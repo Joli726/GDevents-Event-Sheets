@@ -5,7 +5,7 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.2.0**: the event sheet editor, 34 ready-made behaviors, 244
+**Version 0.3.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
 instructions, your own behaviors and extensions, scene and file checks, an
 English and Russian interface.
 
@@ -234,7 +234,21 @@ node, so the scene root keeps its own script.
 Sheets stay plain JSON — they can still be edited as text or by an AI; the
 editor keeps them intact on a round trip.
 
+Sheets are also rebuilt **before a game is exported**, so an exported game
+never carries old event code. Each sheet stores its format number
+(`"format"`): a sheet made with an older plugin is upgraded automatically,
+and a sheet from a newer plugin is not opened, so it is never damaged.
+
 ## Tests
+
+Everything with one command (the same script GitHub runs on every pull
+request):
+
+```bash
+bash addons/gdevents/tools/run_tests.sh
+```
+
+Or one by one:
 
 ```bash
 godot --headless --script res://addons/gdevents/tools/editor_test.gd
@@ -304,6 +318,9 @@ respawns, the dialogue types and takes answers, and so on (one scenario:
 The eleventh runs the newer events on generated sheets with frames ticked
 by hand: "has just collided" fires once, "wait" keeps the picking, object
 timers are independent, lists, effects, key hold and double tap.
+The twelfth, `tools/export_test.sh`, exports a game to a `.pck` (no export
+templates needed), runs it without the editor and checks that the sheet was
+rebuilt before the export and that the translations went into the game.
 
 There are also `tools/editor_shot.gd` and `tools/dialog_shot.tscn`: they put
 screenshots of the panel and the dialogs into `user://` — a quick way to see
