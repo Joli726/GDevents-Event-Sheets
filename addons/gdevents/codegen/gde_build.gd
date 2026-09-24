@@ -14,6 +14,12 @@ static func build_all(root: String = "res://") -> Dictionary:
 		lines.append("  реестр: %s" % e)
 	if not reg.behaviors.is_empty():
 		lines.append("Поведения: %s" % ", ".join(reg.behaviors.keys()))
+	# Своя копия или своё поведение с ошибкой — листы соберутся, а объекты
+	# в игре молча перестанут двигаться. Сказать об этом до запуска.
+	for bn: String in reg.behaviors:
+		var bp := str((reg.behaviors[bn] as Dictionary)["path"])
+		if bp.begins_with(GdeBehaviorLibrary.USER_DIR + "/") and GdeBehaviorLibrary.is_broken(bp):
+			lines.append("  ! поведение «%s» (%s) не собирается — объекты с ним в игре не работают" % [bn, bp])
 
 	var ok := 0
 	var failed := 0

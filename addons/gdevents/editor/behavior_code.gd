@@ -3,6 +3,9 @@
 ##
 ## Только чтение: править код удобнее в редакторе скриптов Godot, где
 ## есть автодополнение, подсветка ошибок и отладчик, — туда ведёт кнопка.
+## Встроенное поведение туда не открывается: править его нельзя, для этого
+## есть своя копия (GdeBehaviorLibrary). Полоса сверху говорит, что перед
+## нами — встроенное, своя копия или своё, — и не сломан ли скрипт.
 ## «Перейти к…» перечисляет действия, условия и выражения поведения теми же
 ## фразами, что и в листе событий, и ставит курсор на их функцию.
 @tool
@@ -11,8 +14,20 @@ extends VBoxContainer
 
 ## Попросили открыть скрипт в редакторе Godot — окну объектов пора уступить.
 signal opened_in_editor
+signal copy_requested
+signal reset_requested
+signal derive_requested
 
 var script_path: String = ""
+var kind: String = ""
+var broken: bool = false
+
+var _state: PanelContainer
+var _state_style: StyleBoxFlat
+var _state_text: Label
+var _btn_copy: Button
+var _btn_reset: Button
+var _btn_derive: Button
 
 var _bar: HBoxContainer
 var _path: Label
@@ -26,6 +41,46 @@ var _jump_lines: Array[int] = []
 func _init() -> void:
 	add_theme_constant_override("separation", 6)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	_state = PanelContainer.new()
+	_state_style = StyleBoxFlat.new()
+	_state_style.set_content_margin_all(8)
+	_state_style.set_corner_radius_all(4)
+	_state_style.border_width_left = 3
+	_state.add_theme_stylebox_override("panel", _state_style)
+	add_child(_state)
+	var state_box := VBoxContainer.new()
+	state_box.add_theme_constant_override("separation", 6)
+	_state.add_child(state_box)
+	_state_text = Label.new()
+	_state_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_state_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_state_text.add_theme_font_size_override("font_size", 12)
+	# Без минимальной ширины автоперенос при первой раскладке считает текст
+	# в колонку по слову и раздувает высоту окна за край экрана.
+	_state_text.custom_minimum_size = Vector2(360, 0)
+	state_box.add_child(_state_text)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	state_box.add_child(actions)
+	_btn_copy = Button.new()
+	_btn_copy.text = "Изменить поведение…"
+	_btn_copy.icon = GdeIcons.get_icon("edit")
+	_btn_copy.tooltip_text = "Сделать свою копию: она заменит встроенное поведение у всех объектов, а встроенное останется нетронутым"
+	_btn_copy.pressed.connect(func() -> void: copy_requested.emit())
+	actions.add_child(_btn_copy)
+	_btn_reset = Button.new()
+	_btn_reset.text = "Вернуть встроенную…"
+	_btn_reset.icon = GdeIcons.get_icon("undo")
+	_btn_reset.tooltip_text = "Все объекты снова работают на встроенной версии; копия уйдёт в историю версий"
+	_btn_reset.pressed.connect(func() -> void: reset_requested.emit())
+	actions.add_child(_btn_reset)
+	_btn_derive = Button.new()
+	_btn_derive.text = "Новое на основе…"
+	_btn_derive.icon = GdeIcons.get_icon("copy")
+	_btn_derive.tooltip_text = "Отдельное поведение с новым именем — например, «Выстрел врага» рядом с «Выстрелом игрока»"
+	_btn_derive.pressed.connect(func() -> void: derive_requested.emit())
+	actions.add_child(_btn_derive)
 
 	_bar = HBoxContainer.new()
 	_bar.add_theme_constant_override("separation", 6)
@@ -76,6 +131,36 @@ func show_script(path: String, entry: Dictionary = {}) -> void:
 	_code.scroll_vertical = 0
 	_open.disabled = not Engine.is_editor_hint() or src.is_empty()
 	_fill_jump(src, entry)
+	_update_state(entry, path, src.is_empty())
+
+
+func _update_state(entry: Dictionary, path: String, missing: bool) -> void:
+	kind = GdeBehaviorLibrary.kind_of(entry) if not entry.is_empty() else "own"
+	broken = not missing and GdeBehaviorLibrary.is_broken(path)
+	var c := Color(0.55, 0.65, 0.8)
+	match kind:
+		"builtin":
+			_state_text.text = "Встроенное поведение. Его код не правится — чтобы что-то изменить или " + \
+					"добавить, сделайте свою копию. Встроенное останется нетронутым, к нему всегда можно вернуться."
+		"copy":
+			c = Color(0.45, 0.75, 0.55)
+			_state_text.text = "Своя копия встроенного поведения — у всех объектов проекта работает она. " + \
+					"Файл: %s" % path
+		_:
+			c = Color(0.45, 0.75, 0.55)
+			_state_text.text = "Своё поведение. Файл: %s" % path
+	if broken:
+		c = Color(0.93, 0.36, 0.36)
+		_state_text.text = "Скрипт не собирается — объекты с этим поведением в игре не работают. " + \
+				"Откройте его в редакторе скриптов: там видна строка с ошибкой." + \
+				(" Или верните встроенную версию." if kind == "copy" else "")
+	_state_style.bg_color = Color(c.r, c.g, c.b, 0.08)
+	_state_style.border_color = Color(c.r, c.g, c.b, 0.8)
+	_btn_copy.visible = kind == "builtin"
+	_btn_reset.visible = kind == "copy"
+	_btn_derive.visible = not missing
+	# Встроенное в редакторе скриптов открылось бы на правку — а его не правят.
+	_open.visible = kind != "builtin"
 
 
 func source() -> String:

@@ -9,6 +9,9 @@ class_name GdeObjectsDialog
 extends AcceptDialog
 
 signal objects_changed
+## Появилась или пропала своя копия поведения, создано новое — реестр
+## перечитан, и листу событий нужен именно он.
+signal library_changed(reg: GdeRegistry)
 
 var _doc: GdeSheetDocument
 var _reg: GdeRegistry
@@ -36,6 +39,14 @@ var _selected_behavior: String = ""
 var _beh_nodes: Dictionary = {}
 ## имя поведения -> скрипт, который реально стоит на объекте
 var _beh_scripts: Dictionary = {}
+
+var _confirm_lib: ConfirmationDialog
+var _lib_action: Callable
+var _derive: ConfirmationDialog
+var _derive_from: String = ""
+var _derive_name: LineEdit
+var _derive_title: LineEdit
+var _derive_error: Label
 
 var _beh_picker: GdeBehaviorPicker
 var _confirm_delete: ConfirmationDialog
@@ -152,6 +163,9 @@ func _init() -> void:
 			_set_note(text)
 			_update_file(_current_scene()))
 	_beh_panel.left_for_editor.connect(hide)
+	_beh_panel.copy_requested.connect(_ask_make_copy)
+	_beh_panel.reset_requested.connect(_ask_reset)
+	_beh_panel.derive_requested.connect(_ask_derive)
 	beh_right.add_child(_beh_panel)
 
 	var checks_tab := VBoxContainer.new()
@@ -242,6 +256,14 @@ func _init() -> void:
 	_confirm_delete.cancel_button_text = "Отмена"
 	_confirm_delete.confirmed.connect(_do_remove_object)
 	add_child(_confirm_delete)
+
+	_confirm_lib = ConfirmationDialog.new()
+	_confirm_lib.cancel_button_text = "Отмена"
+	_confirm_lib.confirmed.connect(func() -> void:
+		if _lib_action.is_valid():
+			_lib_action.call())
+	add_child(_confirm_lib)
+	_build_derive_dialog()
 
 	# Окно закрыли, пока правка настройки ждала записи, — записать сейчас.
 	visibility_changed.connect(func() -> void:
@@ -401,6 +423,28 @@ func _refresh_behaviors() -> void:
 			pick.tooltip_text = "Скрипт поведения не найден в проекте"
 		pick.pressed.connect(_select_behavior.bind(bname))
 		row.add_child(pick)
+
+		# Своё и сломанное видно прямо в списке, не открывая код.
+		var kind := GdeBehaviorLibrary.kind_of(b) if b != null else ""
+		var badge := ""
+		if GdeBehaviorLibrary.is_broken(str(e.get("script", ""))):
+			badge = "ошибка"
+		elif kind == "copy":
+			badge = "копия"
+		elif kind == "own":
+			badge = "своё"
+		if not badge.is_empty():
+			var tag := Label.new()
+			tag.text = badge
+			tag.add_theme_font_size_override("font_size", 10)
+			tag.modulate = Color(0.95, 0.5, 0.5) if badge == "ошибка" else Color(0.55, 0.85, 0.6)
+			tag.tooltip_text = {
+				"ошибка": "Скрипт поведения не собирается — в игре оно не работает",
+				"копия": "Своя копия встроенного поведения",
+				"своё": "Своё поведение из res://behaviors",
+			}[badge]
+			tag.mouse_filter = Control.MOUSE_FILTER_PASS
+			row.add_child(tag)
 
 		var del := Button.new()
 		del.icon = GdeIcons.get_icon("trash")
@@ -674,6 +718,132 @@ func _open_scene() -> void:
 	var ei: Object = Engine.get_singleton("EditorInterface")
 	ei.call("open_scene_from_path", scene)
 	hide()
+
+
+# ---------------------------------------------------------- свои поведения ---
+
+func _ask_make_copy(bname: String) -> void:
+	var entry: Dictionary = _reg.behaviors.get(bname, {})
+	if entry.is_empty():
+		return
+	var dst := GdeBehaviorLibrary.copy_path_for(str(entry["path"]))
+	var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
+	_confirm_lib.title = "Своя копия поведения"
+	_confirm_lib.ok_button_text = "Сделать копию"
+	_confirm_lib.dialog_text = ("Сделать свою копию поведения «%s»?\n\n" +
+			"Копия ляжет в %s и заменит встроенное поведение у всех объектов проекта " +
+			"(сцен с ним: %d). Настройки объектов сохранятся.\n\n" +
+			"Встроенная версия останется нетронутой — вернуть её можно в любой момент " +
+			"кнопкой «Вернуть встроенную».") % [str(entry.get("title", bname)), dst, n]
+	_lib_action = _make_copy.bind(bname)
+	GdeUi.popup_fit(_confirm_lib, Vector2i(560, 300))
+
+
+func _make_copy(bname: String) -> void:
+	await _beh_panel.settings.flush()
+	var res: Dictionary = await GdeBehaviorLibrary.make_copy(bname, _reg)
+	_reload_library()
+	var err := str(res.get("error", ""))
+	if not err.is_empty():
+		_set_error(err)
+		return
+	_set_note("Своя копия создана: %s. Сцен переключено: %d." % [res["path"], (res["scenes"] as Array).size()])
+	# Копию делают, чтобы править, — сразу туда.
+	if _in_editor():
+		_beh_panel.code.open_in_script_editor()
+
+
+func _ask_reset(bname: String) -> void:
+	var entry: Dictionary = _reg.behaviors.get(bname, {})
+	if entry.is_empty():
+		return
+	var n := GdeBehaviorLibrary.scenes_using(str(entry["path"])).size()
+	_confirm_lib.title = "Вернуть встроенное поведение"
+	_confirm_lib.ok_button_text = "Вернуть встроенную"
+	_confirm_lib.dialog_text = ("Вернуть встроенное поведение «%s»?\n\n" +
+			"Все объекты (сцен: %d) снова будут работать на встроенной версии, настройки сохранятся.\n\n" +
+			"Ваша копия не пропадёт — она уйдёт в историю версий.") % [str(entry.get("title", bname)), n]
+	_lib_action = _reset_copy.bind(bname)
+	GdeUi.popup_fit(_confirm_lib, Vector2i(560, 280))
+
+
+func _reset_copy(bname: String) -> void:
+	await _beh_panel.settings.flush()
+	var res: Dictionary = await GdeBehaviorLibrary.reset_to_builtin(bname, _reg)
+	_reload_library()
+	var err := str(res.get("error", ""))
+	if not err.is_empty():
+		_set_error(err)
+		return
+	_set_note("Встроенное поведение вернулось. Сцен переключено: %d. Копия — в истории версий." \
+			% (res["scenes"] as Array).size())
+
+
+func _build_derive_dialog() -> void:
+	_derive = ConfirmationDialog.new()
+	_derive.title = "Новое поведение"
+	_derive.ok_button_text = "Создать"
+	_derive.cancel_button_text = "Отмена"
+	# Закрывать окно по «Создать» будем сами — только если имя подошло.
+	_derive.dialog_hide_on_ok = false
+	_derive.confirmed.connect(_do_derive)
+	add_child(_derive)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_derive.add_child(box)
+	box.add_child(_note("Имя — для кода и листа событий, латиницей: EnemyShoot."))
+	_derive_name = LineEdit.new()
+	_derive_name.placeholder_text = "EnemyShoot"
+	_derive_name.text_changed.connect(func(_t: String) -> void: _derive_error.text = "")
+	box.add_child(_derive_name)
+	box.add_child(_note("Название — как его увидит человек: «Выстрел врага»."))
+	_derive_title = LineEdit.new()
+	_derive_title.placeholder_text = "Выстрел врага"
+	_derive_title.text_submitted.connect(func(_t: String) -> void: _do_derive())
+	box.add_child(_derive_title)
+	_derive_error = Label.new()
+	_derive_error.add_theme_color_override("font_color", Color(0.92, 0.45, 0.45))
+	_derive_error.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_derive_error.custom_minimum_size = Vector2(420, 0)
+	box.add_child(_derive_error)
+
+
+func _ask_derive(bname: String) -> void:
+	_derive_from = bname
+	var entry: Dictionary = _reg.behaviors.get(bname, {})
+	_derive.title = "Новое поведение на основе «%s»" % str(entry.get("title", bname))
+	_derive_name.text = ""
+	_derive_title.text = ""
+	_derive_error.text = ""
+	GdeUi.popup_fit(_derive, Vector2i(480, 260))
+	_derive_name.grab_focus()
+
+
+func _do_derive() -> void:
+	var nm := _derive_name.text.strip_edges()
+	var why := GdeBehaviorLibrary.name_problem(nm, _reg)
+	if not why.is_empty():
+		_derive_error.text = why
+		return
+	var res: Dictionary = await GdeBehaviorLibrary.create_from(_derive_from, nm, _derive_title.text.strip_edges(), _reg)
+	var err := str(res.get("error", ""))
+	if not err.is_empty():
+		_derive_error.text = err
+		return
+	_derive.hide()
+	_reload_library()
+	_set_note("Поведение «%s» создано: %s. Добавьте его объектам кнопкой «Добавить поведение»." \
+			% [nm, res["path"]])
+
+
+## Реестр заново: своя копия подменила встроенное или появилось новое.
+func _reload_library() -> void:
+	_reg = GdeRegistry.load_default()
+	GdeBehaviorInstaller.invalidate()
+	GdeSceneCheck.invalidate()
+	_refresh_behaviors()
+	_rescan_filesystem()
+	library_changed.emit(_reg)
 
 
 ## Сообщить редактору, что файл сцены переписан, — без полного пересканирования.

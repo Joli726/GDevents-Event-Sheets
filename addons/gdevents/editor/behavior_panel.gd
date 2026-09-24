@@ -8,6 +8,11 @@ extends VBoxContainer
 signal message(text: String, is_error: bool)
 ## Пользователь ушёл в редактор скриптов — окну объектов пора закрыться.
 signal left_for_editor
+## Кнопки своей копии — их выполняет окно объектов: там подтверждение
+## и обновление всего списка.
+signal copy_requested(bname: String)
+signal reset_requested(bname: String)
+signal derive_requested(bname: String)
 
 var settings: GdeBehaviorSettings
 var code: GdeBehaviorCode
@@ -64,6 +69,7 @@ func _init() -> void:
 	_about = Label.new()
 	_about.modulate = Color(1, 1, 1, 0.6)
 	_about.add_theme_font_size_override("font_size", 12)
+	_about.custom_minimum_size = Vector2(360, 0)
 	_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_about.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_about)
@@ -84,6 +90,9 @@ func _init() -> void:
 	code = GdeBehaviorCode.new()
 	code.name = "Код"
 	code.opened_in_editor.connect(func() -> void: left_for_editor.emit())
+	code.copy_requested.connect(func() -> void: copy_requested.emit(behavior))
+	code.reset_requested.connect(func() -> void: reset_requested.emit(behavior))
+	code.derive_requested.connect(func() -> void: derive_requested.emit(behavior))
 	_tabs.add_child(code)
 
 	show_empty("")

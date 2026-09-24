@@ -266,9 +266,15 @@ func _scan_behavior_file(path: String) -> void:
 		entry["title"] = bname
 	_retitle(entry, str(entry["title"]))
 
+	# Своя копия встроенного поведения в res://behaviors — не дубль, а замена:
+	# работает она, а встроенная остаётся «дефолтом», к которому можно вернуться.
+	entry["builtin_path"] = path if path.begins_with(BEHAVIOR_DIRS[0] + "/") else ""
 	if behaviors.has(bname):
-		errors.append("поведение «%s» объявлено дважды: %s и %s"
-				% [bname, (behaviors[bname] as Dictionary)["path"], path])
+		var prev := str((behaviors[bname] as Dictionary)["path"])
+		if prev.begins_with(BEHAVIOR_DIRS[0] + "/") and path.begins_with(BEHAVIOR_DIRS[1] + "/"):
+			entry["builtin_path"] = prev
+		else:
+			errors.append("поведение «%s» объявлено дважды: %s и %s" % [bname, prev, path])
 	behaviors[bname] = entry
 
 

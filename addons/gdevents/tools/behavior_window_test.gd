@@ -1,5 +1,5 @@
 ## Безголовый тест окна поведения — настроек и всего, что рядом:
-##   godot --headless --quit-after 900 res://addons/gdevents/tools/behavior_window_test.tscn
+##   godot --headless --quit-after 1500 res://addons/gdevents/tools/behavior_window_test.tscn
 ##
 ## Окно пишет в сцену объекта, и ошибиться тут легко незаметно: форма
 ## показывает одно, а в файле другое. Поэтому каждая проверка правки
@@ -10,6 +10,10 @@
 extends Node
 
 const SCENE := "user://gde_behavior_window_test.tscn"
+## Своя копия переключает сцены проекта — значит, нужна сцена в res://.
+## Папка временная, тест убирает её за собой.
+const LIB_DIR := "res://__gdevents_library_test"
+const LIB_SCENE := LIB_DIR + "/hero.tscn"
 const BULLET := "res://addons/gdevents/tests/bullet.tscn"
 
 var _fails: int = 0
@@ -32,6 +36,8 @@ func _ready() -> void:
 	_test_code()
 	print("—— окно объектов ——")
 	await _test_dialog()
+	print("—— своя копия и возврат к встроенной ——")
+	await _test_library()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCENE))
 	print("—— проверок: %d, провалено: %d" % [_checks, _fails])
 	get_tree().quit(1 if _fails > 0 else 0)
@@ -209,6 +215,141 @@ func _test_dialog() -> void:
 	_eq(dlg._beh_panel.settings.behavior, "Follow", "щелчок по поведению переключает настройки")
 	dlg.hide()
 	dlg.queue_free()
+
+
+func _test_library() -> void:
+	var copy := GdeBehaviorLibrary.copy_path_for(str(_reg.behaviors["Rotate"]["path"]))
+	var derived := "res://behaviors/wobble/wobble.gd"
+	if FileAccess.file_exists(copy) or FileAccess.file_exists(derived):
+		print("  — пропущено: в проекте уже есть своя копия «Вращения» или поведение Wobble")
+		return
+	var had_user_dir := DirAccess.dir_exists_absolute("res://behaviors")
+
+	# Объект с «Вращением» и изменённой настройкой — она должна пережить всё.
+	var root := Node2D.new()
+	root.name = "Крутилка"
+	var ps := PackedScene.new()
+	ps.pack(root)
+	root.free()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(LIB_DIR))
+	ResourceSaver.save(ps, LIB_SCENE)
+	GdeBehaviorInstaller.invalidate()
+	var builtin := str(_reg.behaviors["Rotate"]["path"])
+	await GdeBehaviorInstaller.add(LIB_SCENE, "Rotate", builtin, {})
+	await GdeBehaviorInstaller.set_property(LIB_SCENE, "Rotate", "degrees_per_second", 123.0)
+	_eq(GdeBehaviorLibrary.kind_of(_reg.behaviors["Rotate"]), "builtin", "«Вращение» пока встроенное")
+
+	var res: Dictionary = await GdeBehaviorLibrary.make_copy("Rotate", _reg)
+	_eq(str(res.get("error", "")), "", "копия сделана без ошибок")
+	_ok(FileAccess.file_exists(copy), "копия лежит в %s" % copy)
+	_eq(FileAccess.get_file_as_string(copy), FileAccess.get_file_as_string(builtin),
+			"в копии тот же код, что во встроенном")
+	_ok(FileAccess.file_exists(GdeBehaviorLibrary.meta_dir_for(copy).path_join("base.gd.txt")),
+			"рядом запомнена встроенная версия на момент копирования")
+	var reg := GdeRegistry.load_default()
+	_eq(str(reg.behaviors["Rotate"]["path"]), copy, "реестр берёт копию вместо встроенного")
+	_eq(str(reg.behaviors["Rotate"]["builtin_path"]), builtin, "и помнит, где встроенное")
+	_eq(reg.errors.size(), 0, "копия не считается дублем: %s" % [reg.errors])
+	_eq(GdeBehaviorLibrary.kind_of(reg.behaviors["Rotate"]), "copy", "поведение — своя копия")
+	_ok(FileAccess.get_file_as_string(LIB_SCENE).contains("path=\"%s\"" % copy), "сцена объекта переключена на копию")
+	_ok(not FileAccess.get_file_as_string(LIB_SCENE).contains("path=\"%s\"" % builtin), "и больше не ссылается на встроенное")
+	_ok(GdeBehaviorSettings.same_value(_prop(GdeBehaviorInstaller.describe(LIB_SCENE, "Rotate"), "degrees_per_second").get("value"), 123.0),
+			"настройка объекта пережила переключение")
+	var inst := (ResourceLoader.load(LIB_SCENE, "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene).instantiate()
+	add_child(inst)
+	_ok(Gde.behavior(inst, "Rotate", true) != null, "в игре поведение находится по тому же имени")
+	inst.queue_free()
+
+	var src := FileAccess.get_file_as_string(copy)
+	_ok(not GdeBehaviorLibrary.is_broken(copy), "рабочая копия не помечена сломанной")
+	GdeBehaviorLibrary._write(copy, src + "\nfunc сломано(:\n")
+	_ok(GdeBehaviorLibrary.is_broken(copy), "копия с ошибкой помечена сломанной")
+	GdeBehaviorLibrary._write(copy, src)
+	ResourceLoader.load(copy, "Script", ResourceLoader.CACHE_MODE_REPLACE)
+
+	res = await GdeBehaviorLibrary.reset_to_builtin("Rotate", reg)
+	_eq(str(res.get("error", "")), "", "возврат к встроенному без ошибок")
+	_ok(not FileAccess.file_exists(copy), "файл копии убран")
+	_ok(FileAccess.get_file_as_string(LIB_SCENE).contains("path=\"%s\"" % builtin), "сцена снова на встроенном")
+	_ok(GdeBehaviorSettings.same_value(_prop(GdeBehaviorInstaller.describe(LIB_SCENE, "Rotate"), "degrees_per_second").get("value"), 123.0),
+			"и настройка на месте")
+	var versions := GdeBehaviorLibrary.list_versions(copy)
+	_eq(versions.size(), 1, "копия ушла в историю версий, а не пропала")
+	if not versions.is_empty():
+		_eq(FileAccess.get_file_as_string(str(versions[0]["path"])), src, "в истории — её код целиком")
+	reg = GdeRegistry.load_default()
+	_eq(GdeBehaviorLibrary.kind_of(reg.behaviors["Rotate"]), "builtin", "реестр снова видит встроенное")
+
+	# Новое поведение на основе — отдельное, со своим именем.
+	_ok(not GdeBehaviorLibrary.name_problem("wobble", reg).is_empty(), "имя с маленькой буквы не принимается")
+	_ok(not GdeBehaviorLibrary.name_problem("Rotate", reg).is_empty(), "занятое имя не принимается")
+	_ok(not GdeBehaviorLibrary.name_problem("Enemy Shoot", reg).is_empty(), "имя с пробелом — тоже")
+	res = await GdeBehaviorLibrary.create_from("Rotate", "Wobble", "Качалка", reg)
+	_eq(str(res.get("error", "")), "", "новое поведение создано")
+	reg = GdeRegistry.load_default()
+	_ok(reg.behaviors.has("Wobble") and reg.behaviors.has("Rotate"), "появилось рядом со старым, а не вместо")
+	_eq(str((reg.behaviors.get("Wobble", {}) as Dictionary).get("title", "")), "Качалка", "с новым названием")
+	_eq(GdeBehaviorLibrary.kind_of(reg.behaviors.get("Wobble", {})), "own", "и считается своим")
+	var node := Node.new()
+	node.set_script(load(derived))
+	_eq((node as GdeBehavior).behavior_name() if node is GdeBehavior else "", "Wobble",
+			"рантайм выводит то же имя из имени файла")
+	node.free()
+
+	# То же самое кнопками окна объектов.
+	var doc := GdeSheetDocument.create_empty("тест копий")
+	doc.add_object("Spinner", LIB_SCENE)
+	var dlg := GdeObjectsDialog.new()
+	add_child(dlg)
+	var got: Array = []
+	dlg.library_changed.connect(func(r: GdeRegistry) -> void: got.append(r))
+	dlg.open_for(doc, reg)
+	await get_tree().process_frame
+	var code := dlg._beh_panel.code
+	_eq(code.kind, "builtin", "вкладка «Код» знает, что поведение встроенное")
+	_ok(code._btn_copy.visible and not code._btn_reset.visible and not code._open.visible,
+			"у встроенного — «Изменить поведение…», а в редактор скриптов его не открыть")
+	await dlg._make_copy("Rotate")
+	_eq(got.size(), 1, "лист событий получил новый реестр")
+	_eq(dlg._beh_panel.code.kind, "copy", "после «Изменить» — своя копия")
+	_ok(dlg._beh_panel.code._btn_reset.visible, "и появилась «Вернуть встроенную…»")
+	_ok(_labels(dlg._behaviors).has("копия"), "в списке поведений пометка «копия»")
+	await dlg._reset_copy("Rotate")
+	_eq(dlg._beh_panel.code.kind, "builtin", "«Вернуть встроенную» вернула встроенное")
+	_ok(not _labels(dlg._behaviors).has("копия"), "и пометка пропала")
+	dlg.hide()
+	dlg.queue_free()
+
+	# «Выстрел» выдаёт пуле «Прямолинейное движение» — своё, если есть копия.
+	var lm := "res://addons/gdevents/behaviors/linear_move/linear_move.gd"
+	_eq(GdeBehavior.resolve(lm).resource_path, lm, "без копии пуля получает встроенное движение")
+	await GdeBehaviorLibrary.make_copy("LinearMove", reg)
+	_eq(GdeBehavior.resolve(lm).resource_path, GdeBehaviorLibrary.copy_path_for(lm), "с копией — копию")
+
+	# Убрать за собой всё, что создал тест.
+	_rmdir(LIB_DIR)
+	for d: String in ["res://behaviors/rotate", "res://behaviors/wobble", "res://behaviors/linear_move"]:
+		_rmdir(d)
+	if not had_user_dir:
+		_rmdir("res://behaviors")
+
+
+func _rmdir(path: String) -> void:
+	var d := DirAccess.open(path)
+	if d == null:
+		return
+	d.include_hidden = true
+	d.list_dir_begin()
+	var nm := d.get_next()
+	while nm != "":
+		var full := path.path_join(nm)
+		if d.current_is_dir():
+			_rmdir(full)
+		else:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(full))
+		nm = d.get_next()
+	d.list_dir_end()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 # ---------------------------------------------------------------- помощники ---
