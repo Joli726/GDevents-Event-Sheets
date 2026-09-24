@@ -24,9 +24,12 @@ const PUSHABLE := preload("res://addons/gdevents/behaviors/pushable/pushable.gd"
 const CHECKPOINT := preload("res://addons/gdevents/behaviors/checkpoint/checkpoint.gd")
 const DESTRUCTIBLE := preload("res://addons/gdevents/behaviors/destructible/destructible.gd")
 const HEALTH := preload("res://addons/gdevents/behaviors/health/health.gd")
+const MELEE := preload("res://addons/gdevents/behaviors/melee/melee.gd")
+const ABILITY := preload("res://addons/gdevents/behaviors/ability/ability.gd")
+const STATES := preload("res://addons/gdevents/behaviors/state_machine/state_machine.gd")
 const RUNNER_SCENE := "user://gde_scenario_runner.tscn"
 
-const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible"]
+const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states"]
 
 var _fails: int = 0
 var _checks: int = 0
@@ -743,6 +746,148 @@ func _sprite_box(w: Node, at: Vector2) -> Node2D:
 	s.texture = ImageTexture.create_from_image(img)
 	n.add_child(s)
 	return n
+
+
+func _melee() -> void:
+	print("— Ближний бой")
+	var w := _world()
+	w.position = Vector2(0, 24000)
+	var fighter := _sprite_box(w, Vector2(0, 0))
+	var mb := _beh(fighter, MELEE, {"target_object": "Enemy", "damage": 1.0, "combo_bonus": 0.5,
+			"knockback": 10.0, "swing_time": 0.3, "cooldown": 0.3, "combo_window": 0.3})
+	var foe := _tagged(w, "Enemy", Vector2(24, 0))
+	foe.add_child(_rect(Vector2(16, 16)))
+	var hp := _beh(foe, HEALTH, {"max_health": 10.0, "invulnerable_time": 0.0, "blink_on_hit": false, "min_damage": 0.0})
+	await _frames(2)
+	var x0 := foe.position.x
+	mb.call("attack")
+	_ok(bool(mb.call("is_attacking")), "удар: начался")
+	await _frames(25)
+	_eq(hp.get("current"), 9.0, "удар: попал ровно один раз за замах")
+	_ok(foe.position.x > x0 + 5.0, "удар: отбросил цель")
+	# Комбо: второе нажатие во время удара — второй удар сильнее.
+	foe.position = Vector2(24, 0)
+	# Окно комбо и перезарядка после первого удара должны пройти.
+	await _frames(45)
+	mb.call("attack")
+	await _frames(5)
+	mb.call("attack")
+	var steps: Array[int] = []
+	mb.connect("attack_started", func(st: int) -> void: steps.append(st))
+	await _frames(45)
+	_ok(steps.has(2), "комбо: нажатие во время удара — второй удар")
+	_eq(hp.get("current"), 6.5, "комбо: урон 1 и 1.5")
+	await _frames(25)
+	_ok(not bool(mb.call("can_attack")) or float(mb.call("cooldown_left")) >= 0.0, "комбо: после комбо — перезарядка")
+	await _frames(30)
+	# За спиной не бьёт: спрайт отражён — зона слева.
+	(fighter.get_child(0) as Sprite2D).flip_h = true
+	var before := float(hp.get("current"))
+	mb.call("attack")
+	await _frames(25)
+	_eq(hp.get("current"), before, "удар: цель за спиной не задета")
+	(fighter.get_child(0) as Sprite2D).flip_h = false
+	# Зона — только на нужных кадрах анимации.
+	var af := _node(w, Vector2(300, 0))
+	var spr := AnimatedSprite2D.new()
+	var frames := SpriteFrames.new()
+	frames.add_animation("Slash")
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	for i in 4:
+		frames.add_frame("Slash", ImageTexture.create_from_image(img))
+	frames.set_animation_speed("Slash", 10.0)
+	frames.set_animation_loop("Slash", false)
+	spr.sprite_frames = frames
+	af.add_child(spr)
+	var mb2 := _beh(af, MELEE, {"target_object": "Enemy", "attack_animation": "Slash",
+			"hit_frame_from": 2, "hit_frame_to": 2})
+	var foe2 := _tagged(w, "Enemy", Vector2(324, 0))
+	foe2.add_child(_rect(Vector2(16, 16)))
+	var hp2 := _beh(foe2, HEALTH, {"max_health": 10.0, "invulnerable_time": 0.0, "blink_on_hit": false})
+	await _frames(2)
+	mb2.call("attack")
+	await _frames(3)
+	_ok(not bool(mb2.call("zone_active")) and float(hp2.get("current")) == 10.0, "кадры: на первом кадре анимации зона выключена")
+	var seen_on := false
+	for i in 40:
+		await get_tree().physics_frame
+		if bool(mb2.call("zone_active")):
+			seen_on = true
+	_ok(seen_on and float(hp2.get("current")) == 9.0, "кадры: на втором кадре включилась и попала")
+	_ok(not bool(mb2.call("is_attacking")), "кадры: анимация доиграла — удар кончился")
+	w.queue_free()
+	await _frames(2)
+
+
+func _ability() -> void:
+	print("— Способность")
+	var w := _world()
+	w.position = Vector2(0, 26000)
+	_static(w, Vector2(0, 200), Vector2(4000, 20))
+	var hp: Array = _hero(w, Vector2(0, 170))
+	var hero: CharacterBody2D = hp[0]
+	var dash := _beh(hero, ABILITY, {"kind": 0, "key": "", "duration": 0.2, "dash_speed": 600.0,
+			"cooldown": 0.5, "max_charges": 1, "dash_direction": 1})
+	await _frames(5)
+	var x0 := hero.position.x
+	dash.call("use")
+	await _frames(3)
+	_ok(not (hp[1] as Node).is_physics_processing(), "рывок: платформер на время рывка молчит")
+	await _frames(12)
+	_ok(hero.position.x - x0 > 90.0, "рывок: рванул вперёд (на %.0f px)" % (hero.position.x - x0))
+	_ok((hp[1] as Node).is_physics_processing(), "рывок: кончился — платформер снова ведёт")
+	_ok(not bool(dash.call("can_use")), "заряды: заряд потрачен")
+	var x1 := hero.position.x
+	dash.call("use")
+	await _frames(5)
+	_ok(absf(hero.position.x - x1) < 20.0, "заряды: без заряда рывка нет")
+	await _frames(30)
+	_ok(bool(dash.call("can_use")), "заряды: через полсекунды перезарядился")
+	# Щит и лечение — через «Здоровье».
+	var tank := _node(w, Vector2(500, 0))
+	var health := _beh(tank, HEALTH, {"max_health": 5.0, "invulnerable_time": 0.0, "blink_on_hit": false})
+	var shield := _beh(tank, ABILITY, {"kind": 1, "key": "", "duration": 0.3})
+	var heal := _beh(tank, ABILITY, {"kind": 2, "key": "", "heal_amount": 2.0})
+	await _frames(2)
+	health.call("damage", 3.0)
+	shield.call("use")
+	await _frames(2)
+	health.call("damage", 1.0)
+	_eq(health.get("current"), 2.0, "щит: пока держится, урон не проходит")
+	_ok(tank.modulate != Color.WHITE, "щит: объект подкрашен")
+	await _frames(25)
+	_ok(tank.modulate == Color.WHITE, "щит: кончился — цвет вернулся")
+	heal.call("use")
+	_eq(health.get("current"), 4.0, "лечение: +2 здоровья")
+	w.queue_free()
+	await _frames(2)
+
+
+func _states() -> void:
+	print("— Состояния")
+	var w := _world()
+	var n := _node(w, Vector2.ZERO)
+	var sm := _beh(n, STATES, {"initial_state": "patrol", "states": "patrol, chase, stunned"})
+	await get_tree().process_frame
+	_ok(bool(sm.call("is_state", "patrol")), "состояния: начальное — patrol")
+	var changes: Array = []
+	sm.connect("state_changed", func(a: String, b: String) -> void: changes.append([a, b]))
+	sm.call("set_state", "chase")
+	_ok(bool(sm.call("is_state", "chase")) and bool(sm.call("just_entered", "chase")), "состояния: перешёл в chase — «только что вошёл»")
+	_ok(bool(sm.call("just_left", "patrol")), "состояния: «только что вышел» из patrol")
+	_eq(sm.call("previous_state"), "patrol", "состояния: прежнее — patrol")
+	for i in 10:
+		await get_tree().process_frame
+	_ok(not bool(sm.call("just_entered", "chase")), "состояния: «только что вошёл» — ненадолго")
+	_ok(float(sm.call("time_in_state")) > 0.1, "состояния: время в состоянии идёт")
+	sm.call("set_state_for", "stunned", 0.2, "")
+	_eq(sm.call("state"), "stunned", "состояния: оглушён на время")
+	# Время — настоящее: кадры отрисовки без экрана идут куда чаще 60 в секунду.
+	await _frames(20)
+	_eq(sm.call("state"), "chase", "состояния: через 0.2 с — обратно в прежнее")
+	_eq(changes.size(), 3, "состояния: сигнал state_changed на каждой смене")
+	w.queue_free()
+	await _frames(2)
 
 
 # ---------------------------------------------------------------- мир ---
