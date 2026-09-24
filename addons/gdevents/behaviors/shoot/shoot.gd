@@ -14,8 +14,10 @@ signal ammo_empty
 ## Перезарядка закончена.
 signal reloaded
 
-## Скрипт движения, который выдаётся пуле, если у неё своего нет.
-const LINEAR_MOVE := preload("res://addons/gdevents/behaviors/linear_move/linear_move.gd")
+## Скрипт движения, который выдаётся пуле, если у неё своего нет. Путь, а не
+## preload: своя копия «Прямолинейного движения» в res://behaviors должна
+## работать и здесь.
+const LINEAR_MOVE := "res://addons/gdevents/behaviors/linear_move/linear_move.gd"
 
 const PRESETS: Array[Dictionary] = [
 	{},
@@ -270,7 +272,7 @@ func _spawn_one(o: Node2D, angle_deg: float) -> void:
 		if body != null:
 			speed += body.velocity.dot(dir) * inherit_velocity
 
-	var mv := Gde.behavior(b, "LinearMove", true)
+	var mv: Node = Gde.behavior(b, "LinearMove", true)
 	var created := false
 	if mv == null and auto_move:
 		mv = _give_movement(b)
@@ -290,7 +292,7 @@ func _spawn_one(o: Node2D, angle_deg: float) -> void:
 func _give_movement(b: Node) -> Node:
 	var n := Node.new()
 	n.name = "LinearMove"
-	n.set_script(LINEAR_MOVE)
+	n.set_script(GdeBehavior.resolve(LINEAR_MOVE))
 	b.add_child(n)
 	return n
 

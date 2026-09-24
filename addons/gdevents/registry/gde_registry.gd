@@ -159,17 +159,27 @@ func _scan_behavior_file(path: String) -> void:
 	var re_export := RegEx.create_from_string(
 			"^\\s*@export\\w*(?:\\([^)]*\\))?\\s+var\\s+([A-Za-z_]\\w*)\\s*(?::\\s*([\\w\\[\\], ]+?))?\\s*(?:=|$)")
 	var re_group := RegEx.create_from_string("^\\s*@export_group\\s*\\(\\s*\"([^\"]*)\"")
+	# Аннотация на своей строке, а var — на следующей:
+	#   @export_enum("Свои настройки", "Пистолет")
+	#   var preset: int = 1
+	var re_split_export := RegEx.create_from_string("^\\s*@export\\w*(?:\\([^)]*\\))?\\s*$")
+	var re_var := RegEx.create_from_string("^\\s*var\\s+([A-Za-z_]\\w*)")
 
 	var entry := {
 		"path": path, "actions": {}, "conditions": {}, "expressions": {},
 		"properties": {}, "description": "", "icon": "behavior",
 		"title": "", "target": "", "needs": [],
+		## имя настройки -> {"label", "doc", "group", "internal"} — для окна
+		## настроек поведения. В отличие от действий, тут все @export, и
+		## сложные тоже: сцена снаряда настраивается там же, где скорость.
+		"settings": {},
 	}
 	var pending_kind := ""
 	var pending_text := ""
 	var doc: Array[String] = []
 	var group := ""
 	var internal := false
+	var split_export := false
 
 	for raw_line: String in src.split("\n"):
 		var m_note := re_note.search(raw_line)
@@ -208,16 +218,33 @@ func _scan_behavior_file(path: String) -> void:
 			internal = false
 			continue
 
+		if split_export:
+			split_export = false
+			var m_var := re_var.search(raw_line)
+			if m_var != null:
+				# Только в окно настроек: в библиотеку событий такие свойства
+				# не попадали и раньше — пресет без «применить» ничего не делает.
+				_add_setting(entry, m_var.get_string(1), _doc_text(doc), group, internal)
+				pending_kind = ""
+				doc.clear()
+				internal = false
+				continue
+
 		var m_exp := re_export.search(raw_line)
 		if m_exp != null:
 			var pname := m_exp.get_string(1)
 			var ptype := m_exp.get_string(2).strip_edges()
 			entry["properties"][pname] = ptype
+			_add_setting(entry, pname, _doc_text(doc), group, internal)
 			if not internal:
 				_add_property_members(entry, bname, pname, ptype, _doc_text(doc), group)
 			pending_kind = ""
 			doc.clear()
 			internal = false
+			continue
+
+		if re_split_export.search(raw_line) != null:
+			split_export = true
 			continue
 
 		var m_fn := re_func.search(raw_line)
@@ -239,10 +266,26 @@ func _scan_behavior_file(path: String) -> void:
 		entry["title"] = bname
 	_retitle(entry, str(entry["title"]))
 
+	# Своя копия встроенного поведения в res://behaviors — не дубль, а замена:
+	# работает она, а встроенная остаётся «дефолтом», к которому можно вернуться.
+	entry["builtin_path"] = path if path.begins_with(BEHAVIOR_DIRS[0] + "/") else ""
 	if behaviors.has(bname):
-		errors.append("поведение «%s» объявлено дважды: %s и %s"
-				% [bname, (behaviors[bname] as Dictionary)["path"], path])
+		var prev := str((behaviors[bname] as Dictionary)["path"])
+		if prev.begins_with(BEHAVIOR_DIRS[0] + "/") and path.begins_with(BEHAVIOR_DIRS[1] + "/"):
+			entry["builtin_path"] = prev
+		else:
+			errors.append("поведение «%s» объявлено дважды: %s и %s" % [bname, prev, path])
 	behaviors[bname] = entry
+
+
+static func _add_setting(entry: Dictionary, pname: String, doc: String, group: String,
+		internal: bool) -> void:
+	(entry["settings"] as Dictionary)[pname] = {
+		"label": _label_from_doc(doc, ""),
+		"doc": doc,
+		"group": group,
+		"internal": internal,
+	}
 
 
 ## Английское имя поведения нужно только коду. В глаза пользователю должно
@@ -382,6 +425,12 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 		entry["labels"] = {}
 	(entry["labels"] as Dictionary)[pname] = label
 	var about := _property_about(doc, group)
+	# Чтение свойства в шаблонах. Строке нужен запасной "" — иначе на объекте
+	# без поведения приходил 0.0 и сравнение со строкой падало. Галочку
+	# читаем числом: в листе она 1 или 0, а «true == 1.0» в Godot — ошибка.
+	var read := "Gde.beh_get({o}, \"%s\", \"%s\"%s)" % [bname, pname, ", \"\"" if kind == "string" else ""]
+	if ptype == "bool":
+		read = "float(%s)" % read
 
 	entry["actions"]["set_" + pname] = {
 		"group": bname,
@@ -394,8 +443,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 			{"kind": "modop", "label": "Знак"},
 			{"kind": kind, "label": "Значение"},
 		],
-		"code": "Gde.beh_set({o}, \"%s\", \"%s\", Gde.beh_get({o}, \"%s\", \"%s\") {1~} {2})"
-				% [bname, pname, bname, pname],
+		"code": "Gde.beh_set({o}, \"%s\", \"%s\", %s {1~} {2})" % [bname, pname, read],
 		"code_assign": "Gde.beh_set({o}, \"%s\", \"%s\", {2})" % [bname, pname],
 	}
 	entry["conditions"]["is_" + pname] = {
@@ -409,7 +457,7 @@ func _add_property_members(entry: Dictionary, bname: String, pname: String,
 			{"kind": "cmpop", "label": "Знак"},
 			{"kind": kind, "label": "Значение"},
 		],
-		"pred": "Gde.beh_get({o}, \"%s\", \"%s\") {1} {2}" % [bname, pname],
+		"pred": "%s {1} {2}" % read,
 	}
 	var getter := "Gde.beh_get({ctx}.first(\"{obj}\"), \"{beh}\", \"%s\"%s)" \
 			% [pname, ", \"\"" if kind == "string" else ""]

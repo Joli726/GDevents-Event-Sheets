@@ -169,7 +169,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_event_n += 1
 	var ctx := _new_ctx()
 	_emit_event_comment(e, indent)
-	_line(indent, "var %s := %s" % [ctx, _ctx_init(parent_ctx)])
+	_line(indent, _ctx_decl(ctx, _ctx_init(parent_ctx)))
 
 	var conds: Array[String] = []
 	for c: Dictionary in e.get("conditions", []):
@@ -202,12 +202,12 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_event_n += 1
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, "Для каждого объекта %s" % obj)
-	_line(indent, "var %s := %s" % [outer, _ctx_init(parent_ctx)])
+	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
 	var it := _tmp("_each")
 	_line(indent, "for %s in %s.pick(%s):" % [it, outer, _quote(obj)])
 	_line(indent + 1, "if not is_instance_valid(%s): continue" % it)
 	var inner := _new_ctx()
-	_line(indent + 1, "var %s := %s.with_single(%s, %s)" % [inner, outer, _quote(obj), it])
+	_line(indent + 1, _ctx_decl(inner, "%s.with_single(%s, %s)" % [outer, _quote(obj), it]))
 
 	var conds: Array[String] = []
 	for c: Dictionary in e.get("conditions", []):
@@ -233,13 +233,13 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_event_n += 1
 	var outer := _new_ctx()
 	_emit_event_comment(e, indent, "Повторить %s раз" % str(e.get("count", "1")))
-	_line(indent, "var %s := %s" % [outer, _ctx_init(parent_ctx)])
+	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
 	var n := GdeExpr.compile_as(str(e.get("count", "1")), "number", outer, _reg)
 	_collect(n, "«Повторить»: количество")
 	var it := _tmp("_rep")
 	_line(indent, "for %s in range(int(%s)):" % [it, n["code"]])
 	var inner := _new_ctx()
-	_line(indent + 1, "var %s := %s.copy()" % [inner, outer])
+	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
 	var emitted := false
 	for a: Dictionary in e.get("actions", []):
 		if _gen_action(a, inner, indent + 1):
@@ -258,12 +258,12 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	var guard := _tmp("_guard")
 	_line(indent, "var %s := 0" % guard)
 	var outer := _new_ctx()
-	_line(indent, "var %s := %s" % [outer, _ctx_init(parent_ctx)])
+	_line(indent, _ctx_decl(outer, _ctx_init(parent_ctx)))
 	# Контекст условия пересоздаётся каждой итерацией — иначе выборка,
 	# суженная на первом проходе, заморозила бы цикл.
 	_line(indent, "while true:")
 	var inner := _new_ctx()
-	_line(indent + 1, "var %s := %s.copy()" % [inner, outer])
+	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
 	var conds: Array[String] = []
 	for c: Dictionary in e.get("conditions", []):
 		conds.append(_gen_condition(c, inner))
@@ -307,7 +307,7 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 			if obj == "":
 				return "false"
 			var ov := _tmp("_o")
-			var pred := _fill(str(d.get("pred", "false")), {"ctx": ctx, "self": "self", "o": ov}, args, bare)
+			var pred := _fill(_template(d, "pred", id), {"ctx": ctx, "self": "self", "o": ov}, args, bare)
 			var fn := "Gde.filter_not" if inverted else "Gde.filter"
 			return "%s(%s, %s, func(%s): return %s)" % [fn, ctx, _quote(obj), ov, pred]
 		"pair":
@@ -317,13 +317,13 @@ func _gen_condition(c: Dictionary, ctx: String) -> String:
 				return "false"
 			var av := _tmp("_a")
 			var bv := _tmp("_b")
-			var pred2 := _fill(str(d.get("pred", "false")), {"ctx": ctx, "self": "self", "a": av, "b": bv}, args, bare)
+			var pred2 := _fill(_template(d, "pred", id), {"ctx": ctx, "self": "self", "a": av, "b": bv}, args, bare)
 			var fn2 := "Gde.filter_pair_not" if inverted else "Gde.filter_pair"
 			return "%s(%s, %s, %s, func(%s, %s): return %s)" % [fn2, ctx, _quote(a), _quote(b), av, bv, pred2]
 		_:
 			# Условия с памятью («триггер один раз», «каждые N секунд») получают
 			# свой номер — иначе два таких условия в листе делили бы состояние.
-			var template := str(d.get("code", "false"))
+			var template := _template(d, "code", id)
 			var subs := {
 				"ctx": ctx, "self": "self",
 				"once": str(_once_n), "every": str(_every_n),
@@ -392,8 +392,15 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 				out.append(val)
 				bare.append(val)
 			"raw", "varname":
-				out.append(val)
-				bare.append(val)
+				# Шаблоны ставят такие значения внутрь кавычек: "{0}". Кавычка
+				# или обратная косая в имени закрыли бы строку раньше времени,
+				# и собранный скрипт не компилировался бы — экранируем.
+				if kind == "varname" and not _is_var_path(val):
+					_err("«%s»: %s" % [id, "не указано имя переменной" if val.strip_edges().is_empty()
+							else "имя переменной «%s» — пустая часть между точками" % val])
+				var safe := _escape(val)
+				out.append(safe)
+				bare.append(safe)
 			"cmpop":
 				var cop := _reg.resolve_op("cmpop", val)
 				if cop == "":
@@ -418,7 +425,23 @@ func _compile_params(d: Dictionary, raw: Array, ctx: String, id: String) -> Dict
 				_collect(r2, "«%s», параметр %d" % [id, i + 1])
 				out.append(r2["code"])
 				bare.append(r2["code"])
+	# Строку можно заменить или дописать, но не вычесть и не умножить:
+	# «"Idle" - "Run"» собрался бы, а в игре упал бы на первом же кадре.
+	for i in range(mini(defs.size() - 1, raw.size())):
+		if str((defs[i] as Dictionary).get("kind", "")) == "modop" \
+				and str((defs[i + 1] as Dictionary).get("kind", "")) == "string" \
+				and not (str(raw[i]) in ["=", "+"]):
+			_err("«%s»: строку можно только заменить (=) или дописать (+), а не «%s»" % [id, str(raw[i])])
 	return {"args": out, "bare": bare}
+
+
+## Шаблон условия. Без него условие раньше молча становилось «false» и
+## событие просто никогда не срабатывало — теперь это ошибка сборки.
+func _template(d: Dictionary, key: String, id: String) -> String:
+	if not d.has(key):
+		_err("«%s»: в библиотеке у условия нет шаблона «%s»" % [id, key])
+		return "false"
+	return str(d[key])
 
 
 func _has_plain_assign(d: Dictionary, bare: Array) -> bool:
@@ -479,6 +502,13 @@ func _ctx_init(parent_ctx: String) -> String:
 	return "Gde.new_context()" if parent_ctx == "" else "%s.copy()" % parent_ctx
 
 
+## Объявление контекста с явным типом. С «:=» при первом импорте проекта,
+## пока кэш классов не построен, Godot не выводил тип из Gde.new_context()
+## и сыпал ошибками «Cannot infer the type».
+func _ctx_decl(ctx: String, init: String) -> String:
+	return "var %s: GdePickContext = %s" % [ctx, init]
+
+
 func _join_conds(conds: Array[String], indent: int) -> String:
 	if conds.size() == 1:
 		return conds[0]
@@ -518,7 +548,22 @@ static func _fill(template: String, subs: Dictionary, args: Array, bare: Array =
 
 
 static func _quote(s: String) -> String:
-	return "\"%s\"" % s.replace("\\", "\\\\").replace("\"", "\\\"")
+	return "\"%s\"" % _escape(s)
+
+
+## Содержимое строкового литерала GDScript без внешних кавычек.
+static func _escape(s: String) -> String:
+	return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+
+## Имя переменной: «score» или путь «player.hp» без пустых частей.
+static func _is_var_path(s: String) -> bool:
+	if s.strip_edges().is_empty():
+		return false
+	for part: String in s.split("."):
+		if part.strip_edges().is_empty():
+			return false
+	return true
 
 
 static func _literal(v: Variant) -> String:
@@ -538,7 +583,10 @@ static func _literal(v: Variant) -> String:
 		TYPE_BOOL:
 			return "true" if v else "false"
 		TYPE_INT, TYPE_FLOAT:
-			var f := float(v)
-			return ("%d.0" % int(f)) if is_equal_approx(f, floorf(f)) else ("%.10g" % f)
+			# var_to_str — литерал, который GDScript прочтёт обратно как есть:
+			# «2.5», «3.0», «1e+20». Раньше тут стоял формат %g, которого в
+			# Godot нет: дробное значение превращалось в «%.10g» и ломало
+			# скрипт, а 1e20 через int() становилось отрицательным.
+			return var_to_str(float(v))
 		_:
 			return "null"

@@ -1,3 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Мусор macOS из распакованных архивов и временные файлы сохранения Godot
+__MACOSX/
+.DS_Store
+*.tmp

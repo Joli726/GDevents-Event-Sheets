@@ -746,7 +746,7 @@
           "label": "Объект"
         }
       ],
-      "pred": "Gde.object_exists({0})"
+      "code": "Gde.object_exists(\"{0}\")"
     },
     "object.ray": {
       "group": "Столкновения",
@@ -786,7 +786,7 @@
           "label": "1 лев, 2 прав"
         }
       ],
-      "pred": "Gde.mouse_released({0})"
+      "code": "Gde.mouse_released({0})"
     },
     "mouse.moved": {
       "group": "Мышь",
@@ -795,7 +795,7 @@
       "icon": "mouse",
       "kind": "global",
       "params": [],
-      "pred": "Gde.mouse_moved()"
+      "code": "Gde.mouse_moved()"
     },
     "mouse.right_object": {
       "group": "Мышь",
@@ -823,7 +823,7 @@
           "label": "Имя таймера"
         }
       ],
-      "pred": "Gde.timer_paused(self, \"{0}\")"
+      "code": "Gde.timer_paused({self}, \"{0}\")"
     },
     "object.text_contains": {
       "group": "Текст",
@@ -855,7 +855,7 @@
           "label": "Клавиша"
         }
       ],
-      "pred": "Gde.last_key() == \"{0}\""
+      "code": "Gde.last_key() == \"{0}\""
     }
   },
   "actions": {
@@ -1974,7 +1974,7 @@
           "label": "Объект"
         }
       ],
-      "code": "Gde.delete_all({0})"
+      "code": "Gde.delete_all(\"{0}\")"
     },
     "object.knockback": {
       "group": "Движение",

@@ -259,6 +259,12 @@ func _build_ui() -> void:
 		_rebuild()
 		save_sheet()
 		check_objects())
+	# Своя копия поведения или новое поведение — у листа тот же реестр, что
+	# и у окна, иначе в списке действий осталось бы старое.
+	_objects.library_changed.connect(func(reg: GdeRegistry):
+		registry = reg
+		_rebuild()
+		check_objects())
 	add_child(_objects)
 
 	_new_file = FileDialog.new()

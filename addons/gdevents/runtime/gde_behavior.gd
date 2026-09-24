@@ -56,6 +56,18 @@ var object: Node:
 		return get_parent()
 
 
+## Встроенное поведение — или своя копия в res://behaviors, если её сделали.
+## Копия лежит в папке и файле с теми же именами, что и встроенное.
+static func resolve(builtin_path: String) -> Script:
+	var copy := "res://behaviors".path_join(builtin_path.get_base_dir().get_file()) \
+			.path_join(builtin_path.get_file())
+	if ResourceLoader.exists(copy):
+		var s := load(copy) as Script
+		if s != null:
+			return s
+	return load(builtin_path) as Script
+
+
 ## Имя поведения в редакторе событий. По умолчанию — имя файла скрипта
 ## в PascalCase: shoot.gd -> Shoot, double_jump.gd -> DoubleJump.
 func behavior_name() -> String:
