@@ -230,7 +230,7 @@ godot --headless --script res://addons/gdevents/tools/build_tests.gd
 godot --headless --quit-after 200 res://addons/gdevents/tests/selftest.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/runtime_test.tscn
 godot --headless --quit-after 600 res://addons/gdevents/tools/library_test.tscn
-godot --headless --quit-after 2000 res://addons/gdevents/tools/behavior_window_test.tscn
+godot --headless --quit-after 2500 res://addons/gdevents/tools/behavior_window_test.tscn
 ```
 
 Первый — модель документа, буфер обмена, поиск поведений в сцене, понятность

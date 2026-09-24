@@ -2,7 +2,9 @@
 ##
 ## @behavior Shoot
 ## @title Выстрел
+## @title.en Shoot
 ## @description Стрельба с разбросом, дробью, очередями, магазином и перезарядкой. Если у пули нет своего движения — выдаёт его сама.
+## @description.en Shooting with spread, pellets, bursts, a magazine and reloading. If a bullet has no movement of its own, it gives it one.
 ## @icon action
 @tool
 extends GdeBehavior
@@ -51,11 +53,15 @@ const PRESETS: Array[Dictionary] = [
 	},
 ]
 
+## @group.en Preset
 @export_group("Пресет")
 ## Готовый набор настроек. Применяется галочкой ниже.
+## @en A ready-made set of settings. Applied with the checkbox below.
+## @options.en Custom, Pistol, Shotgun, Machine gun, Burst
 @export_enum("Свои настройки", "Пистолет", "Дробовик", "Пулемёт", "Очередь")
 var preset: int = 1
 ## Поставьте галочку, чтобы записать пресет в настройки. Сама снимается.
+## @en Check the box to write the preset into the settings. It unchecks itself.
 ## @internal
 @export var apply_preset: bool = false:
 	set(v):
@@ -63,61 +69,89 @@ var preset: int = 1
 		if v and preset > 0 and preset < PRESETS.size():
 			apply_values(PRESETS[preset])
 
+## @group.en Projectile
 @export_group("Снаряд")
 ## Сцена снаряда. Без неё стрельба не работает.
+## @en Projectile scene. Shooting does not work without it.
 @export var bullet_scene: PackedScene
 ## Скорость снаряда, пикселей в секунду.
+## @en Projectile speed, pixels per second.
 @export_range(0.0, 3000.0, 10.0) var bullet_speed: float = 520.0
 ## Время жизни снаряда, секунд.
+## @en Projectile lifetime, seconds.
 @export_range(0.0, 30.0, 0.1) var bullet_lifetime: float = 3.0
 ## Выдавать снаряду движение, если у него нет поведения «Прямолинейное движение».
+## @en Give the projectile movement if it has no “Linear movement” behavior.
 @export var auto_move: bool = true
 ## Прибавлять снаряду скорость стрелка.
+## @en Add the shooter's velocity to the projectile.
 @export_range(0.0, 1.0, 0.05) var inherit_velocity: float = 0.0
 
+## @group.en Firing
 @export_group("Стрельба")
 ## Темп стрельбы — секунд между выстрелами.
+## @en Fire rate — seconds between shots.
 @export_range(0.02, 5.0, 0.01) var fire_rate: float = 0.30
 ## Дробь — сколько снарядов за один выстрел.
+## @en Pellets — how many projectiles per shot.
 @export_range(1, 30, 1) var pellets: int = 1
 ## Разброс, в градусах.
+## @en Spread, in degrees.
 @export_range(0.0, 180.0, 0.5) var spread: float = 0.0
 ## Очередь — выстрелов по одному нажатию.
+## @en Burst — shots per press.
 @export_range(1, 10, 1) var burst_count: int = 1
 ## Пауза между выстрелами очереди, секунд.
+## @en Pause between burst shots, seconds.
 @export_range(0.0, 1.0, 0.01) var burst_delay: float = 0.07
 
+## @group.en Direction
 @export_group("Направление")
 ## Вылет вперёд — смещение точки выстрела от центра.
+## @en Muzzle forward — offset of the shot point from the center.
 @export_range(-200.0, 200.0, 1.0) var offset_forward: float = 16.0
 ## Вылет вбок — смещение точки выстрела вбок.
+## @en Muzzle side — sideways offset of the shot point.
 @export_range(-200.0, 200.0, 1.0) var offset_side: float = 0.0
 ## Направление стрельбы — угол относительно поворота объекта, в градусах.
+## @en Firing direction — angle relative to the object's rotation, in degrees.
 @export_range(-180.0, 180.0, 1.0) var direction_deg: float = 0.0
 ## Стрелять туда, куда смотрит спрайт. В платформере персонаж не
 ## поворачивается, а отражается — без этого «Выстрелить» било бы всегда вправо.
+## @en Shoot where the sprite faces. In a platformer the character does not rotate but flips — without this “Shoot” would always fire to the right.
 @export var aim_by_flip: bool = true
 
+## @group.en Ammo
 @export_group("Боезапас")
 ## Патронов в магазине. 0 — без перезарядки.
+## @en Rounds in the magazine. 0 — no reloading.
 @export_range(0, 200, 1) var magazine: int = 0
 ## Время перезарядки, секунд.
+## @en Reload time, seconds.
 @export_range(0.0, 10.0, 0.1) var reload_time: float = 1.2
 ## Перезарядка автоматически, как только магазин опустел.
+## @en Reload automatically as soon as the magazine is empty.
 @export var auto_reload: bool = true
 
+## @group.en Recoil
 @export_group("Отдача")
 ## Отдача — толчок стрелка назад при выстреле.
+## @en Recoil — pushes the shooter back on a shot.
 @export_range(0.0, 1000.0, 5.0) var recoil: float = 0.0
 
+## @group.en Sound
 @export_group("Звук")
 ## Звук выстрела — путь к файлу.
+## @en Shot sound — a path to the file.
 @export var shot_sound: String = ""
 ## Громкость выстрела, в децибелах. 0 — как в файле.
+## @en Shot volume, in decibels. 0 — as in the file.
 @export_range(-40.0, 12.0, 0.5) var shot_volume_db: float = 0.0
 
+## @group.en Controls
 @export_group("Управление")
 ## Стрельба без событий — объект палит сам.
+## @en Shooting without events — the object fires by itself.
 @export var auto_fire: bool = false
 
 var _cooldown: float = 0.0
@@ -159,6 +193,7 @@ func _process(delta: float) -> void:
 
 
 ## @action Выстрелить из _PARAM0_
+## @action.en Shoot from _PARAM0_
 func fire() -> void:
 	fire_at_angle(forward_angle())
 
@@ -175,6 +210,9 @@ func forward_angle() -> float:
 
 
 ## @action Выстрелить из _PARAM0_ под углом _PARAM1_ градусов
+## @action.en Shoot from _PARAM0_ at an angle of _PARAM1_ degrees
+## @param angle_deg Угол, градусов
+## @param.en angle_deg Angle, degrees
 func fire_at_angle(angle_deg: float) -> void:
 	if not can_fire():
 		return
@@ -192,6 +230,9 @@ func fire_at_angle(angle_deg: float) -> void:
 
 
 ## @action Выстрелить из _PARAM0_ в ближайший объект _PARAM1_
+## @action.en Shoot from _PARAM0_ at the nearest object _PARAM1_
+## @param target_name Имя объекта
+## @param.en target_name Object name
 func fire_at_object(target_name: String) -> void:
 	var o := object as Node2D
 	if o == null:
@@ -298,6 +339,9 @@ func _give_movement(b: Node) -> Node:
 
 
 ## @action Выстрелить из _PARAM0_ туда, куда он смотрит, со сдвигом _PARAM1_ градусов
+## @action.en Shoot from _PARAM0_ where it faces, shifted by _PARAM1_ degrees
+## @param extra_deg Сдвиг, градусов
+## @param.en extra_deg Shift, degrees
 func fire_forward(extra_deg: float) -> void:
 	var a := forward_angle()
 	# Сдвиг «вверх» у смотрящего влево — тоже вверх, а не вниз.
@@ -310,6 +354,7 @@ func fire_forward(extra_deg: float) -> void:
 
 
 ## @action Перезарядить _PARAM0_
+## @action.en Reload _PARAM0_
 func start_reload() -> void:
 	if magazine <= 0 or _reload_left > 0.0 or _ammo == magazine:
 		return
@@ -317,6 +362,9 @@ func start_reload() -> void:
 
 
 ## @action Добавить _PARAM0_ патронов: _PARAM1_
+## @action.en Add ammo to _PARAM0_: _PARAM1_
+## @param amount Патронов
+## @param.en amount Rounds
 func add_ammo(amount: float) -> void:
 	if magazine <= 0:
 		return
@@ -324,6 +372,7 @@ func add_ammo(amount: float) -> void:
 
 
 ## @condition _PARAM0_ может стрелять
+## @condition.en _PARAM0_ can shoot
 func can_fire() -> bool:
 	_ensure_ammo()
 	if _cooldown > 0.0 or _reload_left > 0.0:
@@ -332,40 +381,48 @@ func can_fire() -> bool:
 
 
 ## @condition _PARAM0_ перезаряжается
+## @condition.en _PARAM0_ is reloading
 func is_reloading() -> bool:
 	return _reload_left > 0.0
 
 
 ## @condition У _PARAM0_ кончились патроны
+## @condition.en _PARAM0_ is out of ammo
 func is_empty() -> bool:
 	return magazine > 0 and _ammo <= 0
 
 
 ## @condition _PARAM0_ только что выстрелил
+## @condition.en _PARAM0_ has just fired
 func just_fired() -> bool:
 	return Engine.get_process_frames() - _fire_frame <= RECENT_FRAMES
 
 
 ## @expression Угол, куда сейчас стреляет объект
+## @expression.en The angle the object is firing at now
 func aim_angle() -> float:
 	return forward_angle()
 
 
 ## @expression Секунд до следующего выстрела
+## @expression.en Seconds until the next shot
 func cooldown_left() -> float:
 	return _cooldown
 
 
 ## @expression Патронов в магазине
+## @expression.en Rounds in the magazine
 func ammo() -> float:
 	return float(maxi(0, _ammo))
 
 
 ## @expression Доля патронов от 0 до 1
+## @expression.en Ammo share from 0 to 1
 func ammo_fraction() -> float:
 	return float(_ammo) / float(magazine) if magazine > 0 else 1.0
 
 
 ## @expression Секунд до конца перезарядки
+## @expression.en Seconds until the reload ends
 func reload_left() -> float:
 	return _reload_left

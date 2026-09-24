@@ -60,8 +60,9 @@ static func for_instruction(def: Variant, kind: String) -> Texture2D:
 			if t != null:
 				return t
 		var g := str(d.get("group", ""))
-		if GROUP_ICONS.has(g):
-			return get_icon(GROUP_ICONS[g])
+		var by_group := _group_icon(g)
+		if not by_group.is_empty():
+			return get_icon(by_group)
 		if not g.is_empty():
 			# Группа без карты — это имя поведения.
 			return get_icon("behavior")
@@ -71,12 +72,24 @@ static func for_instruction(def: Variant, kind: String) -> Texture2D:
 ## Группа приходит уже переведённой («Movement»), а в таблице — русские
 ## названия: сверяем и так, и в переводе.
 static func for_group(group: String) -> Texture2D:
+	var name := _group_icon(group)
+	return get_icon(name if not name.is_empty() else "behavior")
+
+
+## Переведённое название группы -> иконка; строится один раз на язык.
+static var _by_title: Dictionary = {}
+static var _by_title_lang: String = ""
+
+
+static func _group_icon(group: String) -> String:
 	if GROUP_ICONS.has(group):
-		return get_icon(GROUP_ICONS[group])
-	for k: String in GROUP_ICONS:
-		if GdeI18n.t(k) == group:
-			return get_icon(GROUP_ICONS[k])
-	return get_icon("behavior")
+		return GROUP_ICONS[group]
+	if _by_title_lang != GdeI18n.language():
+		_by_title.clear()
+		for k: String in GROUP_ICONS:
+			_by_title[GdeI18n.t(k)] = GROUP_ICONS[k]
+		_by_title_lang = GdeI18n.language()
+	return str(_by_title.get(group, ""))
 
 
 static func for_event_type(t: String) -> Texture2D:

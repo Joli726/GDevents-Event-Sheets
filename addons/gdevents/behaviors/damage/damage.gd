@@ -2,9 +2,13 @@
 ##
 ## @behavior Damage
 ## @title Урон при касании
+## @title.en Contact damage
 ## @needs Area2D Область урона
+## @needs.en Area2D Damage area
 ## @needs CollisionShape2D Форма
+## @needs.en CollisionShape2D Shape
 ## @description Снимает здоровье тому, кого задел: шипы, пуля, огонь, враг. С перезарядкой по каждой жертве, отбросом, пробитием нескольких целей и самоуничтожением после удара.
+## @description.en Takes health from whoever it touches: spikes, a bullet, fire, an enemy. With a per-victim cooldown, knockback, piercing several targets and self-destruction after a hit.
 ## @icon damage
 @tool
 extends GdeBehavior
@@ -38,12 +42,16 @@ const PRESETS: Array[Dictionary] = [
 	},
 ]
 
+## @group.en Preset
 @export_group("Пресет")
 ## Готовый набор настроек. Сам по себе ничего не меняет — нажмите галочку ниже.
+## @en A ready-made set of settings. It changes nothing by itself — press the checkbox below.
+## @options.en Custom, Spikes, Bullet, Piercing projectile, Poison
 @export_enum("Свои настройки", "Шипы", "Пуля", "Пробивающий снаряд", "Яд")
 var preset: int = 1
 ## Поставьте галочку, чтобы записать выбранный пресет в настройки ниже.
 ## Галочка тут же снимается: это кнопка, а не переключатель.
+## @en Check the box to write the selected preset into the settings below. The box unchecks itself right away: it is a button, not a switch.
 ## @internal
 @export var apply_preset: bool = false:
 	set(v):
@@ -51,33 +59,46 @@ var preset: int = 1
 		if v and preset > 0 and preset < PRESETS.size():
 			apply_values(PRESETS[preset])
 
+## @group.en Whom to hit
 @export_group("Кого бить")
 ## Жертва — имя объекта из листа событий, например Player.
 ## Пусто — не бьёт никого: цель задаётся действием из событий.
+## @en Victim — the name of an object from the event sheet, e.g. Player. Empty — hits no one: the target is set by an action from events.
 @export var target_object: String = ""
 ## Урон за одно попадание.
+## @en Damage per hit.
 @export_range(0.0, 1000.0, 0.5) var amount: float = 1.0
 ## Урон включён.
+## @en Damage is on.
 @export var active: bool = true
 
+## @group.en How often
 @export_group("Как часто")
 ## Перезарядка по каждой жертве — сколько секунд не бить её повторно.
 ## 0 — бить каждый кадр, пока касается.
+## @en Cooldown per victim — how many seconds not to hit it again. 0 — hit every frame while touching.
 @export_range(0.0, 10.0, 0.05) var repeat_delay: float = 0.5
 ## Пробитие — сколько всего попаданий выдержит объект. 0 — сколько угодно.
+## @en Piercing — how many hits in total the object survives. 0 — any number.
 @export_range(0, 50, 1) var pierce: int = 0
 ## Задержка после создания — сколько секунд не бить никого.
 ## Спасает снаряд от удара по тому, кто его выпустил.
+## @en Arming delay — how many seconds after creation not to hit anyone. Keeps a projectile from hitting whoever fired it.
 @export_range(0.0, 5.0, 0.05) var arm_time: float = 0.05
 
+## @group.en What happens on a hit
 @export_group("Что при ударе")
 ## Самоуничтожение — исчезнуть после удара. Если пробитие больше 1 — после последнего попадания.
+## @en Self-destruct — disappear after a hit. If piercing is above 1 — after the last hit.
 @export var destroy_on_hit: bool = false
 ## Отброс жертвы прочь от себя, пикселей за удар.
+## @en Knockback of the victim away from itself, pixels per hit.
 @export_range(0.0, 1000.0, 5.0) var knockback: float = 0.0
 ## Урон сквозь неуязвимость — не даёт жертве отсидеться после первого удара.
+## @en Damage through invulnerability — does not let the victim wait it out after the first hit.
 @export var pierce_invulnerability: bool = false
 ## Звук удара — путь к файлу.
+## @en Hit sound — a path to the file.
 @export_file("*.ogg", "*.wav", "*.mp3") var hit_sound: String = ""
 
 var _cooldowns: Dictionary = {}
@@ -145,11 +166,15 @@ func _strike(victim: Node) -> void:
 
 
 ## @action Задать жертву для _PARAM0_: объект _PARAM1_
+## @action.en Set the victim of _PARAM0_: object _PARAM1_
+## @param name Имя объекта
+## @param.en name Object name
 func target(name: String) -> void:
 	target_object = name
 
 
 ## @action Включить урон у _PARAM0_
+## @action.en Turn damage on for _PARAM0_
 func arm() -> void:
 	active = true
 	_spent = false
@@ -158,35 +183,42 @@ func arm() -> void:
 
 
 ## @action Выключить урон у _PARAM0_
+## @action.en Turn damage off for _PARAM0_
 func disarm() -> void:
 	active = false
 
 
 ## @action Сбросить перезарядку урона у _PARAM0_ — можно бить снова
+## @action.en Reset the damage cooldown of _PARAM0_ — it can hit again
 func reset_cooldowns() -> void:
 	_cooldowns.clear()
 
 
 ## @condition _PARAM0_ только что нанёс урон
+## @condition.en _PARAM0_ has just dealt damage
 func just_hit() -> bool:
 	return Engine.get_physics_frames() - _hit_frame <= RECENT_FRAMES
 
 
 ## @condition У _PARAM0_ кончились попадания
+## @condition.en _PARAM0_ has run out of hits
 func is_spent() -> bool:
 	return _spent
 
 
 ## @condition Урон у _PARAM0_ включён
+## @condition.en Damage of _PARAM0_ is on
 func is_active() -> bool:
 	return active and not _spent
 
 
 ## @expression Сколько раз объект уже попал
+## @expression.en How many times the object has already hit
 func hits_done() -> float:
 	return float(_hits)
 
 
 ## @expression Сколько попаданий осталось
+## @expression.en How many hits are left
 func hits_left() -> float:
 	return INF if pierce <= 0 else float(maxi(0, pierce - _hits))

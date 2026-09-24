@@ -2,8 +2,11 @@
 ##
 ## @behavior Draggable
 ## @title Перетаскиваемый
+## @title.en Draggable
 ## @needs Sprite2D|AnimatedSprite2D Спрайт
+## @needs.en Sprite2D|AnimatedSprite2D Sprite
 ## @description Перетаскивание мышью с сеткой, ограничением осей, плавным следованием и возвратом на место.
+## @description.en Mouse dragging with a grid, axis locking, smooth following and returning home.
 ## @icon drag
 @tool
 extends GdeBehavior
@@ -13,34 +16,51 @@ signal grabbed
 ## Отпустили.
 signal dropped
 
+## @group.en Dragging
 @export_group("Перетаскивание")
 ## Перетаскивание включено. Выключите, чтобы временно закрепить объект на месте.
+## @en Dragging is on. Turn it off to pin the object in place for a while.
 @export var enabled: bool = true
 ## Кнопка мыши, которой тащат объект.
+## @en Mouse button used to drag the object.
+## @options.en Left, Right, Middle
 @export_enum("Левая:1", "Правая:2", "Средняя:3") var mouse_button: int = 1
 ## Оси движения — по какой из них объект можно двигать.
+## @en Movement axes — along which the object can be moved.
+## @options.en Both axes, X only, Y only
 @export_enum("Обе оси", "Только по X", "Только по Y") var axis_lock: int = 0
 ## Прилипание к сетке в пикселях. 0 — без прилипания.
+## @en Grid snapping in pixels. 0 — no snapping.
 @export_range(0.0, 256.0, 1.0) var grid: float = 0.0
 ## Плавность следования за курсором. 0 — приклеен намертво.
+## @en Smoothness of following the cursor. 0 — glued tight.
 @export_range(0.0, 1.0, 0.02) var smoothing: float = 0.0
 ## Хват за точку касания — объект не прыгает центром под курсор.
+## @en Grab at the touch point — the object does not jump its center under the cursor.
 @export var keep_grab_offset: bool = true
 
+## @group.en Bounds
 @export_group("Границы")
 ## Держать в экране — не выпускать за края.
+## @en Keep on screen — do not let it past the edges.
 @export var clamp_to_screen: bool = false
 
+## @group.en Return
 @export_group("Возврат")
 ## Возврат на место после отпускания.
+## @en Return home after release.
 @export var return_on_drop: bool = false
 ## Скорость возврата на место, пикселей в секунду.
+## @en Speed of returning home, pixels per second.
 @export_range(10.0, 3000.0, 10.0) var return_speed: float = 600.0
 
+## @group.en Look
 @export_group("Вид")
 ## Подъём поверх остальных, пока объект тащат.
+## @en Lift above the others while the object is dragged.
 @export var lift_while_dragging: bool = true
 ## Размер во время перетаскивания. 1.1 — чуть крупнее обычного.
+## @en Size while dragging. 1.1 — a little bigger than usual.
 @export_range(0.5, 2.0, 0.05) var drag_scale: float = 1.0
 
 var _dragging: bool = false
@@ -117,6 +137,9 @@ func _clamped(o: Node2D, p: Vector2) -> Vector2:
 
 
 ## @action Разрешить перетаскивание _PARAM0_: _PARAM1_ (1 да, 0 нет)
+## @action.en Allow dragging _PARAM0_: _PARAM1_ (1 yes, 0 no)
+## @param on 1 да, 0 нет
+## @param.en on 1 yes, 0 no
 func allow(on: float) -> void:
 	enabled = on > 0.5
 	if not enabled:
@@ -124,6 +147,7 @@ func allow(on: float) -> void:
 
 
 ## @action Запомнить текущее место _PARAM0_ как домашнее
+## @action.en Remember the current place of _PARAM0_ as home
 func set_home() -> void:
 	var o := object as Node2D
 	if o != null:
@@ -131,22 +155,26 @@ func set_home() -> void:
 
 
 ## @action Вернуть _PARAM0_ на домашнее место
+## @action.en Return _PARAM0_ home
 func go_home() -> void:
 	_dragging = false
 	_returning = true
 
 
 ## @condition _PARAM0_ сейчас тащат
+## @condition.en _PARAM0_ is being dragged
 func is_dragging() -> bool:
 	return _dragging
 
 
 ## @condition _PARAM0_ возвращается на место
+## @condition.en _PARAM0_ is returning home
 func is_returning() -> bool:
 	return _returning
 
 
 ## @expression Расстояние до домашнего места
+## @expression.en Distance to the home place
 func distance_from_home() -> float:
 	var o := object as Node2D
 	return o.global_position.distance_to(_home) if o != null else 0.0

@@ -2,8 +2,11 @@
 ##
 ## @behavior LinearMove
 ## @title Прямолинейное движение
+## @title.en Linear movement
 ## @needs Sprite2D|AnimatedSprite2D Спрайт
+## @needs.en Sprite2D|AnimatedSprite2D Sprite
 ## @description Движение по углу с разгоном, гравитацией, сопротивлением, отскоком от краёв и угасанием. Основа для пуль и простых врагов.
+## @description.en Movement at an angle with acceleration, gravity, drag, bouncing off the edges and fading. The basis for bullets and simple enemies.
 ## @icon move
 @tool
 extends GdeBehavior
@@ -13,36 +16,52 @@ signal expired
 ## Отскочил от края экрана.
 signal bounced
 
+## @group.en Movement
 @export_group("Движение")
 ## Направление в градусах: 0 вправо, −90 вверх, 90 вниз.
+## @en Direction in degrees: 0 right, −90 up, 90 down.
 @export_range(-180.0, 180.0, 1.0) var angle: float = 0.0
 ## Скорость полёта, пикселей в секунду.
+## @en Flight speed, pixels per second.
 @export_range(0.0, 3000.0, 5.0) var speed: float = 200.0
 ## Разгон, пикселей в секунду за секунду. Отрицательный — замедление.
+## @en Acceleration, pixels per second per second. Negative — slowing down.
 @export_range(-3000.0, 3000.0, 10.0) var acceleration: float = 0.0
 ## Потолок скорости при разгоне.
+## @en Speed limit when accelerating.
 @export_range(0.0, 5000.0, 10.0) var max_speed: float = 0.0
 ## Сопротивление среды — какая доля скорости теряется за секунду.
+## @en Drag of the medium — what share of the speed is lost per second.
 @export_range(0.0, 5.0, 0.05) var drag: float = 0.0
 
+## @group.en Gravity
 @export_group("Гравитация")
 ## Гравитация — тянет вниз, превращая полёт в дугу.
+## @en Gravity — pulls down, turning the flight into an arc.
 @export_range(0.0, 3000.0, 10.0) var gravity: float = 0.0
 
+## @group.en Life
 @export_group("Жизнь")
 ## Время жизни, секунд. 0 — живёт вечно.
+## @en Lifetime, seconds. 0 — lives forever.
 @export_range(0.0, 60.0, 0.1) var lifetime: float = 3.0
 ## Угасание — за сколько секунд до конца начать растворяться.
+## @en Fade-out — how many seconds before the end to start fading.
 @export_range(0.0, 10.0, 0.1) var fade_out: float = 0.0
 
+## @group.en Screen edges
 @export_group("Края экрана")
 ## Отскок от краёв экрана вместо вылета за них.
+## @en Bounce off the screen edges instead of flying out.
 @export var bounce_off_edges: bool = false
 ## Упругость — какая доля скорости остаётся после отскока.
+## @en Bounciness — what share of the speed remains after a bounce.
 @export_range(0.0, 1.5, 0.05) var bounciness: float = 1.0
 
+## @group.en Look
 @export_group("Вид")
 ## Поворот объекта по направлению полёта.
+## @en Rotate the object toward the flight direction.
 @export var rotate_to_direction: bool = false
 
 var _age: float = 0.0
@@ -119,6 +138,11 @@ func _bounce(o: Node2D) -> void:
 
 
 ## @action Задать движение _PARAM0_: угол _PARAM1_ градусов, скорость _PARAM2_
+## @action.en Set the movement of _PARAM0_: angle _PARAM1_ degrees, speed _PARAM2_
+## @param angle_deg Угол, градусов
+## @param.en angle_deg Angle, degrees
+## @param new_speed Скорость
+## @param.en new_speed Speed
 func set_direction(angle_deg: float, new_speed: float) -> void:
 	angle = angle_deg
 	speed = new_speed
@@ -127,16 +151,23 @@ func set_direction(angle_deg: float, new_speed: float) -> void:
 
 
 ## @action Развернуть _PARAM0_ на 180 градусов
+## @action.en Turn _PARAM0_ around by 180 degrees
 func reverse() -> void:
 	_vel = -_vel
 
 
 ## @action Повернуть полёт _PARAM0_ на _PARAM1_ градусов
+## @action.en Turn the flight of _PARAM0_ by _PARAM1_ degrees
+## @param degrees Градусов
+## @param.en degrees Degrees
 func turn(degrees: float) -> void:
 	_vel = _vel.rotated(deg_to_rad(degrees))
 
 
 ## @action Направить _PARAM0_ на ближайший объект _PARAM1_
+## @action.en Aim _PARAM0_ at the nearest object _PARAM1_
+## @param target_name Имя объекта
+## @param.en target_name Object name
 func aim_at(target_name: String) -> void:
 	var o := object as Node2D
 	if o == null:
@@ -156,20 +187,26 @@ func aim_at(target_name: String) -> void:
 
 
 ## @action Продлить жизнь _PARAM0_ на _PARAM1_ секунд
+## @action.en Extend the life of _PARAM0_ by _PARAM1_ seconds
+## @param seconds Секунд
+## @param.en seconds Seconds
 func extend_life(seconds: float) -> void:
 	_age = maxf(0.0, _age - absf(seconds))
 
 
 ## @condition _PARAM0_ движется
+## @condition.en _PARAM0_ is moving
 func is_moving() -> bool:
 	return _vel.length_squared() > 1.0
 
 
 ## @expression Сколько секунд объект уже живёт
+## @expression.en How many seconds the object has lived
 func age() -> float:
 	return _age
 
 
 ## @expression Сколько секунд жизни осталось
+## @expression.en How many seconds of life are left
 func life_left() -> float:
 	return maxf(0.0, lifetime - _age) if lifetime > 0.0 else 999.0

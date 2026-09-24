@@ -108,7 +108,8 @@ func rebuild() -> void:
 			continue
 		var group := str(p["group"])
 		if group != last_group:
-			_form.add_child(_group_caption(group if not group.is_empty() else GdeI18n.t("Основное")))
+			var gname := str(_group_names().get(group, group))
+			_form.add_child(_group_caption(gname if not gname.is_empty() else GdeI18n.t("Основное")))
 			last_group = group
 		_form.add_child(_row(p, m, has_preset and nm == "preset"))
 		shown += 1
@@ -123,6 +124,13 @@ func rebuild() -> void:
 	reset_all.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	reset_all.pressed.connect(reset_all_values)
 	_form.add_child(reset_all)
+
+
+## @export_group как в коде -> название на выбранном языке (@group.en).
+func _group_names() -> Dictionary:
+	if _reg == null or not _reg.behaviors.has(behavior):
+		return {}
+	return (_reg.behaviors[behavior] as Dictionary).get("group_names", {})
 
 
 func _settings_meta() -> Dictionary:
@@ -154,7 +162,7 @@ func _row(p: Dictionary, m: Dictionary, preset_row: bool) -> Control:
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
 	line.add_child(label)
 
-	var editor := _editor_for(p)
+	var editor := _editor_for(p, m)
 	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.add_child(editor)
 
@@ -199,7 +207,7 @@ static func label_for(prop: String, meta: Dictionary) -> String:
 
 # ---------------------------------------------------------------- редакторы ---
 
-func _editor_for(p: Dictionary) -> Control:
+func _editor_for(p: Dictionary, meta: Dictionary = {}) -> Control:
 	var nm := str(p["name"])
 	var t := int(p["type"])
 	var hint := int(p["hint"])
@@ -217,8 +225,10 @@ func _editor_for(p: Dictionary) -> Control:
 	if (t == TYPE_INT or t == TYPE_FLOAT) and hint == PROPERTY_HINT_ENUM:
 		var ob := OptionButton.new()
 		var ids := parse_enum(hs)
+		# Пункты на выбранном языке — из @options.en; в коде они как есть.
+		var shown: Array = meta.get("options", [])
 		for i in range(ids.size()):
-			ob.add_item(str(ids[i][0]), int(ids[i][1]))
+			ob.add_item(str(shown[i]) if shown.size() == ids.size() else str(ids[i][0]), int(ids[i][1]))
 		ob.fit_to_longest_item = false
 		var select := func(v: Variant) -> void:
 			var idx := ob.get_item_index(int(v))
