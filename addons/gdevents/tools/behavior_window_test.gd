@@ -28,6 +28,8 @@ func _ready() -> void:
 	await _test_form()
 	print("—— пресет ——")
 	await _test_preset()
+	print("—— код поведения ——")
+	_test_code()
 	print("—— окно объектов ——")
 	await _test_dialog()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCENE))
@@ -159,6 +161,33 @@ func _test_preset() -> void:
 	await form.flush()
 	_eq(_disk("Shoot", "pellets"), 1, "«Вернуть все по умолчанию» вернуло и дробь")
 	form.queue_free()
+
+
+func _test_code() -> void:
+	var panel := GdeBehaviorPanel.new()
+	add_child(panel)
+	var path := str((_reg.behaviors["Shoot"] as Dictionary)["path"])
+	panel.show_behavior(SCENE, "Shoot", _reg, [], "Shoot", path)
+	var code := panel.code
+	_ok(code.source().contains("extends GdeBehavior"), "на вкладке «Код» — исходник поведения")
+	_ok(not code._code.editable, "только для чтения: правка — в редакторе скриптов")
+	var items: Array[String] = []
+	var pop := code._jump.get_popup()
+	for i in range(pop.item_count):
+		if not pop.is_item_separator(i):
+			items.append(pop.get_item_text(i))
+	var fire := -1
+	for i in range(items.size()):
+		if items[i] == "Выстрелить из ‹Объект›":
+			fire = i
+	_ok(fire >= 0, "«Перейти к…» называет действия фразами из листа: %s" % [items.slice(0, 3)])
+	_ok(not items.has("Изменить «Скорость снаряда» у ‹Объект› (Выстрел): ‹Знак› ‹Значение›"),
+			"и не путает их с настройками — у тех нет своей функции")
+	if fire >= 0:
+		code._on_jump(fire)
+		var line := code._code.get_line(code.caret_line())
+		_ok(line.begins_with("func fire"), "переход ставит курсор на функцию: %s" % line.strip_edges())
+	panel.queue_free()
 
 
 func _test_dialog() -> void:

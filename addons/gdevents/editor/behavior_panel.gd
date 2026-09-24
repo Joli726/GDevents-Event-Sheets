@@ -6,8 +6,11 @@ extends VBoxContainer
 
 ## Для строки сообщений окна объектов.
 signal message(text: String, is_error: bool)
+## Пользователь ушёл в редактор скриптов — окну объектов пора закрыться.
+signal left_for_editor
 
 var settings: GdeBehaviorSettings
+var code: GdeBehaviorCode
 var scene_path: String = ""
 var behavior: String = ""
 
@@ -78,11 +81,16 @@ func _init() -> void:
 			message.emit(err, true))
 	_tabs.add_child(settings)
 
+	code = GdeBehaviorCode.new()
+	code.name = "Код"
+	code.opened_in_editor.connect(func() -> void: left_for_editor.emit())
+	_tabs.add_child(code)
+
 	show_empty("")
 
 
 func show_behavior(scene: String, bname: String, reg: GdeRegistry, object_names: Array = [],
-		node_path: String = "") -> void:
+		node_path: String = "", script_path: String = "") -> void:
 	scene_path = scene
 	behavior = bname
 	_set_body_visible(true)
@@ -99,6 +107,9 @@ func show_behavior(scene: String, bname: String, reg: GdeRegistry, object_names:
 	_about.visible = not _about.text.is_empty()
 	_where.text = node_path
 	_where.tooltip_text = "Узел поведения в сцене объекта: %s" % node_path
+	var entry: Dictionary = b if b != null else {}
+	# Код — того скрипта, что реально стоит на объекте.
+	code.show_script(script_path if not script_path.is_empty() else str(entry.get("path", "")), entry)
 	settings.show_behavior(scene, bname, reg, object_names)
 
 

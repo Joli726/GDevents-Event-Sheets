@@ -2,8 +2,8 @@
 ##   godot res://addons/gdevents/tools/dialog_shot.tscn
 ##
 ## Кладёт в user://: gde_panel.png, gde_objects.png, gde_bullet.png,
-## gde_picker.png, gde_toggles.png, gde_panel_narrow.png и gde_behavior.png
-## (настройки «Выстрела» у Player). Нужно, чтобы ловить перекос вёрстки окон,
+## gde_picker.png, gde_toggles.png, gde_panel_narrow.png, gde_behavior.png
+## (настройки «Выстрела» у Player) и gde_code.png (его код). Нужно, чтобы ловить перекос вёрстки окон,
 ## не открывая редактор.
 ##
 ## Запускается сценой, а не через --script: без автозагрузки Gde скрипты
@@ -91,6 +91,10 @@ func _process(_delta: float) -> void:
 			_panel._objects._select_behavior("Shoot")
 		118:
 			_save("gde_behavior.png")
+			_panel._objects._beh_panel._tabs.current_tab = 1
+			_panel._objects._beh_panel.code._on_jump(0)
+		126:
+			_save("gde_code.png")
 			get_tree().quit()
 
 

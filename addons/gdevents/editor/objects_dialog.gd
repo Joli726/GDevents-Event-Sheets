@@ -34,6 +34,8 @@ var _beh_group: ButtonGroup
 var _selected_behavior: String = ""
 ## имя поведения -> путь его узла в сцене объекта
 var _beh_nodes: Dictionary = {}
+## имя поведения -> скрипт, который реально стоит на объекте
+var _beh_scripts: Dictionary = {}
 
 var _beh_picker: GdeBehaviorPicker
 var _confirm_delete: ConfirmationDialog
@@ -149,6 +151,7 @@ func _init() -> void:
 		else:
 			_set_note(text)
 			_update_file(_current_scene()))
+	_beh_panel.left_for_editor.connect(hide)
 	beh_right.add_child(_beh_panel)
 
 	var checks_tab := VBoxContainer.new()
@@ -345,6 +348,7 @@ func _refresh_behaviors() -> void:
 		_behaviors.remove_child(c)
 		c.queue_free()
 	_beh_nodes.clear()
+	_beh_scripts.clear()
 	_beh_group = ButtonGroup.new()
 
 	_refresh_checks()
@@ -373,6 +377,7 @@ func _refresh_behaviors() -> void:
 		var bname := str(e["name"])
 		names.append(bname)
 		_beh_nodes[bname] = str(e["node"])
+		_beh_scripts[bname] = str(e.get("script", ""))
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 2)
 
@@ -441,7 +446,8 @@ func _select_behavior(bname: String) -> void:
 			if c is Button and c.has_meta("gde_behavior"):
 				(c as Button).set_pressed_no_signal(str(c.get_meta("gde_behavior")) == bname)
 	_beh_panel.show_behavior(_current_scene(), bname, _reg,
-			_doc.object_names() if _doc != null else [], str(_beh_nodes.get(bname, "")))
+			_doc.object_names() if _doc != null else [], str(_beh_nodes.get(bname, "")),
+			str(_beh_scripts.get(bname, "")))
 
 
 ## Находки проверки для выбранного объекта, с кнопками исправления.
