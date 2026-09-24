@@ -1195,6 +1195,36 @@
       "params": [],
       "code": "Gde.is_fading()",
       "description": "Экран сейчас темнеет или проявляется — например, чтобы не запускать переход второй раз."
+    },
+    "list.contains": {
+      "group": "Списки",
+      "sentence": "Список _PARAM0_ содержит _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "string",
+          "label": "Что искать"
+        }
+      ],
+      "code": "Gde.list_contains(\"{0}\", {1})",
+      "description": "Есть ли в списке такой элемент: в инвентаре есть ключ — дверь открывается."
+    },
+    "list.empty": {
+      "group": "Списки",
+      "sentence": "Список _PARAM0_ пуст",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        }
+      ],
+      "code": "Gde.list_count(\"{0}\") == 0.0",
+      "description": "В списке ничего нет: волны кончились — победа."
     }
   },
   "actions": {
@@ -2669,6 +2699,155 @@
       ],
       "code": "Gde.change_scene_fade(\"{0}\", {1}, \"{2}\")",
       "description": "Экран плавно темнеет, сцена меняется, и новая плавно проявляется — вместо резкого переключения. Работает и из меню паузы."
+    },
+    "list.add": {
+      "group": "Списки",
+      "sentence": "Добавить в список _PARAM0_ текст _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.list_add(\"{0}\", {1})",
+      "description": "Список — переменная сцены: инвентарь, очередь волн, реплики. Если его ещё нет, он создаётся. Текст — в кавычках: \"ключ\"."
+    },
+    "list.add_number": {
+      "group": "Списки",
+      "sentence": "Добавить в список _PARAM0_ число _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "number",
+          "label": "Число"
+        }
+      ],
+      "code": "Gde.list_add(\"{0}\", {1})",
+      "description": "Число в конец списка: очки волн, номера уровней."
+    },
+    "list.remove_value": {
+      "group": "Списки",
+      "sentence": "Убрать из списка _PARAM0_ элемент _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "string",
+          "label": "Что убрать"
+        }
+      ],
+      "code": "Gde.list_remove_value(\"{0}\", {1})",
+      "description": "Убирает первый такой элемент: потратил ключ — ключа нет. Числа и текст сравниваются одинаково: 5 и \"5\" — одно и то же."
+    },
+    "list.remove_at": {
+      "group": "Списки",
+      "sentence": "Убрать из списка _PARAM0_ элемент номер _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "number",
+          "label": "Номер, с нуля"
+        }
+      ],
+      "code": "Gde.list_remove_at(\"{0}\", {1})",
+      "description": "Убирает элемент по номеру: 0 — первый."
+    },
+    "list.clear": {
+      "group": "Списки",
+      "sentence": "Очистить список _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        }
+      ],
+      "code": "Gde.list_clear(\"{0}\")",
+      "description": "Список становится пустым."
+    },
+    "list.shuffle": {
+      "group": "Списки",
+      "sentence": "Перемешать список _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        }
+      ],
+      "code": "Gde.list_shuffle(\"{0}\")",
+      "description": "Случайный порядок: колода карт, порядок волн."
+    },
+    "list.take_first": {
+      "group": "Списки",
+      "sentence": "Вынуть первый элемент списка _PARAM0_ в переменную _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "varname",
+          "label": "Список"
+        },
+        {
+          "kind": "varname",
+          "label": "Переменная"
+        }
+      ],
+      "code": "Gde.list_take_first(\"{0}\", \"{1}\")",
+      "description": "Очередь: первый элемент уходит из списка в переменную сцены. Пустой список даёт пустой текст."
+    },
+    "debug.show": {
+      "group": "Система",
+      "sentence": "Показать на экране _PARAM0_: _PARAM1_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "string",
+          "label": "Подпись"
+        },
+        {
+          "kind": "string",
+          "label": "Значение"
+        }
+      ],
+      "code": "Gde.show_value({0}, {1})",
+      "description": "Надпись в углу поверх игры вместо консоли: видно, что происходит, прямо во время игры. Ставьте в событие без условий — значение обновляется каждый кадр и пропадает, когда его перестали показывать."
+    },
+    "debug.log": {
+      "group": "Система",
+      "sentence": "Написать на экране: _PARAM0_",
+      "kind": "global",
+      "params": [
+        {
+          "kind": "string",
+          "label": "Текст"
+        }
+      ],
+      "code": "Gde.screen_log({0})",
+      "description": "Строка в журнал поверх игры: последние восемь строк держатся несколько секунд. Удобно, чтобы увидеть, что событие сработало."
+    },
+    "debug.clear": {
+      "group": "Система",
+      "sentence": "Убрать надписи с экрана",
+      "kind": "global",
+      "params": [],
+      "code": "Gde.clear_screen_values()",
+      "description": "Стирает показанные значения и журнал."
     }
   },
   "expressions": {
@@ -3032,6 +3211,49 @@
       ],
       "template": "Gde.key_held_time({0})",
       "description": "Сколько секунд клавиша удерживается: KeyHeldTime(Space). Сила броска, заряд."
+    },
+    "ListCount": {
+      "type": "number",
+      "params": [
+        "varname"
+      ],
+      "template": "Gde.list_count({0})",
+      "description": "Сколько элементов в списке: ListCount(inventory)."
+    },
+    "ListItem": {
+      "type": "string",
+      "params": [
+        "varname",
+        "number"
+      ],
+      "template": "Gde.list_item({0}, {1})",
+      "description": "Элемент по номеру, текстом: ListItem(inventory, 0) — первый."
+    },
+    "ListNumber": {
+      "type": "number",
+      "params": [
+        "varname",
+        "number"
+      ],
+      "template": "Gde.list_number({0}, {1})",
+      "description": "Элемент по номеру, числом: ListNumber(waves, 2)."
+    },
+    "ListRandom": {
+      "type": "string",
+      "params": [
+        "varname"
+      ],
+      "template": "Gde.list_random({0})",
+      "description": "Случайный элемент: ListRandom(phrases) — случайная реплика."
+    },
+    "ListJoin": {
+      "type": "string",
+      "params": [
+        "varname",
+        "string"
+      ],
+      "template": "Gde.list_join({0}, {1})",
+      "description": "Все элементы одной строкой через разделитель: ListJoin(inventory, \", \")."
     }
   },
   "object_expressions": {

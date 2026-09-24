@@ -588,6 +588,171 @@ func is_fading() -> bool:
 	return _fading
 
 
+# ---------------------------------------------------------------- списки ---
+
+## Список — переменная сцены, в которой лежит массив: инвентарь, очередь
+## волн, реплики. Элементы — числа или текст; сравниваются как текст,
+## поэтому 5 и «5» — одно и то же.
+func _list(path: String, create: bool) -> Array:
+	var v: Variant = var_get(path, null)
+	if v is Array:
+		return v
+	var a: Array = []
+	if create:
+		var_set(path, a)
+	return a
+
+
+func _as_text(v: Variant) -> String:
+	return num_str(float(v)) if (v is float or v is int) else str(v)
+
+
+func list_add(path: String, value: Variant) -> void:
+	_list(path, true).append(value)
+
+
+func list_remove_value(path: String, text: String) -> void:
+	var a := _list(path, false)
+	for i in a.size():
+		if _as_text(a[i]) == text:
+			a.remove_at(i)
+			return
+
+
+func list_remove_at(path: String, index: float) -> void:
+	var a := _list(path, false)
+	var i := int(index)
+	if i >= 0 and i < a.size():
+		a.remove_at(i)
+
+
+func list_clear(path: String) -> void:
+	_list(path, true).clear()
+
+
+func list_shuffle(path: String) -> void:
+	_list(path, false).shuffle()
+
+
+## Вынуть первый элемент в переменную сцены: очередь волн, реплик.
+func list_take_first(path: String, target: String) -> void:
+	var a := _list(path, false)
+	var_set(target, a.pop_front() if not a.is_empty() else "")
+
+
+func list_contains(path: String, text: String) -> bool:
+	for v: Variant in _list(path, false):
+		if _as_text(v) == text:
+			return true
+	return false
+
+
+func list_count(path: String) -> float:
+	return float(_list(path, false).size())
+
+
+func list_item(path: String, index: float) -> String:
+	var a := _list(path, false)
+	var i := int(index)
+	return _as_text(a[i]) if i >= 0 and i < a.size() else ""
+
+
+func list_number(path: String, index: float) -> float:
+	var a := _list(path, false)
+	var i := int(index)
+	if i < 0 or i >= a.size():
+		return 0.0
+	var v: Variant = a[i]
+	return float(v) if (v is float or v is int) else float(str(v)) if str(v).is_valid_float() else 0.0
+
+
+func list_random(path: String) -> String:
+	var a := _list(path, false)
+	return _as_text(a.pick_random()) if not a.is_empty() else ""
+
+
+func list_join(path: String, sep: String) -> String:
+	var parts := PackedStringArray()
+	for v: Variant in _list(path, false):
+		parts.append(_as_text(v))
+	return sep.join(parts)
+
+
+# ---------------------------------------------------- значения на экране ---
+
+## Надпись поверх игры вместо консоли: подпись -> {"text", "at": мс}.
+## Значение, которое перестали показывать, через полсекунды исчезает.
+var _watch: Dictionary = {}
+var _log: Array = []
+var _watch_label: Label = null
+const WATCH_TTL_MS := 500
+const LOG_TTL_MS := 6000
+const LOG_LINES := 8
+
+
+func show_value(label: String, value: String) -> void:
+	_watch[label] = {"text": value, "at": Time.get_ticks_msec()}
+	_ensure_watch_label()
+
+
+func screen_log(text: String) -> void:
+	_log.append({"text": text, "at": Time.get_ticks_msec()})
+	while _log.size() > LOG_LINES:
+		_log.pop_front()
+	_ensure_watch_label()
+
+
+func clear_screen_values() -> void:
+	_watch.clear()
+	_log.clear()
+
+
+func _ensure_watch_label() -> void:
+	if _watch_label != null:
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 128
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	_watch_label = Label.new()
+	_watch_label.position = Vector2(8, 6)
+	_watch_label.add_theme_font_size_override("font_size", 14)
+	_watch_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.85))
+	_watch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_watch_label.add_theme_constant_override("outline_size", 4)
+	_watch_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_watch_label)
+
+
+func _update_watch() -> void:
+	if _watch_label == null:
+		return
+	var now := Time.get_ticks_msec()
+	var lines := PackedStringArray()
+	for k: Variant in _watch.keys():
+		var w: Dictionary = _watch[k]
+		if now - int(w["at"]) > WATCH_TTL_MS:
+			_watch.erase(k)
+		else:
+			lines.append("%s: %s" % [k, w["text"]] if not str(k).is_empty() else str(w["text"]))
+	var fresh: Array = []
+	for e: Dictionary in _log:
+		if now - int(e["at"]) <= LOG_TTL_MS:
+			fresh.append(e)
+	_log = fresh
+	if not _log.is_empty():
+		if not lines.is_empty():
+			lines.append("")
+		for e2: Dictionary in _log:
+			lines.append(str(e2["text"]))
+	_watch_label.text = "\n".join(lines)
+
+
+func screen_text() -> String:
+	_update_watch()
+	return _watch_label.text if _watch_label != null else ""
+
+
 # ------------------------------------------------------- таймеры объекта ---
 
 ## Таймер экземпляра: у каждого врага свой, иначе десять врагов стреляли
@@ -958,6 +1123,7 @@ func _process(delta: float) -> void:
 	_mouse_moved_acc = false
 	_clock += delta
 	_update_camera(delta)
+	_update_watch()
 
 
 func _keycode(name: String) -> int:

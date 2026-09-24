@@ -46,6 +46,9 @@ func _ready() -> void:
 	print("—— эффекты ——")
 	await _test_effects()
 	await _test_hitstop_flash_fade()
+	print("—— списки, значения на экране ——")
+	_test_lists()
+	await _test_screen_values()
 	_finish()
 
 
@@ -413,7 +416,8 @@ func _test_effects() -> void:
 		if c is GdeFloatText:
 			ft = c
 	_ok(ft != null and ft.global_position.y < hero.global_position.y, "всплывающий текст: появился над объектом")
-	await _wait_ms(1100)
+	# Дым взрыва живёт дольше всех — до 1.2 с.
+	await _wait_ms(1500)
 	_ok(not is_instance_valid(ft) and _count("GdeDebris") == 0, "всплывающий текст и частицы растаяли сами")
 	_free([r, r2, hero])
 
@@ -437,6 +441,51 @@ func _test_hitstop_flash_fade() -> void:
 	_ok(fade.color.a > 0.9, "затемнение: экран потемнел")
 	await _wait_ms(250)
 	_ok(not Gde.is_fading() and fade.color.a < 0.01, "затемнение: проявился обратно")
+
+
+# ------------------------------------------- списки, значения на экране ---
+
+func _test_lists() -> void:
+	var r := _runner({"inv": [], "has_key": 0, "n": 0, "empty": 0}, [
+		_event([_cond("system.trigger_once", [])], [
+			_act("list.add", ["inv", "\"key\""]),
+			_act("list.add_number", ["inv", "5"]),
+			_act("list.add", ["inv", "\"sword\""]),
+			_act("var.modify", ["n", "=", "ListCount(inv)"]),
+		], [
+			_event([_cond("list.contains", ["inv", "\"key\""])], [_act("var.modify", ["has_key", "=", "1"])]),
+			_event([], [
+				_act("list.remove_value", ["inv", "\"5\""]),
+				_act("var.set_string", ["joined", "ListJoin(inv, \", \")"]),
+				_act("list.take_first", ["inv", "got"]),
+				_act("var.set_string", ["first", "ListItem(inv, 0)"]),
+			]),
+		]),
+		_event([_cond("list.empty", ["inv"])], [_act("var.modify", ["empty", "=", "1"])]),
+	])
+	_tick(r, 1)
+	_eq(Gde.var_get("n"), 3.0, "списки: добавили три элемента — ListCount 3")
+	_eq(Gde.var_get("has_key"), 1.0, "списки: «содержит key»")
+	_eq(Gde.var_get("joined"), "key, sword", "списки: число 5 убрано по тексту \"5\", ListJoin — «key, sword»")
+	_ok(Gde.var_get("got") == "key" and Gde.var_get("first") == "sword", "списки: вынули первый в переменную, дальше — sword")
+	_eq(Gde.var_get("empty"), 0.0, "списки: пока не пуст — «пуст» ложно")
+	Gde.list_clear("inv")
+	_tick(r, 1)
+	_eq(Gde.var_get("empty"), 1.0, "списки: очистили — «пуст»")
+	_free([r])
+
+
+func _test_screen_values() -> void:
+	Gde.show_value("hp", "3")
+	Gde.screen_log("hello")
+	await get_tree().process_frame
+	var t := Gde.screen_text()
+	_ok(t.contains("hp: 3") and t.contains("hello"), "на экране: значение и строка журнала")
+	await _wait_ms(650)
+	t = Gde.screen_text()
+	_ok(not t.contains("hp: 3") and t.contains("hello"), "на экране: переставшее обновляться значение исчезло, журнал держится")
+	Gde.clear_screen_values()
+	_ok(Gde.screen_text().is_empty(), "на экране: «убрать надписи»")
 
 
 # ------------------------------------------------------------------ лист ---
