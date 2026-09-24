@@ -8,6 +8,25 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.9.0
+
+- **Fast collisions**: "collides with", "has just collided", "touching from
+  above / below / the side" no longer compare every pair of instances. With
+  500 enemies and 300 bullets a sheet frame went from 1.7 s to a few
+  milliseconds; `tools/bench.tscn` keeps it that way. · **Быстрые
+  столкновения**: 500 врагов и 300 пуль — несколько миллисекунд вместо 1,7 с.
+- **Fix**: "Contact damage" added to an empty scene put its collision shape
+  next to the damage area instead of inside it, so it hit no one. Every
+  built-in behavior is now tested in an empty scene. · **Исправлено**:
+  «Урон при касании» в пустой сцене никого не бил.
+- **Help**: an instruction reference built from the library
+  (`docs/REFERENCE.md`), descriptions with examples for all expressions, and
+  a first-game tutorial with screenshots (`docs/TUTORIAL.md`); the sheets in
+  the docs are built by the tests. · **Справка**: справочник всех
+  инструкций, описания выражений, урок «Первая игра за 15 минут».
+- **Releases**: a tag `vX.Y.Z` runs the tests and attaches a zip with the
+  plugin to the GitHub release. · **Выпуски**: архив плагина собирается сам.
+
 ## 0.5.0
 
 - **Functions made of events**: own actions and conditions with object,

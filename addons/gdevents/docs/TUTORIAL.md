@@ -48,6 +48,8 @@ turns the scene into a `CharacterBody2D` with a collision shape and an
 pictures. If something is forgotten, the **Scene check** tab says what and
 offers a one-button fix.
 
+![The objects window: the Coin object with the Pickup behavior and its settings](images/objects_en.png)
+
 ## 4. The level
 
 Create a scene `level.tscn` with a **Node2D** root. Drag `player.tscn`,
@@ -61,6 +63,8 @@ Go back to the Events tab. An event is added with **Add event**, a
 condition and an action with the **+ Condition** and **+ Action** rows
 inside it. In the picker you choose the object on the left and the
 instruction on the right; the values go at the bottom of the window.
+
+![The picker: object Player on the left, the Health behavior's "has just died" chosen](images/picker_en.png)
 
 1. **The score on screen.** An event with no conditions (it runs every
    frame). Action: object `Score` → "Set the text" →
@@ -82,6 +86,8 @@ scene (F6). The sheet is saved and built by itself before every run.
 While the game runs, fired events light up green in the sheet, and the
 **GDevents** tab of Godot's debugger at the bottom shows the value of
 `coins`.
+
+![The finished sheet while the game runs: fired events are green](images/sheet_en.png)
 
 ## The finished sheet
 
