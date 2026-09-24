@@ -8,6 +8,23 @@ every such change comes with an automatic upgrade of old sheets.
 до 1.0.0 формат листа и id инструкций ещё могут меняться между версиями,
 и каждое такое изменение приходит с автоматическим обновлением старых листов.
 
+## 0.4.0
+
+- **Any of the conditions (OR)**: an event can join its conditions with OR
+  (event menu). · **Любое из условий (ИЛИ)** — из меню события.
+- **Local variables** of an event: reset on every run, seen by sub-events,
+  kept by "Wait". · **Локальные переменные** события.
+- **Shared sheets**: the "Include sheet" event builds another sheet's events
+  in place and adds its objects and variables. · **Общие листы**: событие
+  «Подключить лист».
+- **Find and replace** in a sheet (Ctrl+F) and **collapsing** events with
+  sub-events. · **Поиск и замена** (Ctrl+F) и **сворачивание** событий.
+- **A runtime error names the event**: the generated script carries a line
+  map, and a line under the Godot error says which event of which sheet
+  failed. · **Ошибка в игре называет событие** листа.
+- Sheet format 2 (older sheets are upgraded when opened). · Формат листа 2,
+  старые листы обновляются сами.
+
 ## 0.3.0
 
 - Sheets carry a format number. Older sheets are upgraded when opened, built

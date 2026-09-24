@@ -5,7 +5,7 @@
 GDevelop-style event sheets for Godot 4. Conditions and actions compile to
 ordinary, readable GDScript — there is no interpreter at runtime.
 
-**Version 0.3.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
+**Version 0.4.0** ([changes](CHANGELOG.md), MIT license): the event sheet editor, 34 ready-made behaviors, 244
 instructions, your own behaviors and extensions, scene and file checks, an
 English and Russian interface.
 
@@ -44,6 +44,29 @@ next to "2D / 3D / Script".
   right one: "there is no object “Plaer” in the sheet — did you mean
   “Player”?". Disabled events are not checked — people disable exactly what
   is broken for now.
+- **Any of the conditions (OR).** Event menu → "Any of the conditions": the
+  event runs when at least one condition is true. Instances picked by any
+  true condition stay picked. For "A and (B or C)" put the OR event with B
+  and C as a sub-event of the one with A.
+- **Local variables.** Event menu → "Local variables…", one per line:
+  `count = 0`, `name = "Bob"`. They live only in that event and its
+  sub-events, reset every time the event runs, travel with "Wait", and are
+  used with the same `Variable(count)` and "Change variable" as scene
+  variables (a local one hides a scene variable of the same name).
+- **Shared sheets.** "Add event → Include sheet" builds the events of another
+  sheet in its place, as if they were copied there, and adds its objects and
+  variables. Player controls, pause, score — written once, included in every
+  level; a change reaches all of them on the next build. A loop of includes
+  or a missing sheet is shown as an error on the include event.
+- **Find and replace (Ctrl+F).** Matching events are highlighted, Enter / F3
+  jump between them; "Replace all" changes parameter values, comments and
+  group names in one undo step.
+- **Collapsing.** The arrow in the header of an event or group with
+  sub-events hides them.
+- **Errors in the game name the event.** If a sheet's code fails while the
+  game runs, a line under the Godot error says which event of which sheet
+  it was: "the error above is in event 5 of sheet res://level.gdes.json:
+  IF Left key is pressed".
 
 ### Object check
 
@@ -363,7 +386,7 @@ What each number of its result line means is in the "Tests" section.
 
 ```jsonc
 {
-  "format": 1,
+  "format": 2,
   "extends": "Node2D",              // base class of the generated script
 
   "objects": [                      // object type = a .tscn scene
@@ -374,7 +397,9 @@ What each number of its result line means is in the "Tests" section.
 
   "events": [
     {
-      "type": "standard",           // standard | comment | group | foreach | repeat | while
+      "type": "standard",           // standard | comment | group | foreach | repeat | while | include
+      "any": false,                 // true — "any of the conditions" (OR)
+      "locals": { "count": 0 },     // local variables of the event
       "conditions": [
         { "id": "key.pressed", "params": ["Space"], "inverted": false }
       ],
@@ -388,7 +413,8 @@ What each number of its result line means is in the "Tests" section.
 ```
 
 Event types: `foreach` takes `"object"`, `repeat` — `"count"`, `comment` —
-`"text"`, `group` — `"name"`. Any event can be switched off for a while with
+`"text"`, `group` — `"name"`, `include` — `"sheet"` (path of the sheet to
+include). `"folded": true` only collapses an event in the editor. Any event can be switched off for a while with
 `"disabled": true`. Sub-events go only in `"children"`, NOT is
 `"inverted": true`; every parameter is a string, and text inside it is in
 quotes: `"\"Score: \" + ToString(Variable(score))"`. The exact ids of all

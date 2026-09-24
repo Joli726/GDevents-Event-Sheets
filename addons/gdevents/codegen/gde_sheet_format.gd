@@ -8,15 +8,27 @@
 class_name GdeSheetFormat
 extends RefCounted
 
-const CURRENT := 1
+## 2 — GDevents 0.4: «any», «locals», «folded», событие «include».
+const CURRENT := 2
 
-## Шаги обновления: STEPS[n] переводит лист из формата n в n+1.
+## Шаги обновления: steps()[n] переводит лист из формата n в n+1.
 ## Функция получает копию листа и возвращает обновлённую.
-static var STEPS: Dictionary = {}
+##
+## Функцией, а не статической переменной: у обычного (не @tool) скрипта
+## статические переменные в редакторе не инициализируются, и экспорт,
+## который собирает листы в редакторе, не видел ни одного шага.
+static func steps() -> Dictionary:
+	return {
+		# Формат 2 только добавил ключи: старый лист читается как есть. Номер
+		# растёт, чтобы плагин 0.3 не открыл новый лист и не потерял «или»
+		# и локальные переменные, которых он не знает.
+		1: func(d: Dictionary) -> Dictionary: return d,
+	}
 
 
 ## {"data": обновлённый лист, "from": был формат, "changed": bool, "error": ""}
-static func migrate(sheet: Dictionary, steps: Dictionary = STEPS, current: int = CURRENT) -> Dictionary:
+static func migrate(sheet: Dictionary, with_steps: Variant = null, current: int = CURRENT) -> Dictionary:
+	var steps_: Dictionary = with_steps if with_steps is Dictionary else steps()
 	var from := version_of(sheet)
 	var out := {"data": sheet, "from": from, "changed": false, "error": ""}
 	if from < 1:
@@ -28,10 +40,10 @@ static func migrate(sheet: Dictionary, steps: Dictionary = STEPS, current: int =
 	var data := sheet.duplicate(true)
 	var v := from
 	while v < current:
-		if not steps.has(v):
+		if not steps_.has(v):
 			out["error"] = GdeI18n.t("нет шага обновления листа из формата %d") % v
 			return out
-		data = (steps[v] as Callable).call(data)
+		data = (steps_[v] as Callable).call(data)
 		v += 1
 		data["format"] = v
 	# Лист без номера — из самых первых версий: формат 1, но номер допишем.
