@@ -681,20 +681,43 @@ func aabb(n: Node) -> Rect2:
 		for p: Vector2 in cp.polygon:
 			rp = rp.expand(p)
 		return Rect2(cp.global_position + rp.position, rp.size)
-	if n is Sprite2D:
-		var s := n as Sprite2D
+	# Формы нет — по картинке. Спрайт ищем по всему объекту: у «Node2D со
+	# спрайтом внутри» раньше выходил нулевой прямоугольник, и «курсор над
+	# объектом», «щелчок по объекту» и столкновения без форм молчали.
+	var spr := _find_sprite(n)
+	if spr is Sprite2D:
+		var s := spr as Sprite2D
 		if s.texture != null:
-			var sz := s.texture.get_size() * s.global_scale
-			return Rect2(s.global_position - sz * 0.5, sz)
-	if n is AnimatedSprite2D:
-		var a := n as AnimatedSprite2D
+			var sr := s.get_rect()
+			var gs := s.global_scale.abs()
+			return Rect2(s.global_position + sr.position * gs, sr.size * gs)
+	if spr is AnimatedSprite2D:
+		var a := spr as AnimatedSprite2D
 		var fr := a.sprite_frames
 		if fr != null and fr.has_animation(a.animation):
 			var tex := fr.get_frame_texture(a.animation, a.frame)
 			if tex != null:
-				var sz2 := tex.get_size() * a.global_scale
-				return Rect2(a.global_position - sz2 * 0.5, sz2)
+				var sz2 := tex.get_size() * a.global_scale.abs()
+				var at := a.global_position + a.offset * a.global_scale.abs()
+				if not a.centered:
+					at += sz2 * 0.5
+				return Rect2(at - sz2 * 0.5, sz2)
 	return Rect2(n2.global_position, Vector2.ZERO)
+
+
+## Первый спрайт объекта: сам узел или ближайший вглубь.
+func _find_sprite(n: Node) -> Node:
+	if n is Sprite2D or n is AnimatedSprite2D:
+		return n
+	for c: Node in n.get_children():
+		if c is Sprite2D or c is AnimatedSprite2D:
+			return c
+	for c: Node in n.get_children():
+		if not (c is GdeBehavior):
+			var r := _find_sprite(c)
+			if r != null:
+				return r
+	return null
 
 
 ## Столкновение двух объектов.

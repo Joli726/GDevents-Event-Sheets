@@ -29,9 +29,11 @@ const ABILITY := preload("res://addons/gdevents/behaviors/ability/ability.gd")
 const STATES := preload("res://addons/gdevents/behaviors/state_machine/state_machine.gd")
 const STICK := preload("res://addons/gdevents/behaviors/stick_to/stick_to.gd")
 const BAR := preload("res://addons/gdevents/behaviors/value_bar/value_bar.gd")
+const JUICE := preload("res://addons/gdevents/behaviors/juice/juice.gd")
+const MENU_BUTTON := preload("res://addons/gdevents/behaviors/menu_button/menu_button.gd")
 const RUNNER_SCENE := "user://gde_scenario_runner.tscn"
 
-const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states", "stick_to", "value_bar"]
+const SCENARIOS: Array[String] = ["patrol_enemy", "pathfinder", "homing", "orbit", "flock", "car", "grid_step", "platforms", "ladder", "pushable", "checkpoint", "destructible", "melee", "ability", "states", "stick_to", "value_bar", "juice", "menu_button"]
 
 var _fails: int = 0
 var _checks: int = 0
@@ -968,12 +970,149 @@ func _value_bar() -> void:
 	await _frames(2)
 
 
+func _juice() -> void:
+	print("— Сочность")
+	var w := _world()
+	w.position = Vector2(0, 32000)
+	_static(w, Vector2(0, 200), Vector2(4000, 20))
+	var hp: Array = _hero(w, Vector2(0, 170))
+	var hero: CharacterBody2D = hp[0]
+	var img := Image.create(16, 32, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	var spr := Sprite2D.new()
+	spr.texture = ImageTexture.create_from_image(img)
+	hero.add_child(spr)
+	var health := _beh(hero, HEALTH, {"max_health": 5.0, "invulnerable_time": 0.0, "blink_on_hit": false})
+	var dash := _beh(hero, ABILITY, {"kind": 0, "key": "", "duration": 0.25, "dash_speed": 500.0})
+	var jb := _beh(hero, JUICE, {})
+	await _frames(20)
+	(hp[1] as Node).call("simulate_jump")
+	await _frames(2)
+	await get_tree().process_frame
+	_ok(spr.scale.y > 1.05 and spr.scale.x < 0.95, "сочность: в прыжке вытянулся (%.2f × %.2f)" % [spr.scale.x, spr.scale.y])
+	var squashed := false
+	var dust := 0
+	for i in 90:
+		await get_tree().physics_frame
+		if spr.scale.x > 1.05 and spr.scale.y < 0.95:
+			squashed = true
+		for c: Node in get_children():
+			if c is GdeDebris and (c as GdeDebris).texture != spr.texture:
+				dust += 1
+		if squashed and dust > 0:
+			break
+	_ok(squashed, "сочность: при приземлении сплющился")
+	_ok(dust > 0, "сочность: пыль из-под ног")
+	await _frames(40)
+	_ok(spr.scale.distance_to(Vector2.ONE) < 0.02, "сочность: форма вернулась")
+	health.call("damage", 1.0)
+	await get_tree().process_frame
+	_ok(spr.self_modulate.r > 1.5, "сочность: вспышка при ударе")
+	await _frames(15)
+	_ok(spr.self_modulate == Color.WHITE, "сочность: вспышка погасла")
+	dash.call("use")
+	var ghosts := 0
+	for i in 10:
+		await get_tree().physics_frame
+	for c: Node in get_children():
+		if c is GdeDebris and (c as GdeDebris).texture == spr.texture:
+			ghosts += 1
+	_ok(ghosts >= 3, "сочность: шлейф при рывке (%d силуэтов)" % ghosts)
+	_ok(bool(jb.call("has_trail")), "сочность: условие «тянется шлейф»")
+	w.queue_free()
+	await _frames(2)
+
+
+func _menu_button() -> void:
+	print("— Кнопка меню")
+	var w := _world()
+	var img := Image.create(100, 30, false, Image.FORMAT_RGBA8)
+	var tex := ImageTexture.create_from_image(img)
+	var buttons: Array[Node2D] = []
+	var behs: Array[Node] = []
+	for i in 2:
+		var n := _node(w, Vector2(300, 200 + i * 60))
+		var s := Sprite2D.new()
+		s.texture = tex
+		n.add_child(s)
+		buttons.append(n)
+		behs.append(_beh(n, MENU_BUTTON, {"menu_name": "test"}))
+	var clicks: Array[int] = [0, 0]
+	behs[0].connect("clicked", func() -> void: clicks[0] += 1)
+	behs[1].connect("clicked", func() -> void: clicks[1] += 1)
+	_mouse_move(Vector2(300, 200))
+	await _wait_ms(200)
+	_ok(bool(behs[0].call("is_hovered")) and not bool(behs[1].call("is_hovered")), "кнопка: мышь навелась на первую")
+	_ok(buttons[0].scale.x > 1.04, "кнопка: при наведении увеличилась (%.2f)" % buttons[0].scale.x)
+	_mouse_button(Vector2(300, 200), true)
+	await _wait_ms(200)
+	_ok(buttons[0].scale.x < 1.0, "кнопка: при нажатии сжалась (%.2f)" % buttons[0].scale.x)
+	_mouse_button(Vector2(300, 200), false)
+	for i in 3:
+		await get_tree().process_frame
+	_eq(clicks[0], 1, "кнопка: отпустили — нажата один раз")
+	_ok(bool(behs[0].call("just_clicked")) or clicks[0] == 1, "кнопка: условие «только что нажали»")
+	# Стрелками: вниз — вторая, Enter — нажать её.
+	_mouse_move(Vector2(-500, -500))
+	for i in 3:
+		await get_tree().process_frame
+	await _action("ui_down")
+	_ok(bool(behs[1].call("is_selected")) and not bool(behs[0].call("is_selected")), "кнопка: стрелка вниз выбрала вторую")
+	await _action("ui_accept")
+	_eq(clicks[1], 1, "кнопка: Enter нажал выбранную")
+	# Выключенная не нажимается.
+	behs[1].call("set_enabled", false)
+	behs[1].call("click")
+	_eq(clicks[1], 1, "кнопка: выключенная не нажимается")
+	w.queue_free()
+	await _frames(2)
+
+
+func _mouse_move(at: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = at
+	ev.global_position = at
+	Input.parse_input_event(ev)
+
+
+func _mouse_button(at: Vector2, down: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.position = at
+	ev.global_position = at
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = down
+	Input.parse_input_event(ev)
+
+
+func _action(name: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = name
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	for i in 3:
+		await get_tree().process_frame
+	var up := InputEventAction.new()
+	up.action = name
+	up.pressed = false
+	Input.parse_input_event(up)
+	for i in 2:
+		await get_tree().process_frame
+
+
 # ---------------------------------------------------------------- мир ---
 
 func _world() -> Node2D:
 	var w := Node2D.new()
 	add_child(w)
 	return w
+
+
+## Подождать настоящее время: кадры отрисовки без экрана идут неровно и
+## куда чаще 60 в секунду, а плавные анимации считают секунды.
+func _wait_ms(ms: int) -> void:
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < ms:
+		await get_tree().process_frame
 
 
 func _frames(n: int) -> void:
