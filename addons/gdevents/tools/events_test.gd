@@ -28,6 +28,10 @@ func _ready() -> void:
 	await _test_touch_start()
 	await _test_touch_end()
 	await _test_touch_sides()
+	print("—— подождать ——")
+	_test_wait_basic()
+	_test_wait_keeps_picking()
+	_test_wait_chain_and_children()
 	_finish()
 
 
@@ -94,6 +98,66 @@ func _test_touch_sides() -> void:
 	_tick(r, 1)
 	_ok(Gde.var_get("bottom") == 1.0 and Gde.var_get("top") == 0.0, "касается снизу: упёрся снизу")
 	_free([r, hero, spike])
+
+
+# ------------------------------------------------------------ подождать ---
+
+func _test_wait_basic() -> void:
+	var r := _runner({"a": 0, "b": 0}, [
+		_event([_cond("system.trigger_once", [])], [
+			_act("var.modify", ["a", "=", "1"]),
+			_act("system.wait", ["0.5"]),
+			_act("var.modify", ["b", "=", "1"]),
+		]),
+		_event([_cond("system.waiting", [])], [_act("var.modify", ["w", "=", "1"])]),
+	])
+	_tick(r, 10)
+	_ok(Gde.var_get("a") == 1.0 and Gde.var_get("b") == 0.0, "подождать: что выше — сразу, что ниже — ещё нет")
+	_eq(Gde.var_get("w", 0.0), 1.0, "подождать: условие «идёт ожидание»")
+	_tick(r, 25)
+	_eq(Gde.var_get("b"), 1.0, "подождать: через полсекунды выполнилось")
+	Gde.var_set("w", 0.0)
+	_tick(r, 2)
+	_eq(Gde.var_get("w", 0.0), 0.0, "подождать: ожидание кончилось — условие ложно")
+	_free([r])
+
+
+func _test_wait_keeps_picking() -> void:
+	var coins: Array = []
+	for x: float in [10.0, 200.0, 400.0]:
+		coins.append(_thing("Coin", Vector2(x, 0), Vector2(8, 8)))
+	var r := _runner({}, [
+		_event([_cond("system.trigger_once", []), _cond("pick.nearest", ["Coin", "0", "0"])], [
+			_act("system.wait", ["0.2"]),
+			_act("object.delete", ["Coin"]),
+		]),
+	])
+	_tick(r, 5)
+	_eq(Gde.all_instances("Coin").size(), 3, "подождать: пока ждём — все монеты на месте")
+	_tick(r, 15)
+	var left := Gde.all_instances("Coin")
+	_ok(left.size() == 2 and not left.has(coins[0]), "подождать: удалена именно отобранная до ожидания")
+	_free([r] + coins)
+
+
+func _test_wait_chain_and_children() -> void:
+	var r := _runner({"x": 0, "y": 0, "c": 0}, [
+		_event([_cond("system.trigger_once", [])], [
+			_act("system.wait", ["0.1"]),
+			_act("var.modify", ["x", "=", "1"]),
+			_act("system.wait", ["0.2"]),
+			_act("var.modify", ["y", "=", "1"]),
+		], [
+			_event([], [_act("var.modify", ["c", "+", "1"])]),
+		]),
+	])
+	_tick(r, 3)
+	_ok(Gde.var_get("x") == 0.0 and Gde.var_get("c") == 0.0, "подождать: подсобытия тоже ждут")
+	_tick(r, 6)
+	_ok(Gde.var_get("x") == 1.0 and Gde.var_get("y") == 0.0, "подождать дважды: после первого — только своё")
+	_tick(r, 13)
+	_ok(Gde.var_get("y") == 1.0 and Gde.var_get("c") == 1.0, "подождать дважды: после второго — остальное и подсобытие, один раз")
+	_free([r])
 
 
 # ------------------------------------------------------------------ лист ---

@@ -259,6 +259,46 @@ func timer_advance(runner: Node, delta: float) -> void:
 	for k: Variant in e:
 		e[k] = float(e[k]) + delta
 	_every[id] = e
+	_advance_waits(runner, delta)
+
+
+# ------------------------------------------------------------ ожидание ---
+
+## Отложенные «Подождать N секунд»: {"runner": id раннера, "left", "fn"}.
+var _waits: Array = []
+
+
+func wait(runner: Node, seconds: float, fn: Callable) -> void:
+	_waits.append({"runner": runner.get_instance_id(), "left": maxf(0.0, seconds), "fn": fn})
+
+
+## Ожидания раннера идут вместе с его кадрами: на паузе стоят, а в начале
+## кадра, когда время вышло, выполняют отложенное — до событий листа.
+func _advance_waits(runner: Node, delta: float) -> void:
+	if _waits.is_empty():
+		return
+	var id := runner.get_instance_id()
+	var due: Array = []
+	for w: Dictionary in _waits:
+		if int(w["runner"]) == id:
+			w["left"] = float(w["left"]) - delta
+			if float(w["left"]) <= 0.0:
+				due.append(w)
+	for w: Dictionary in due:
+		_waits.erase(w)
+		var fn: Callable = w["fn"]
+		if fn.is_valid():
+			fn.call()
+
+
+## Сколько отложенного ждёт у раннера — для условия «идёт ожидание».
+func waits_pending(runner: Node) -> float:
+	var id := runner.get_instance_id()
+	var n := 0
+	for w: Dictionary in _waits:
+		if int(w["runner"]) == id:
+			n += 1
+	return float(n)
 
 
 func timer_value(runner: Node, name: String) -> float:
@@ -306,6 +346,11 @@ func begin_scene(initial: Dictionary) -> void:
 ## Состояние раннеров хранится по id экземпляра. Раннеры ушедшей сцены
 ## освобождены — их записи больше никому не нужны.
 func _forget_dead_runners() -> void:
+	var alive: Array = []
+	for w: Dictionary in _waits:
+		if is_instance_id_valid(int(w["runner"])):
+			alive.append(w)
+	_waits = alive
 	for store: Dictionary in [_once, _every, _runner_frames, _timers_paused, _touch]:
 		for id: Variant in store.keys():
 			if not is_instance_id_valid(int(id)):

@@ -180,16 +180,7 @@ func _gen_standard(e: Dictionary, indent: int, parent_ctx: String) -> void:
 		_line(indent, "if %s:" % _join_conds(conds, indent))
 		body = indent + 1
 
-	var emitted := false
-	for a: Dictionary in e.get("actions", []):
-		if _gen_action(a, ctx, body):
-			emitted = true
-
-	var children: Array = e.get("children", [])
-	if not children.is_empty():
-		_gen_events(children, body, ctx)
-		emitted = true
-
+	var emitted := _gen_body(e.get("actions", []), e.get("children", []), ctx, body)
 	if not emitted and body > indent:
 		_line(body, "pass")
 
@@ -217,15 +208,7 @@ func _gen_foreach(e: Dictionary, indent: int, parent_ctx: String) -> void:
 		_line(indent + 1, "if %s:" % _join_conds(conds, indent + 1))
 		body = indent + 2
 
-	var emitted := false
-	for a: Dictionary in e.get("actions", []):
-		if _gen_action(a, inner, body):
-			emitted = true
-	var children: Array = e.get("children", [])
-	if not children.is_empty():
-		_gen_events(children, body, inner)
-		emitted = true
-	if not emitted:
+	if not _gen_body(e.get("actions", []), e.get("children", []), inner, body):
 		_line(body, "pass")
 
 
@@ -240,15 +223,7 @@ func _gen_repeat(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent, "for %s in range(int(%s)):" % [it, n["code"]])
 	var inner := _new_ctx()
 	_line(indent + 1, _ctx_decl(inner, "%s.copy()" % outer))
-	var emitted := false
-	for a: Dictionary in e.get("actions", []):
-		if _gen_action(a, inner, indent + 1):
-			emitted = true
-	var children: Array = e.get("children", [])
-	if not children.is_empty():
-		_gen_events(children, indent + 1, inner)
-		emitted = true
-	if not emitted:
+	if not _gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1):
 		_line(indent + 1, "pass")
 
 
@@ -275,9 +250,39 @@ func _gen_while(e: Dictionary, indent: int, parent_ctx: String) -> void:
 	_line(indent + 1, "if %s > %d:" % [guard, MAX_WHILE_ITERATIONS])
 	_line(indent + 2, "push_error(%s)" % _quote(GdeI18n.t("GDevents: событие «Пока» превысило %d итераций") % MAX_WHILE_ITERATIONS))
 	_line(indent + 2, "break")
-	for a: Dictionary in e.get("actions", []):
-		_gen_action(a, inner, indent + 1)
-	_gen_events(e.get("children", []), indent + 1, inner)
+	_gen_body(e.get("actions", []), e.get("children", []), inner, indent + 1)
+
+
+## Действия и подсобытия события. «Подождать N секунд» уносит всё, что
+## стоит после него, в отложенную функцию: она выполнится позже с той же
+## выборкой — контекст захватывается вместе с ней, как в GDevelop.
+func _gen_body(actions: Array, children: Array, ctx: String, indent: int) -> bool:
+	var emitted := false
+	var cur := indent
+	var opened: Array[int] = []
+	for a: Dictionary in actions:
+		var d: Variant = _reg.action(str(a.get("id", "")))
+		if d is Dictionary and bool((d as Dictionary).get("defer", false)) and not a.get("disabled", false):
+			_act_i += 1
+			_inst = ["actions", _act_i]
+			var p := _compile_params(d, a.get("params", []), ctx, str(a.get("id", "")))
+			var secs: String = (p["args"] as Array)[0] if not (p["args"] as Array).is_empty() else "0.0"
+			_line(cur, "Gde.wait(self, float(%s), func() -> void:" % secs)
+			opened.append(_out.size())
+			cur += 1
+			emitted = true
+			continue
+		if _gen_action(a, ctx, cur):
+			emitted = true
+	if not children.is_empty():
+		_gen_events(children, cur, ctx)
+		emitted = true
+	while not opened.is_empty():
+		if _out.size() == opened.pop_back():
+			_line(cur, "pass")
+		cur -= 1
+		_line(cur, ")")
+	return emitted
 
 
 # -------------------------------------------------------- условия/действия ---

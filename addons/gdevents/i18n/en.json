@@ -828,5 +828,9 @@
 	"_PARAM0_ касается _PARAM1_ снизу": "_PARAM0_ touches _PARAM1_ from below",
 	"Первый объект упёрся во второй снизу — удар головой о блок.": "The first object has bumped into the second one from below — hitting a block with the head.",
 	"_PARAM0_ касается _PARAM1_ сбоку": "_PARAM0_ touches _PARAM1_ from the side",
-	"Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага.": "A touch from the left or right — the enemy touched the player, not the player jumping on the enemy."
+	"Касание слева или справа — враг задел игрока, а не игрок прыгнул на врага.": "A touch from the left or right — the enemy touched the player, not the player jumping on the enemy.",
+	"Подождать _PARAM0_ секунд, затем — всё, что ниже": "Wait _PARAM0_ seconds, then everything below",
+	"Всё, что стоит ниже в этом событии, и его подсобытия выполнятся через N секунд — с теми же отобранными объектами. Как «Подождать» в GDevelop: вспышка, пауза, взрыв.": "Everything below in this event and its sub-events run after N seconds — with the same picked objects. Like “Wait” in GDevelop: a flash, a pause, an explosion.",
+	"Идёт ожидание («Подождать»)": "A wait is running (“Wait”)",
+	"Истинно, пока в этом листе что-то отложено действием «Подождать» и ещё не выполнилось. Чтобы не запускать то же самое второй раз.": "True while something in this sheet is delayed by the “Wait” action and has not run yet. So as not to start the same thing a second time."
 }
