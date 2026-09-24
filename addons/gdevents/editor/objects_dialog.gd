@@ -1,8 +1,9 @@
 ## Объекты листа и их поведения — аналог редактора объектов в GDevelop.
 ##
-## Слева список объектов, справа выбранный: сцена и поведения.
+## Слева список объектов, справа выбранный: сцена, поведения и проверка.
 ## Кнопка «Добавить поведение» сама кладёт ноду в сцену объекта —
-## вручную лезть в дерево сцены больше не нужно.
+## вручную лезть в дерево сцены больше не нужно. Щелчок по поведению
+## открывает рядом его настройки, как в GDevelop.
 @tool
 class_name GdeObjectsDialog
 extends AcceptDialog
@@ -26,6 +27,13 @@ var _error: Label
 
 var _checks: VBoxContainer
 var _checks_caption: Label
+
+var _tabs: TabContainer
+var _beh_panel: GdeBehaviorPanel
+var _beh_group: ButtonGroup
+var _selected_behavior: String = ""
+## имя поведения -> путь его узла в сцене объекта
+var _beh_nodes: Dictionary = {}
 
 var _beh_picker: GdeBehaviorPicker
 var _confirm_delete: ConfirmationDialog
@@ -99,23 +107,56 @@ func _init() -> void:
 	open_btn.pressed.connect(_open_scene)
 	scene_row.add_child(open_btn)
 
-	_detail.add_child(HSeparator.new())
-	_detail.add_child(_caption("ПОВЕДЕНИЯ"))
+	# Две вкладки: поведения с их настройками и проверка сцены. Вместе на
+	# одном экране им тесно — настройки «Выстрела» одни занимают три экрана.
+	_tabs = TabContainer.new()
+	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_detail.add_child(_tabs)
 
+	var beh_split := HSplitContainer.new()
+	beh_split.name = "Поведения"
+	_tabs.add_child(beh_split)
+
+	var beh_col := VBoxContainer.new()
+	beh_col.custom_minimum_size = Vector2(250, 0)
+	beh_col.add_theme_constant_override("separation", 6)
+	beh_split.add_child(beh_col)
+
+	var beh_scroll := ScrollContainer.new()
+	beh_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	beh_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	beh_col.add_child(beh_scroll)
 	_behaviors = VBoxContainer.new()
-	_behaviors.add_theme_constant_override("separation", 4)
-	_detail.add_child(_behaviors)
+	_behaviors.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_behaviors.add_theme_constant_override("separation", 2)
+	beh_scroll.add_child(_behaviors)
 
 	var add_beh := Button.new()
 	add_beh.text = "  Добавить поведение"
 	add_beh.icon = GdeIcons.get_icon("plus")
 	add_beh.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_beh.pressed.connect(_open_behavior_picker)
-	_detail.add_child(add_beh)
+	beh_col.add_child(add_beh)
 
-	_detail.add_child(HSeparator.new())
+	var beh_right := PanelContainer.new()
+	beh_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	beh_right.add_theme_stylebox_override("panel", _panel_style())
+	beh_split.add_child(beh_right)
+	_beh_panel = GdeBehaviorPanel.new()
+	_beh_panel.message.connect(func(text: String, is_error: bool) -> void:
+		if is_error:
+			_set_error(text)
+		else:
+			_set_note(text)
+			_update_file(_current_scene()))
+	beh_right.add_child(_beh_panel)
+
+	var checks_tab := VBoxContainer.new()
+	checks_tab.name = "Проверка сцены"
+	checks_tab.add_theme_constant_override("separation", 6)
+	_tabs.add_child(checks_tab)
 	_checks_caption = _caption("ПРОВЕРКА СЦЕНЫ")
-	_detail.add_child(_checks_caption)
+	checks_tab.add_child(_checks_caption)
 
 	# Прокрутка обязательна: длинные пояснения с переносом иначе раздули бы
 	# минимальную высоту диалога и вытолкнули его за край экрана.
@@ -123,7 +164,7 @@ func _init() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.custom_minimum_size = Vector2(0, 90)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_detail.add_child(scroll)
+	checks_tab.add_child(scroll)
 	_checks = VBoxContainer.new()
 	_checks.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_checks.add_theme_constant_override("separation", 6)
@@ -199,6 +240,11 @@ func _init() -> void:
 	_confirm_delete.confirmed.connect(_do_remove_object)
 	add_child(_confirm_delete)
 
+	# Окно закрыли, пока правка настройки ждала записи, — записать сейчас.
+	visibility_changed.connect(func() -> void:
+		if not visible and _beh_panel.settings.has_pending():
+			_beh_panel.settings.flush())
+
 
 func _caption(text: String) -> Label:
 	var l := Label.new()
@@ -230,7 +276,7 @@ func open_for(doc: GdeSheetDocument, reg: GdeRegistry) -> void:
 	_name_edit.text = ""
 	_scene_edit.text = ""
 	_refresh_list()
-	GdeUi.popup_fit(self, Vector2i(960, 720))
+	GdeUi.popup_fit(self, Vector2i(1200, 880))
 
 
 # ------------------------------------------------------------------ список ---
@@ -298,6 +344,8 @@ func _refresh_behaviors() -> void:
 	for c: Node in _behaviors.get_children():
 		_behaviors.remove_child(c)
 		c.queue_free()
+	_beh_nodes.clear()
+	_beh_group = ButtonGroup.new()
 
 	_refresh_checks()
 	var scene := _current_scene()
@@ -307,6 +355,7 @@ func _refresh_behaviors() -> void:
 		miss.modulate = Color(0.92, 0.45, 0.45)
 		miss.clip_text = true
 		_behaviors.add_child(miss)
+		_beh_panel.show_empty("")
 		return
 
 	var found := GdeBehaviorInstaller.scan(scene)
@@ -315,41 +364,38 @@ func _refresh_behaviors() -> void:
 		none.text = "Поведений нет."
 		none.modulate = Color(1, 1, 1, 0.45)
 		_behaviors.add_child(none)
+		_beh_panel.show_empty("У объекта пока нет поведений. Поведение — это готовая способность: " +
+				"бегать и прыгать, стрелять, получать урон. Добавьте первое кнопкой слева внизу.")
 		return
 
+	var names: Array[String] = []
 	for e: Dictionary in found:
 		var bname := str(e["name"])
+		names.append(bname)
+		_beh_nodes[bname] = str(e["node"])
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", 2)
 
 		var b: Variant = _reg.behaviors.get(bname) if _reg != null else null
-		var icon := TextureRect.new()
-		icon.texture = GdeIcons.get_icon(str((b as Dictionary).get("icon", "behavior")) if b != null else "behavior")
-		icon.custom_minimum_size = Vector2(18, 18)
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		row.add_child(icon)
-
-		var label := Label.new()
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var pick := Button.new()
+		pick.toggle_mode = true
+		pick.button_group = _beh_group
+		_style_pick(pick)
+		pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		pick.clip_text = true
+		pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pick.icon = GdeIcons.get_icon(str((b as Dictionary).get("icon", "behavior")) if b != null else "behavior")
+		pick.set_meta("gde_behavior", bname)
 		if b != null:
-			label.text = str((b as Dictionary).get("title", bname))
-			label.tooltip_text = "%s\n\nУзел в сцене: %s" \
+			pick.text = str((b as Dictionary).get("title", bname))
+			pick.tooltip_text = "%s\n\nУзел в сцене: %s" \
 					% [str((b as Dictionary).get("description", "")), str(e["node"])]
 		else:
-			label.text = bname
-			label.modulate = Color(0.92, 0.65, 0.35)
-			label.tooltip_text = "Скрипт поведения не найден в проекте"
-		row.add_child(label)
-
-		# Где именно лежит поведение — важно: в живой сцене оно редко
-		# висит на корне, а понять это раньше было негде.
-		var where := Label.new()
-		where.text = str(e["node"])
-		where.add_theme_font_size_override("font_size", 10)
-		where.modulate = Color(1, 1, 1, 0.35)
-		where.clip_text = true
-		where.custom_minimum_size = Vector2(150, 0)
-		row.add_child(where)
+			pick.text = bname
+			pick.modulate = Color(0.92, 0.65, 0.35)
+			pick.tooltip_text = "Скрипт поведения не найден в проекте"
+		pick.pressed.connect(_select_behavior.bind(bname))
+		row.add_child(pick)
 
 		var del := Button.new()
 		del.icon = GdeIcons.get_icon("trash")
@@ -359,6 +405,43 @@ func _refresh_behaviors() -> void:
 		row.add_child(del)
 
 		_behaviors.add_child(row)
+
+	# Выбранное поведение переживает обновление списка — и переход к другому
+	# объекту с тем же поведением: сравнивать настройки так удобнее.
+	_select_behavior(_selected_behavior if names.has(_selected_behavior) else names[0])
+
+
+## Строка поведения: без рамки, пока не выбрана, и с подсветкой выбранной —
+## у плоской кнопки Godot подсветки нажатия нет вовсе.
+func _style_pick(b: Button) -> void:
+	var none := StyleBoxEmpty.new()
+	none.set_content_margin_all(4)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(1, 1, 1, 0.05)
+	hover.set_content_margin_all(4)
+	hover.set_corner_radius_all(3)
+	var on := StyleBoxFlat.new()
+	on.bg_color = Color(0.36, 0.55, 0.9, 0.22)
+	on.border_color = Color(0.45, 0.62, 0.95, 0.9)
+	on.border_width_left = 3
+	on.set_content_margin_all(4)
+	on.set_corner_radius_all(3)
+	b.add_theme_stylebox_override("normal", none)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", on)
+	b.add_theme_stylebox_override("hover_pressed", on)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+
+## Показать настройки поведения справа.
+func _select_behavior(bname: String) -> void:
+	_selected_behavior = bname
+	for row: Node in _behaviors.get_children():
+		for c: Node in row.get_children():
+			if c is Button and c.has_meta("gde_behavior"):
+				(c as Button).set_pressed_no_signal(str(c.get_meta("gde_behavior")) == bname)
+	_beh_panel.show_behavior(_current_scene(), bname, _reg,
+			_doc.object_names() if _doc != null else [], str(_beh_nodes.get(bname, "")))
 
 
 ## Находки проверки для выбранного объекта, с кнопками исправления.
@@ -371,8 +454,10 @@ func _refresh_checks() -> void:
 	var scene := _current_scene()
 	if scene.is_empty() or not ResourceLoader.exists(scene):
 		_checks_caption.text = "ПРОВЕРКА СЦЕНЫ"
+		_set_checks_tab(0)
 		return
 	var found := GdeSceneCheck.check(scene, _reg, _doc.object_names())
+	_set_checks_tab(found.size())
 	if found.is_empty():
 		_checks_caption.text = "ПРОВЕРКА СЦЕНЫ — ВСЁ В ПОРЯДКЕ"
 		var ok := Label.new()
@@ -384,6 +469,15 @@ func _refresh_checks() -> void:
 	_checks_caption.text = "ПРОВЕРКА СЦЕНЫ — НАХОДОК: %d" % found.size()
 	for it: Dictionary in found:
 		_checks.add_child(_check_row(scene, it))
+
+
+## Число находок — прямо на ярлычке вкладки: иначе их не видно, пока
+## смотришь на поведения.
+func _set_checks_tab(n: int) -> void:
+	if _tabs == null or _tabs.get_tab_count() < 2:
+		return
+	_tabs.set_tab_title(1, "Проверка сцены" if n == 0 else "Проверка сцены · %d" % n)
+	_tabs.set_tab_icon(1, GdeIcons.get_icon("warning") if n > 0 else null)
 
 
 func _check_row(scene: String, it: Dictionary) -> Control:
@@ -458,6 +552,7 @@ func open_on_problem(doc: GdeSheetDocument, reg: GdeRegistry, object_name: Strin
 			_selected = i
 			break
 	open_for(doc, reg)
+	_tabs.current_tab = 1
 
 
 func _open_behavior_picker() -> void:
@@ -480,25 +575,31 @@ func _install_behavior(bname: String, script_path: String) -> void:
 	if b != null:
 		spec = {"target": (b as Dictionary).get("target", ""),
 				"needs": (b as Dictionary).get("needs", [])}
+	await _beh_panel.settings.flush()
 	var res := await GdeBehaviorInstaller.add(scene, bname, script_path, spec)
 	var err := str(res.get("error", ""))
 	if not err.is_empty():
 		_set_error(err)
 		return
 	_clear_error()
+	# Как в GDevelop: поставил поведение — сразу видишь его настройки.
+	_selected_behavior = bname
+	_tabs.current_tab = 0
 	_refresh_behaviors()
 	_rescan_filesystem()
 	var created: Array = res.get("created", [])
 	if not created.is_empty():
-		_set_note("Для этого поведения в сцену добавлено: %s" % ", ".join(created))
+		_set_note("Поведение добавлено, настройки — справа. Для него в сцену добавлено: %s" % ", ".join(created))
 	else:
-		_set_note("Поведение добавлено. Его настройки — в инспекторе сцены")
+		_set_note("Поведение добавлено, его настройки — справа")
 
 
 func _uninstall_behavior(bname: String) -> void:
 	var scene := _current_scene()
 	if scene.is_empty():
 		return
+	# Недописанная правка настроек не должна прилететь в уже снятое поведение.
+	await _beh_panel.settings.flush()
 	var err := await GdeBehaviorInstaller.remove(scene, bname)
 	if not err.is_empty():
 		_set_error(err)
@@ -562,15 +663,25 @@ func _do_remove_object() -> void:
 
 func _open_scene() -> void:
 	var scene := _current_scene()
-	if scene.is_empty() or not Engine.has_singleton("EditorInterface"):
+	if scene.is_empty() or not _in_editor():
 		return
 	var ei: Object = Engine.get_singleton("EditorInterface")
 	ei.call("open_scene_from_path", scene)
 	hide()
 
 
+## Сообщить редактору, что файл сцены переписан, — без полного пересканирования.
+func _update_file(path: String) -> void:
+	if path.is_empty() or not _in_editor():
+		return
+	var ei: Object = Engine.get_singleton("EditorInterface")
+	var fs: Object = ei.call("get_resource_filesystem")
+	if fs != null:
+		fs.call("update_file", path)
+
+
 func _rescan_filesystem() -> void:
-	if not Engine.has_singleton("EditorInterface"):
+	if not _in_editor():
 		return
 	var ei: Object = Engine.get_singleton("EditorInterface")
 	var fs: Object = ei.call("get_resource_filesystem")
@@ -617,6 +728,12 @@ func _set_note(text: String) -> void:
 
 func _clear_error() -> void:
 	_error.text = ""
+
+
+## Engine.has_singleton("EditorInterface") верит и вне редактора, а
+## get_singleton тогда падает — в запущенной сцене (тестах) окно тоже живёт.
+static func _in_editor() -> bool:
+	return Engine.is_editor_hint() and Engine.has_singleton("EditorInterface")
 
 
 static func _is_valid_name(n: String) -> bool:

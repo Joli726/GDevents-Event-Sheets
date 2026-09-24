@@ -400,6 +400,57 @@ static func properties(scene_path: String, bname: String) -> Dictionary:
 
 
 static func set_property(scene_path: String, bname: String, prop: String, value: Variant) -> String:
+	return await edit_behavior(scene_path, bname, func(node: Node) -> String:
+		node.set(prop, value)
+		return "")
+
+
+## Всё, что нужно окну настроек поведения:
+## {"node": путь узла от корня, "script": путь скрипта,
+##  "props": [{"name", "type", "hint", "hint_string", "group", "value", "default"}],
+##  "animations": имена анимаций сцены — для настроек вида *_animation}.
+## Порядок props — как в исходнике поведения. Пустой словарь — поведения нет.
+static func describe(scene_path: String, bname: String) -> Dictionary:
+	var out: Variant = read(scene_path, func(root: Node) -> Variant:
+		var node := _find_behavior(root, bname)
+		if node == null:
+			return {}
+		var scr := node.get_script() as Script
+		var props: Array = []
+		var group := ""
+		for p: Dictionary in node.get_property_list():
+			var usage := int(p.get("usage", 0))
+			if (usage & PROPERTY_USAGE_CATEGORY) != 0:
+				group = ""
+				continue
+			if (usage & PROPERTY_USAGE_GROUP) != 0:
+				group = str(p["name"])
+				continue
+			if (usage & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or (usage & PROPERTY_USAGE_EDITOR) == 0:
+				continue
+			var nm := str(p["name"])
+			props.append({
+				"name": nm,
+				"type": int(p.get("type", TYPE_NIL)),
+				"hint": int(p.get("hint", PROPERTY_HINT_NONE)),
+				"hint_string": str(p.get("hint_string", "")),
+				"group": group,
+				"value": node.get(nm),
+				"default": scr.get_property_default_value(nm) if scr != null else null,
+			})
+		return {
+			"node": String(root.get_path_to(node)),
+			"script": scr.resource_path if scr != null else "",
+			"props": props,
+			"animations": GdeSceneCheck._sprite_frames(root),
+		})
+	return out if out is Dictionary else {}
+
+
+## Изменить поведение на объекте. fn получает узел поведения и возвращает
+## текст ошибки или "". В открытой вкладке правка ложится в историю
+## редактора — Ctrl+Z в сцене отменит и её.
+static func edit_behavior(scene_path: String, bname: String, fn: Callable) -> String:
 	var session := await _begin(scene_path)
 	var root: Node = session.get("root")
 	if root == null:
@@ -408,10 +459,50 @@ static func set_property(scene_path: String, bname: String, prop: String, value:
 	if node == null:
 		_abort(session)
 		return "поведения «%s» на объекте нет" % bname
-	node.set(prop, value)
-	var err := await _commit(session)
+	var live := bool(session.get("live", false))
+	var before := _script_values(node)
+	var err := str(fn.call(node))
+	if not err.is_empty():
+		if live:
+			for k: String in before:
+				node.set(k, before[k])
+		_abort(session)
+		return err
+	if live:
+		_record_undo(node, bname, before, _script_values(node))
+	err = await _commit(session)
 	invalidate(scene_path)
 	return err
+
+
+static func _script_values(node: Node) -> Dictionary:
+	var out: Dictionary = {}
+	for p: Dictionary in node.get_property_list():
+		var usage := int(p.get("usage", 0))
+		if (usage & PROPERTY_USAGE_SCRIPT_VARIABLE) != 0 and (usage & PROPERTY_USAGE_STORAGE) != 0:
+			out[str(p["name"])] = node.get(str(p["name"]))
+	return out
+
+
+## Уже применённую правку — в историю редактора, не применяя повторно.
+static func _record_undo(node: Node, bname: String, before: Dictionary, after: Dictionary) -> void:
+	var ei := _editor()
+	if ei == null or not ei.has_method("get_editor_undo_redo"):
+		return
+	var ur: Object = ei.call("get_editor_undo_redo")
+	if ur == null:
+		return
+	var changed: Array[String] = []
+	for k: String in after:
+		if not before.has(k) or typeof(before[k]) != typeof(after[k]) or before[k] != after[k]:
+			changed.append(k)
+	if changed.is_empty():
+		return
+	ur.call("create_action", "Настройки поведения «%s»" % bname, UndoRedo.MERGE_DISABLE, node)
+	for k: String in changed:
+		ur.call("add_do_property", node, k, after[k])
+		ur.call("add_undo_property", node, k, before.get(k))
+	ur.call("commit_action", false)
 
 
 # ------------------------------------------------------------- вспомогательное ---
