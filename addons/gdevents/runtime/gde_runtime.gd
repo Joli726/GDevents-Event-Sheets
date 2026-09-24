@@ -366,12 +366,12 @@ func timer_advance(runner: Node, delta: float) -> void:
 
 ## Имена эффектов, по-английски и по-русски.
 const EFFECTS := {
-	"explosion": "explosion", "взрыв": "explosion",
-	"sparks": "sparks", "искры": "sparks",
-	"dust": "dust", "пыль": "dust",
-	"smoke": "smoke", "дым": "smoke",
-	"magic": "magic", "волшебство": "magic", "магия": "magic",
-	"confetti": "confetti", "конфетти": "confetti",
+	"explosion": "explosion", "взрыв": "explosion",  # i18n: ключ — так пишут в листе
+	"sparks": "sparks", "искры": "sparks",  # i18n: ключ
+	"dust": "dust", "пыль": "dust",  # i18n: ключ
+	"smoke": "smoke", "дым": "smoke",  # i18n: ключ
+	"magic": "magic", "волшебство": "magic", "магия": "magic",  # i18n: ключ
+	"confetti": "confetti", "конфетти": "confetti",  # i18n: ключ
 }
 
 var _soft_dot: Texture2D = null
